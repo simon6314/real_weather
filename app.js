@@ -463,8 +463,8 @@ async function fetchAllWeatherData() {
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
-  // Use Cache if younger than 1 Hour (3,600,000 ms) and fully valid
-  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 3600000) {
+  // Use Cache if younger than 10 Minutes (600,000 ms) and fully valid to ensure fresh observations
+  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
     try {
       const parsedData = JSON.parse(cachedDataStr);
       // Validate county cache integrity
@@ -814,6 +814,12 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         
         const timeStr = timeItem.dataTime;
         const timeVal = new Date(timeStr);
+        
+        // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
+        if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
+          continue;
+        }
+        
         const temp = timeItem.elementValue?.[0] ? parseInt(timeItem.elementValue[0].value) : NaN;
         if (isNaN(temp)) continue;
         
@@ -2052,7 +2058,7 @@ async function fetchCwaTownshipData(countyName) {
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
-  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 3600000) {
+  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
     try {
       const parsedTowns = JSON.parse(cachedDataStr);
       
@@ -2245,6 +2251,11 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       
       const timeStr = timeItem.DataTime || timeItem.dataTime;
       const timeVal = new Date(timeStr);
+      
+      // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
+      if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
+        continue;
+      }
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
       const temp = parseFloat(getValueFromCwaArray(valArr));
