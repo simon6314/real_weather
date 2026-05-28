@@ -102,6 +102,7 @@ const AppState = {
   currentWeather: {},            // Cached current weather for main display
   addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '臺中市', '高雄市'],
   allCountiesWeatherData: {},    // Map of countyName -> parsed weather profile
+  observations: [],              // Real-time automatic weather station observations
   
   activeTab: 'weather',          // 'weather' or 'radar'
   radarZoom: 1,
@@ -178,7 +179,72 @@ function initNavigation() {
 // --------------------------------------------------------------------------
 // 4. Geolocation Positioning & Mapping
 // --------------------------------------------------------------------------
+// Proactive Cache Validation to scan and remove any corrupted caches containing NaN/undefined/null
+function validateAndCleanAllCaches() {
+  console.log('Validating cache integrity in localStorage...');
+  
+  // 1. Validate county cache
+  const countyCacheKey = 'cwa_weather_cache_v1';
+  const countyTimeKey = 'cwa_weather_cache_time';
+  const countyCache = localStorage.getItem(countyCacheKey);
+  if (countyCache) {
+    try {
+      const parsed = JSON.parse(countyCache);
+      const counties = Object.values(parsed);
+      const sample = counties.find(c => c && c.current && !c.error);
+      const isValid = sample && 
+                      sample.current.temp !== undefined && 
+                      sample.current.temp !== null && 
+                      !isNaN(sample.current.temp) && 
+                      sample.current.desc !== undefined &&
+                      parsed._observations !== undefined;
+      if (!isValid) {
+        console.warn('Wiping invalid/corrupted/outdated county cache from localStorage');
+        localStorage.removeItem(countyCacheKey);
+        localStorage.removeItem(countyTimeKey);
+      }
+    } catch (e) {
+      localStorage.removeItem(countyCacheKey);
+      localStorage.removeItem(countyTimeKey);
+    }
+  }
+  
+  // 2. Validate all township caches
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('cwa_town_cache_') && !key.includes('_time_')) {
+      const townCache = localStorage.getItem(key);
+      if (townCache) {
+        try {
+          const parsed = JSON.parse(townCache);
+          const towns = Object.values(parsed);
+          const sample = towns.find(t => t && t.current && !t.error);
+          const isValid = sample && 
+                          sample.current.temp !== undefined && 
+                          sample.current.temp !== null && 
+                          !isNaN(sample.current.temp) && 
+                          sample.current.desc !== undefined;
+          if (!isValid) {
+            keysToRemove.push(key);
+          }
+        } catch (e) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+  }
+  
+  keysToRemove.forEach(key => {
+    console.warn(`Wiping invalid/corrupted township cache: ${key}`);
+    localStorage.removeItem(key);
+    const timeKey = key.replace('cwa_town_cache_', 'cwa_town_cache_time_');
+    localStorage.removeItem(timeKey);
+  });
+}
+
 function startupSequence() {
+  validateAndCleanAllCaches();
   updateDataBadge('定位中...', 'loading');
   
   if (navigator.geolocation) {
@@ -280,14 +346,35 @@ async function fetchAllWeatherData() {
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
-  // Use Cache if younger than 1 Hour (3,600,000 ms)
+  // Use Cache if younger than 1 Hour (3,600,000 ms) and fully valid
   if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 3600000) {
     try {
-      console.log('Retrieved weather data from local storage cache.');
-      AppState.allCountiesWeatherData = JSON.parse(cachedDataStr);
-      return true;
+      const parsedData = JSON.parse(cachedDataStr);
+      // Validate county cache integrity
+      const counties = Object.values(parsedData);
+      const sampleCounty = counties.find(c => c && c.current && !c.error);
+      const isCacheValid = sampleCounty && 
+                           sampleCounty.current.temp !== undefined && 
+                           sampleCounty.current.temp !== null && 
+                           !isNaN(sampleCounty.current.temp) && 
+                           sampleCounty.current.desc !== undefined;
+      
+      if (isCacheValid) {
+        console.log('Retrieved valid weather data from local storage cache.');
+        AppState.allCountiesWeatherData = parsedData;
+        if (parsedData._observations) {
+          AppState.observations = parsedData._observations;
+        }
+        return true;
+      } else {
+        console.warn('Corrupted/incomplete county cache detected. Bypassing and clearing cache.');
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(cacheTimeKey);
+      }
     } catch (e) {
-      console.warn('Failed parsing cache. Refreshing CWA API.');
+      console.warn('Failed parsing cache. Refreshing CWA API.', e);
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheTimeKey);
     }
   }
   
@@ -329,10 +416,27 @@ async function fetchAllWeatherData() {
     if (!res7d.ok) throw new Error('CWA 7d API returned status ' + res7d.status);
     const data7d = await res7d.json();
     
+    // 4. Fetch real-time automatic weather station observations (O-A0003-001)
+    let observationData = null;
+    try {
+      console.log('Fetching CWA real-time weather observations (O-A0003-001)...');
+      const resObs = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`);
+      if (resObs.ok) {
+        observationData = await resObs.json();
+      }
+    } catch (obsErr) {
+      console.warn('Failed to fetch real-time observations, falling back to forecast values.', obsErr);
+    }
+    
+    if (observationData && observationData.records) {
+      AppState.observations = observationData.records.Station || observationData.records.station || [];
+    }
+    
     // Parse and integrate the three datasets
     const parsedData = integrateCwaDatasets(data36h, data72h, data7d);
     
     if (Object.keys(parsedData).length > 0) {
+      parsedData._observations = AppState.observations;
       AppState.allCountiesWeatherData = parsedData;
       localStorage.setItem(cacheKey, JSON.stringify(parsedData));
       localStorage.setItem(cacheTimeKey, String(now));
@@ -342,6 +446,65 @@ async function fetchAllWeatherData() {
   } catch (err) {
     console.error('Weather API Fetch failed:', err);
     return false;
+  }
+}
+
+// Helper to find a matching automatic weather station observation
+function findObservation(countyName, townName = '') {
+  if (!AppState.observations || AppState.observations.length === 0) return null;
+  
+  const normCounty = countyName.replace('台', '臺');
+  const normTown = townName ? townName.replace('台', '臺') : '';
+  
+  // 1. Try to find exact township station match
+  if (normTown) {
+    const match = AppState.observations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const obsTown = (obs.GeoInfo?.TownName || obs.geoInfo?.townName || '').replace('台', '臺');
+      const tempVal = obs.WeatherElement?.AirTemperature;
+      const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+      return obsCounty === normCounty && obsTown === normTown && hasTemp;
+    });
+    if (match) return match;
+  }
+  
+  // 2. Fallback: Find the first station in the county with a valid temperature
+  const countyMatch = AppState.observations.find(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    const tempVal = obs.WeatherElement?.AirTemperature;
+    const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+    return obsCounty === normCounty && hasTemp;
+  });
+  return countyMatch;
+}
+
+// Helper to apply real-time observation values to current weather state
+function applyObservationToCurrent(current, countyName, townName = '') {
+  const obs = findObservation(countyName, townName);
+  if (!obs || !obs.WeatherElement) return;
+  
+  const tempVal = obs.WeatherElement.AirTemperature;
+  const temp = parseFloat(tempVal);
+  if (!isNaN(temp) && temp > -50 && temp < 60 && tempVal !== -99 && tempVal !== '-99') {
+    current.temp = parseFloat(temp.toFixed(1));
+    current.apparentTemp = parseFloat(temp.toFixed(1));
+  }
+  
+  const rhVal = obs.WeatherElement.RelativeHumidity;
+  const rh = parseFloat(rhVal);
+  if (!isNaN(rh) && rh >= 0 && rh <= 100 && rhVal !== -99 && rhVal !== '-99') {
+    current.humidity = Math.round(rh);
+  }
+  
+  const wsVal = obs.WeatherElement.WindSpeed;
+  const ws = parseFloat(wsVal);
+  if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
+    if (ws <= 1) current.windGrade = 0;
+    else if (ws <= 3) current.windGrade = 1;
+    else if (ws <= 5) current.windGrade = 2;
+    else if (ws <= 8) current.windGrade = 3;
+    else if (ws <= 11) current.windGrade = 4;
+    else current.windGrade = 5;
   }
 }
 
@@ -388,6 +551,9 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         windGrade: 2,       // Default fallback
         apparentTemp: Math.round((parseInt(minT) + parseInt(maxT)) / 2) || 26
       };
+      
+      // Override with real-time station observation values if available
+      applyObservationToCurrent(merged[cName].current, cName);
     }
     
     // 2. Process 72h detailed data (F-D0047-089)
@@ -1349,7 +1515,17 @@ function initSearchIndex() {
 }
 
 async function loadWeatherForRegion(id) {
-  if (AppState.allCountiesWeatherData[id] && !AppState.allCountiesWeatherData[id].error) return; // Already loaded successfully!
+  // Validate that the region has valid weather data loaded in memory (not error, not NaN/undefined temperature)
+  const existingData = AppState.allCountiesWeatherData[id];
+  const isInMemoryValid = existingData && 
+                          !existingData.error && 
+                          existingData.current && 
+                          existingData.current.temp !== undefined && 
+                          existingData.current.temp !== null && 
+                          !isNaN(existingData.current.temp) && 
+                          existingData.current.desc !== undefined;
+  
+  if (isInMemoryValid) return; // Already loaded successfully and valid!
   
   const parsed = parseIdentifier(id);
   
@@ -1394,10 +1570,29 @@ async function fetchCwaTownshipData(countyName) {
   if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 3600000) {
     try {
       const parsedTowns = JSON.parse(cachedDataStr);
-      Object.assign(AppState.allCountiesWeatherData, parsedTowns);
-      return true;
+      
+      // Validate township cache integrity
+      const towns = Object.values(parsedTowns);
+      const sampleTown = towns.find(t => t && t.current && !t.error);
+      const isCacheValid = sampleTown && 
+                           sampleTown.current.temp !== undefined && 
+                           sampleTown.current.temp !== null && 
+                           !isNaN(sampleTown.current.temp) && 
+                           sampleTown.current.desc !== undefined;
+      
+      if (isCacheValid) {
+        console.log(`Successfully loaded valid township weather cache for ${countyName}`);
+        Object.assign(AppState.allCountiesWeatherData, parsedTowns);
+        return true;
+      } else {
+        console.warn(`Corrupted/incomplete township cache detected for ${countyName}. Bypassing and clearing cache.`);
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(cacheTimeKey);
+      }
     } catch (e) {
-      console.warn('Failed parsing township cache.');
+      console.warn(`Failed parsing township cache for ${countyName}. Clearing corrupted keys.`, e);
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheTimeKey);
     }
   }
   
@@ -1459,6 +1654,40 @@ async function fetchCwaTownshipData(countyName) {
   }
 }
 
+// Robustly extract CWA data values supporting county and detailed township formats
+function getValueFromCwaArray(valArr, propertyName = '') {
+  if (!valArr || valArr.length === 0) return '';
+  
+  const firstObj = valArr[0];
+  
+  // Case A: Standard county format with 'value' / 'Value' properties
+  if (firstObj.value !== undefined || firstObj.Value !== undefined) {
+    if (propertyName === 'WeatherCode' && valArr.length > 1) {
+      return valArr[1].value !== undefined ? valArr[1].value : valArr[1].Value;
+    }
+    return firstObj.value !== undefined ? firstObj.value : firstObj.Value;
+  }
+  
+  // Case B: Township detailed format with specific property keys (e.g. Temperature, RelativeHumidity, etc.)
+  const keys = Object.keys(firstObj);
+  
+  if (propertyName === 'WeatherCode') {
+    const codeKey = keys.find(k => k.toUpperCase() === 'WEATHERCODE');
+    if (codeKey) return firstObj[codeKey];
+  }
+  if (propertyName === 'Weather') {
+    const wxKey = keys.find(k => k.toUpperCase() === 'WEATHER');
+    if (wxKey) return firstObj[wxKey];
+  }
+  
+  const excludeKeys = ['MEASURES', 'WEATHERCODE', 'COMFORTINDEXDESCRIPTION', 'BEAUFORTSCALE'];
+  const primaryKey = keys.find(k => !excludeKeys.includes(k.toUpperCase()));
+  if (primaryKey) return firstObj[primaryKey];
+  
+  if (keys.length > 0) return firstObj[keys[0]];
+  return '';
+}
+
 function parseTownshipCwaResponse(countyName, data3, data7) {
   const parsed = {};
   
@@ -1500,11 +1729,26 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
     };
     
     const elements = loc.WeatherElement || loc.weatherElement || [];
-    const tempEl = elements.find(el => (el.ElementName || el.elementName) === 'T');
-    const rhEl = elements.find(el => (el.ElementName || el.elementName) === 'RH');
-    const wsEl = elements.find(el => (el.ElementName || el.elementName) === 'WS');
-    const wxEl = elements.find(el => (el.ElementName || el.elementName) === 'Wx');
-    const popEl = elements.find(el => (el.ElementName || el.elementName) === 'PoP6h') || elements.find(el => (el.ElementName || el.elementName) === 'PoP12h');
+    const tempEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'T' || name.includes('溫度');
+    });
+    const rhEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'RH' || name.includes('濕度');
+    });
+    const wsEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'WS' || name.includes('風速');
+    });
+    const wxEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'WX' || name.includes('天氣現象');
+    });
+    const popEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'POP6H' || name === 'POP12H' || name.includes('降雨機率');
+    });
     
     const hourlyList = [];
     const tempTime = tempEl ? (tempEl.Time || tempEl.time) : null;
@@ -1518,7 +1762,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       const timeVal = new Date(timeStr);
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
-      const temp = valArr?.[0] ? parseFloat(valArr[0].Value || valArr[0].value) : NaN;
+      const temp = parseFloat(getValueFromCwaArray(valArr));
       if (isNaN(temp)) continue;
       
       let humidity = 70;
@@ -1526,8 +1770,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const rhTime = rhEl.Time || rhEl.time;
         const rhItem = rhTime?.[i];
         const rhValArr = rhItem ? (rhItem.ElementValue || rhItem.elementValue) : null;
-        if (rhValArr && rhValArr[0]) {
-          humidity = parseInt(rhValArr[0].Value || rhValArr[0].value) || 70;
+        if (rhValArr) {
+          humidity = parseInt(getValueFromCwaArray(rhValArr)) || 70;
         }
       }
       
@@ -1536,8 +1780,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const wsTime = wsEl.Time || wsEl.time;
         const wsItem = wsTime?.[i];
         const wsValArr = wsItem ? (wsItem.ElementValue || wsItem.elementValue) : null;
-        if (wsValArr && wsValArr[0]) {
-          const wsVal = wsValArr[0].Value || wsValArr[0].value;
+        if (wsValArr) {
+          const wsVal = getValueFromCwaArray(wsValArr);
           const wsInt = parseInt(wsVal) || 0;
           if (wsInt <= 1) wind = 0;
           else if (wsInt <= 3) wind = 1;
@@ -1554,8 +1798,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const wxItem = wxTime?.[i];
         const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
         if (wxValArr) {
-          wx = wxValArr[0] ? (wxValArr[0].Value || wxValArr[0].value) : '多雲';
-          wxValue = wxValArr[1] ? (wxValArr[1].Value || wxValArr[1].value) : '2';
+          wx = getValueFromCwaArray(wxValArr, 'Weather') || '多雲';
+          wxValue = getValueFromCwaArray(wxValArr, 'WeatherCode') || '2';
         }
       }
       
@@ -1568,8 +1812,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
             return timeVal >= start;
           });
           const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
-          if (popValArr && popValArr[0]) {
-            rainProb = parseInt(popValArr[0].Value || popValArr[0].value) || 0;
+          if (popValArr) {
+            rainProb = parseInt(getValueFromCwaArray(popValArr)) || 0;
           }
         }
       }
@@ -1601,6 +1845,9 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         windGrade: curH.windGrade,
         apparentTemp: curH.temp
       };
+      
+      // Override with real-time local station observation if available
+      applyObservationToCurrent(parsed[fullId].current, countyName, townName);
     }
   }
   
@@ -1612,10 +1859,22 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
     if (!parsed[fullId]) continue;
     
     const elements = loc.WeatherElement || loc.weatherElement || [];
-    const minTEl = elements.find(el => (el.ElementName || el.elementName) === 'MinT');
-    const maxTEl = elements.find(el => (el.ElementName || el.elementName) === 'MaxT');
-    const wxEl = elements.find(el => (el.ElementName || el.elementName) === 'Wx');
-    const popEl = elements.find(el => (el.ElementName || el.elementName) === 'PoP12h');
+    const minTEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'MINT' || name.includes('最低溫度');
+    });
+    const maxTEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'MAXT' || name.includes('最高溫度');
+    });
+    const wxEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'WX' || name.includes('天氣現象');
+    });
+    const popEl = elements.find(el => {
+      const name = (el.ElementName || el.elementName || '').toUpperCase();
+      return name === 'POP12H' || name === 'POP6H' || name.includes('降雨機率');
+    });
     
     const weeklyList = [];
     const minTTime = minTEl ? (minTEl.Time || minTEl.time) : null;
@@ -1631,14 +1890,14 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       const dateVal = new Date(dateStr);
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
-      const minT1 = valArr?.[0] ? parseFloat(valArr[0].Value || valArr[0].value) : NaN;
+      const minT1 = parseFloat(getValueFromCwaArray(valArr));
       if (isNaN(minT1)) continue;
       
       let minT2 = minT1;
       if (i+1 < len && minTTime[i+1]) {
         const nextValArr = minTTime[i+1].ElementValue || minTTime[i+1].elementValue;
-        if (nextValArr && nextValArr[0]) {
-          minT2 = parseFloat(nextValArr[0].Value || nextValArr[0].value) || minT1;
+        if (nextValArr) {
+          minT2 = parseFloat(getValueFromCwaArray(nextValArr)) || minT1;
         }
       }
       const minT = Math.min(minT1, minT2);
@@ -1648,8 +1907,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const maxTTime = maxTEl.Time || maxTEl.time;
         const maxTItem = maxTTime?.[i];
         const maxTValArr = maxTItem ? (maxTItem.ElementValue || maxTItem.elementValue) : null;
-        if (maxTValArr && maxTValArr[0]) {
-          maxT1 = parseFloat(maxTValArr[0].Value || maxTValArr[0].value) || minT;
+        if (maxTValArr) {
+          maxT1 = parseFloat(getValueFromCwaArray(maxTValArr)) || minT;
         }
       }
       let maxT2 = maxT1;
@@ -1657,8 +1916,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const maxTTime = maxTEl.Time || maxTEl.time;
         const nextMaxTItem = maxTTime?.[i+1];
         const nextMaxTValArr = nextMaxTItem ? (nextMaxTItem.ElementValue || nextMaxTItem.elementValue) : null;
-        if (nextMaxTValArr && nextMaxTValArr[0]) {
-          maxT2 = parseFloat(nextMaxTValArr[0].Value || nextMaxTValArr[0].value) || maxT1;
+        if (nextMaxTValArr) {
+          maxT2 = parseFloat(getValueFromCwaArray(nextMaxTValArr)) || maxT1;
         }
       }
       const maxT = Math.max(maxT1, maxT2);
@@ -1670,8 +1929,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const wxItem = wxTime?.[i];
         const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
         if (wxValArr) {
-          wxVal = wxValArr[0] ? (wxValArr[0].Value || wxValArr[0].value) : '多雲';
-          wxIconVal = wxValArr[1] ? (wxValArr[1].Value || wxValArr[1].value) : '2';
+          wxVal = getValueFromCwaArray(wxValArr, 'Weather') || '多雲';
+          wxIconVal = getValueFromCwaArray(wxValArr, 'WeatherCode') || '2';
         }
       }
       
@@ -1680,8 +1939,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const popTime = popEl.Time || popEl.time;
         const popItem = popTime?.[i];
         const popValArr = popItem ? (popItem.ElementValue || popItem.elementValue) : null;
-        if (popValArr && popValArr[0]) {
-          pop = parseInt(popValArr[0].Value || popValArr[0].value) || 0;
+        if (popValArr) {
+          pop = parseInt(getValueFromCwaArray(popValArr)) || 0;
         }
       }
       
