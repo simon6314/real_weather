@@ -1809,7 +1809,7 @@ function loadRadarImage(force = false) {
   loader.style.opacity = '1';
   
   const cacheBust = force ? `?t=${new Date().getTime()}` : '';
-  radarImg.src = `https://www.cwa.gov.tw/Data/radar/CV1_TW_1000_forPreview.png${cacheBust}`;
+  radarImg.src = `https://www.cwa.gov.tw/Data/radar/CV1_3600.png${cacheBust}`;
   
   // Format current CWA standard update intervals (typically 10 min)
   const now = new Date();
