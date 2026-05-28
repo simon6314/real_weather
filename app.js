@@ -364,6 +364,15 @@ async function fetchAllWeatherData() {
         AppState.allCountiesWeatherData = parsedData;
         if (parsedData._observations) {
           AppState.observations = parsedData._observations;
+          // Re-apply real-time observation desc/icon overrides even from cached data
+          // (the cached forecast desc may not match actual sky conditions)
+          for (const countyName of Object.keys(parsedData)) {
+            if (countyName.startsWith('_')) continue;
+            const countyData = parsedData[countyName];
+            if (countyData && countyData.current) {
+              applyObservationToCurrent(countyData.current, countyName);
+            }
+          }
         }
         return true;
       } else {
@@ -478,6 +487,79 @@ function findObservation(countyName, townName = '') {
   return countyMatch;
 }
 
+// ── Apparent Temperature (體感溫度) Calculation ─────────────────────────────
+// Uses NOAA Heat Index when temp >= 27°C & RH >= 40%, Wind Chill when temp <= 10°C,
+// otherwise uses Steadman's simple regression.
+function calcApparentTemp(tempC, relativeHumidity, windSpeedMs) {
+  const T = tempC;
+  const RH = relativeHumidity || 70;
+  const WS = windSpeedMs || 1.5; // m/s
+
+  // Wind Chill (only valid when T <= 10°C and wind > 1.3 m/s)
+  if (T <= 10 && WS >= 1.3) {
+    // Australian Bureau of Meteorology Wind Chill
+    const windChill = 13.12 + 0.6215 * T - 11.37 * Math.pow(WS * 3.6, 0.16) + 0.3965 * T * Math.pow(WS * 3.6, 0.16);
+    return parseFloat(windChill.toFixed(1));
+  }
+
+  // Heat Index (NOAA Rothfusz, valid when T >= 27°C)
+  if (T >= 27 && RH >= 40) {
+    const T_F = T * 9/5 + 32; // Convert to Fahrenheit
+    let HI_F = -42.379
+      + 2.04901523 * T_F
+      + 10.14333127 * RH
+      - 0.22475541 * T_F * RH
+      - 0.00683783 * T_F * T_F
+      - 0.05481717 * RH * RH
+      + 0.00122874 * T_F * T_F * RH
+      + 0.00085282 * T_F * RH * RH
+      - 0.00000199 * T_F * T_F * RH * RH;
+    // Adjustment for low humidity
+    if (RH < 13 && T_F >= 80 && T_F <= 112) {
+      HI_F -= ((13 - RH) / 4) * Math.sqrt((17 - Math.abs(T_F - 95)) / 17);
+    }
+    // Adjustment for high humidity
+    if (RH > 85 && T_F >= 80 && T_F <= 87) {
+      HI_F += ((RH - 85) / 10) * ((87 - T_F) / 5);
+    }
+    const HI_C = (HI_F - 32) * 5/9;
+    return parseFloat(HI_C.toFixed(1));
+  }
+
+  // Steadman simple apparent temp (mild range)
+  const apparent = T + 0.33 * (RH / 100 * 6.105 * Math.exp(17.27 * T / (237.7 + T))) - 0.70 * WS - 4.0;
+  return parseFloat(apparent.toFixed(1));
+}
+
+// Convert windGrade (Beaufort scale) to approximate m/s
+function windGradeToMs(grade) {
+  const table = [0.3, 1.5, 3.3, 5.5, 8.0, 11.0];
+  return table[Math.min(grade, table.length - 1)] || 1.5;
+}
+
+// Map observation station's human-readable Weather string to our icon key
+function mapObsWeatherToIcon(obsWeather) {
+  const w = obsWeather.trim();
+  if (!w || w === '-99') return null;
+  // Rain / storm variants first (most specific)
+  if (/雷/.test(w)) return 'thunderstorm';
+  if (/大雨|暴雨|豪雨|大豪雨/.test(w)) return 'rainy';
+  if (/雨|霧雨|毛毛雨|陣雨/.test(w)) return 'rainy';
+  // Snow / hail
+  if (/雪|冰雹/.test(w)) return 'rainy';
+  // Fog / mist / dust
+  if (/霧|靄|煙/.test(w)) return 'cloudy';
+  // Overcast
+  if (/陰/.test(w)) return 'cloudy';
+  // Mostly cloudy
+  if (/多雲/.test(w)) return 'sunny-cloudy';
+  // Partly cloudy / fair
+  if (/晴時多雲|多雲時晴/.test(w)) return 'sunny-cloudy';
+  // Clear / sunny
+  if (/晴/.test(w)) return 'sunny';
+  return 'sunny-cloudy'; // safe default
+}
+
 // Helper to apply real-time observation values to current weather state
 function applyObservationToCurrent(current, countyName, townName = '') {
   const obs = findObservation(countyName, townName);
@@ -505,6 +587,19 @@ function applyObservationToCurrent(current, countyName, townName = '') {
     else if (ws <= 8) current.windGrade = 3;
     else if (ws <= 11) current.windGrade = 4;
     else current.windGrade = 5;
+  }
+  
+  // ── Override desc & icon from real-time observed sky condition ────────────
+  // The observation station returns a human-readable Weather string (e.g. '晴', '多雲', '陰有雨').
+  // Use it to override the *forecast* description so the card shows actual sky conditions.
+  const obsWeather = (obs.WeatherElement.Weather || '').trim();
+  if (obsWeather && obsWeather !== '-99' && obsWeather.length > 0) {
+    const obsIcon = mapObsWeatherToIcon(obsWeather);
+    if (obsIcon) {
+      current.icon = obsIcon;
+      current.desc = obsWeather; // Actual observed text
+      current._fromObservation = true;
+    }
   }
 }
 
@@ -645,7 +740,9 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         const curH = hourlyList[0];
         merged[cName].current.humidity = curH.humidity;
         merged[cName].current.windGrade = curH.windGrade;
-        merged[cName].current.apparentTemp = curH.temp;
+        // Calculate proper apparent temperature using Heat Index / Wind Chill
+        const ws = windGradeToMs(curH.windGrade);
+        merged[cName].current.apparentTemp = calcApparentTemp(curH.temp, curH.humidity, ws);
       }
     }
     
@@ -1001,12 +1098,130 @@ function renderMainLocationWeather() {
   document.getElementById('current-wind-grade').textContent = `${cur.windGrade} 級`;
   document.getElementById('current-rain-prob').textContent = `${cur.rainProb}%`;
   
+  // Render the dressed-person icon based on apparent temperature
+  renderApparentTempPerson(cur.apparentTemp);
+  
   // Inject Hero weather SVG icon
   const iconContainer = document.getElementById('hero-weather-icon');
   iconContainer.innerHTML = getAnimatedSvgCode(cur.icon, 128, 128);
   
   // Apply dynamic background style
   applyDynamicBackdropTheme(cur.icon);
+}
+
+// Render a dressed SVG "person" in the apparent temp stat card based on feels-like temperature
+function renderApparentTempPerson(apparentTemp) {
+  const container = document.getElementById('apparent-temp-person-icon');
+  if (!container) return;
+  
+  const T = Number(apparentTemp);
+  
+  // Determine outfit and colors based on temperature
+  let outfit, skinColor, clothColor, extraDetails;
+  
+  if (T >= 34) {
+    // Very hot: tank top + shorts, sun-kissed skin
+    outfit = 'scorching';
+    skinColor = '#FBBF8C';
+    clothColor = '#F97316';
+    extraDetails = `
+      <!-- tank top (thin straps) -->
+      <path d="M9.5 10 L9 17 L15 17 L14.5 10" fill="${clothColor}" stroke="none"/>
+      <!-- shorts -->
+      <path d="M9 17 L8.5 21 L11.5 21 L12 18.5 L12.5 21 L15.5 21 L15 17 Z" fill="${clothColor}" stroke="none"/>
+      <!-- bare arms -->
+      <line x1="9" y1="10.5" x2="7" y2="14" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="15" y1="10.5" x2="17" y2="14" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    `;
+  } else if (T >= 28) {
+    // Hot: short-sleeve + shorts
+    outfit = 'hot';
+    skinColor = '#FBBF8C';
+    clothColor = '#3B82F6';
+    extraDetails = `
+      <!-- t-shirt body -->
+      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
+      <!-- shorts -->
+      <path d="M9.5 17 L9 21 L11.5 21 L12 18.5 L12.5 21 L15 21 L14.5 17 Z" fill="${clothColor}" stroke="none"/>
+      <!-- short sleeves + bare forearms -->
+      <line x1="8" y1="12" x2="6.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="16" y1="12" x2="17.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    `;
+  } else if (T >= 22) {
+    // Warm: t-shirt + long pants
+    outfit = 'warm';
+    skinColor = '#FBBF8C';
+    clothColor = '#10B981';
+    extraDetails = `
+      <!-- t-shirt body -->
+      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
+      <!-- long pants -->
+      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#374151" stroke="none"/>
+      <!-- short sleeves + bare forearms -->
+      <line x1="8" y1="12" x2="6.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="16" y1="12" x2="17.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    `;
+  } else if (T >= 16) {
+    // Mild/Cool: long-sleeve + pants
+    outfit = 'mild';
+    skinColor = '#FBBF8C';
+    clothColor = '#8B5CF6';
+    extraDetails = `
+      <!-- long-sleeve shirt -->
+      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
+      <!-- long sleeves -->
+      <line x1="8.5" y1="11.5" x2="6.5" y2="17" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="15.5" y1="11.5" x2="17.5" y2="17" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- long pants -->
+      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#374151" stroke="none"/>
+    `;
+  } else if (T >= 8) {
+    // Cold: jacket + pants
+    outfit = 'cold';
+    skinColor = '#FBBF8C';
+    clothColor = '#6366F1';
+    extraDetails = `
+      <!-- jacket body with lapels -->
+      <path d="M8.5 10 L7.5 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16.5 12 L15.5 10 Z" fill="${clothColor}" stroke="none"/>
+      <path d="M10.5 10 L12 12 L13.5 10" fill="white" opacity="0.4" stroke="none"/>
+      <!-- jacket sleeves -->
+      <line x1="7.5" y1="11.5" x2="5.5" y2="17" stroke="${clothColor}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="16.5" y1="11.5" x2="18.5" y2="17" stroke="${clothColor}" stroke-width="3" stroke-linecap="round"/>
+      <!-- pants -->
+      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#1F2937" stroke="none"/>
+    `;
+  } else {
+    // Very cold: heavy coat + scarf
+    outfit = 'freezing';
+    skinColor = '#FBBF8C';
+    clothColor = '#DC2626';
+    extraDetails = `
+      <!-- heavy coat -->
+      <path d="M8 9.5 L7 12 L9.5 12.5 L9.5 17.5 L14.5 17.5 L14.5 12.5 L17 12 L16 9.5 Z" fill="${clothColor}" stroke="none"/>
+      <!-- thick sleeves -->
+      <line x1="7" y1="11.5" x2="5" y2="18" stroke="${clothColor}" stroke-width="4" stroke-linecap="round"/>
+      <line x1="17" y1="11.5" x2="19" y2="18" stroke="${clothColor}" stroke-width="4" stroke-linecap="round"/>
+      <!-- scarf around neck -->
+      <path d="M9 8.5 Q12 10.5 15 8.5" stroke="#FCD34D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <!-- pants (thick) -->
+      <path d="M9.5 17.5 L8.5 23 L11.5 23 L12 20 L12.5 23 L15.5 23 L14.5 17.5 Z" fill="#1F2937" stroke="none"/>
+    `;
+  }
+  
+  container.innerHTML = `
+    <svg width="22" height="24" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg"
+         style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); transition: all 0.4s ease;">
+      <!-- Head -->
+      <circle cx="12" cy="5" r="3" fill="${skinColor}" stroke="none"/>
+      <!-- Body/Outfit -->
+      ${extraDetails}
+      <!-- Face: eyes -->
+      <circle cx="10.8" cy="4.5" r="0.4" fill="#333" />
+      <circle cx="13.2" cy="4.5" r="0.4" fill="#333" />
+      <!-- Face: smile -->
+      <path d="M10.8 6 Q12 7 13.2 6" stroke="#333" stroke-width="0.5" stroke-linecap="round" fill="none"/>
+    </svg>
+  `;
 }
 
 // Map active icon to background styles and trigger custom screen particles!
@@ -1843,7 +2058,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         rainProb: curH.rainProb,
         humidity: curH.humidity,
         windGrade: curH.windGrade,
-        apparentTemp: curH.temp
+        apparentTemp: calcApparentTemp(curH.temp, curH.humidity, windGradeToMs(curH.windGrade))
       };
       
       // Override with real-time local station observation if available
