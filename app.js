@@ -197,8 +197,8 @@ function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v2';
-  const countyTimeKey = 'cwa_weather_cache_time_v2';
+  const countyCacheKey = 'cwa_weather_cache_v3';
+  const countyTimeKey = 'cwa_weather_cache_time_v3';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -226,7 +226,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v2_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v3_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -251,7 +251,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v2_', 'cwa_town_cache_time_v2_');
+    const timeKey = key.replace('cwa_town_cache_v3_', 'cwa_town_cache_time_v3_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -457,8 +457,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v2';
-  const cacheTimeKey = 'cwa_weather_cache_time_v2';
+  const cacheKey = 'cwa_weather_cache_v3';
+  const cacheTimeKey = 'cwa_weather_cache_time_v3';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2154,8 +2154,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v2_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v2_${countyName}`;
+  const cacheKey = `cwa_town_cache_v3_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v3_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2366,26 +2366,36 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       let humidity = 70;
       if (rhEl) {
         const rhTime = rhEl.Time || rhEl.time;
-        const rhItem = rhTime?.[i];
-        const rhValArr = rhItem ? (rhItem.ElementValue || rhItem.elementValue) : null;
-        if (rhValArr) {
-          humidity = parseInt(getValueFromCwaArray(rhValArr)) || 70;
+        if (rhTime) {
+          const rhItem = rhTime.find(item => {
+            const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
+            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+          });
+          const rhValArr = rhItem ? (rhItem.ElementValue || rhItem.elementValue) : null;
+          if (rhValArr) {
+            humidity = parseInt(getValueFromCwaArray(rhValArr)) || 70;
+          }
         }
       }
       
       let wind = 2;
       if (wsEl) {
         const wsTime = wsEl.Time || wsEl.time;
-        const wsItem = wsTime?.[i];
-        const wsValArr = wsItem ? (wsItem.ElementValue || wsItem.elementValue) : null;
-        if (wsValArr) {
-          const wsVal = getValueFromCwaArray(wsValArr);
-          const wsInt = parseInt(wsVal) || 0;
-          if (wsInt <= 1) wind = 0;
-          else if (wsInt <= 3) wind = 1;
-          else if (wsInt <= 5) wind = 2;
-          else if (wsInt <= 8) wind = 3;
-          else wind = 4;
+        if (wsTime) {
+          const wsItem = wsTime.find(item => {
+            const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
+            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+          });
+          const wsValArr = wsItem ? (wsItem.ElementValue || wsItem.elementValue) : null;
+          if (wsValArr) {
+            const wsVal = getValueFromCwaArray(wsValArr);
+            const wsInt = parseInt(wsVal) || 0;
+            if (wsInt <= 1) wind = 0;
+            else if (wsInt <= 3) wind = 1;
+            else if (wsInt <= 5) wind = 2;
+            else if (wsInt <= 8) wind = 3;
+            else wind = 4;
+          }
         }
       }
       
@@ -2393,11 +2403,16 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       let wxValue = '2';
       if (wxEl) {
         const wxTime = wxEl.Time || wxEl.time;
-        const wxItem = wxTime?.[i];
-        const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
-        if (wxValArr) {
-          wx = getValueFromCwaArray(wxValArr, 'Weather') || '多雲';
-          wxValue = getValueFromCwaArray(wxValArr, 'WeatherCode') || '2';
+        if (wxTime) {
+          const wxItem = wxTime.find(item => {
+            const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
+            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+          });
+          const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
+          if (wxValArr) {
+            wx = getValueFromCwaArray(wxValArr, 'Weather') || '多雲';
+            wxValue = getValueFromCwaArray(wxValArr, 'WeatherCode') || '2';
+          }
         }
       }
       
@@ -2407,7 +2422,9 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         if (popTime) {
           const popMatch = popTime.find(p => {
             const start = new Date(p.StartTime || p.startTime || p.DataTime || p.dataTime);
-            return timeVal >= start;
+            const endStr = p.EndTime || p.endTime;
+            const end = endStr ? new Date(endStr) : new Date(start.getTime() + 6 * 3600000);
+            return timeVal >= start && timeVal <= end;
           });
           const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
           if (popValArr) {
@@ -2791,8 +2808,8 @@ function initSettings() {
     localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
-    localStorage.removeItem('cwa_weather_cache_v2');
-    localStorage.removeItem('cwa_weather_cache_time_v2');
+    localStorage.removeItem('cwa_weather_cache_v3');
+    localStorage.removeItem('cwa_weather_cache_time_v3');
     
     closeModal();
     
