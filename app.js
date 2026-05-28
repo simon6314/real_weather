@@ -1424,11 +1424,27 @@ async function fetchCwaTownshipData(countyName) {
     if (!res3.ok) throw new Error('Township 3d API status ' + res3.status);
     const data3 = await res3.json();
     
+    // Add debugging logs for JSON structure
+    console.log('data3 keys:', Object.keys(data3));
+    if (data3.records) {
+      console.log('data3.records keys:', Object.keys(data3.records));
+      if (data3.records.locations) {
+        console.log('data3 locations length:', data3.records.locations.length);
+        if (data3.records.locations[0]) {
+          console.log('data3 locations[0] keys:', Object.keys(data3.records.locations[0]));
+          console.log('data3 location array length:', data3.records.locations[0].location ? data3.records.locations[0].location.length : (data3.records.locations[0].locations ? data3.records.locations[0].locations.length : 'no location array'));
+        }
+      } else if (data3.records.location) {
+        console.log('data3.records.location length:', data3.records.location.length);
+      }
+    }
+    
     const res7 = await fetch(`${baseUrl}/api/v1/rest/datastore/${apis[7]}${queryParams}`);
     if (!res7.ok) throw new Error('Township 7d API status ' + res7.status);
     const data7 = await res7.json();
     
     const parsedTowns = parseTownshipCwaResponse(countyName, data3, data7);
+    console.log('Parsed towns output count:', Object.keys(parsedTowns).length);
     
     if (Object.keys(parsedTowns).length > 0) {
       Object.assign(AppState.allCountiesWeatherData, parsedTowns);
