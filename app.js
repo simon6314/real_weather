@@ -38,7 +38,7 @@ const DEFAULT_API_KEY = '';
 // Cloudflare Worker Proxy URL (Optional)
 // If you deploy a Cloudflare Worker to proxy CWA API and hide your API key, paste its URL here.
 // Example: 'https://taiwan-weather-proxy.yourname.workers.dev'
-const CLOUDFLARE_PROXY_URL = 'wearther-proxy.simon6314.workers.dev';
+const CLOUDFLARE_PROXY_URL = 'https://wearther-proxy.simon6314.workers.dev';
 
 // --------------------------------------------------------------------------
 // 2. Application State Management
@@ -249,7 +249,10 @@ async function fetchAllWeatherData() {
   let queryParams = '?format=JSON';
   
   if (CLOUDFLARE_PROXY_URL) {
-    baseUrl = CLOUDFLARE_PROXY_URL.replace(/\/$/, ''); // Remove trailing slash
+    baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, ''); // Remove trailing slash
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl;
+    }
   } else {
     queryParams += `&Authorization=${AppState.apiKey}`;
   }
