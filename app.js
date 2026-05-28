@@ -294,17 +294,21 @@ async function fetchAllWeatherData() {
   // Cache missing or expired, fetch fresh from CWA
   console.log('Fetching fresh weather data...');
   
-  // Construct URLs dynamically: Prioritize personal API Key direct connection if configured
+  // Construct URLs dynamically: Route through Cloudflare proxy if configured to bypass browser CORS blocks, otherwise direct CWA connection
   let baseUrl = 'https://opendata.cwa.gov.tw';
   let queryParams = '?format=JSON';
   
-  if (AppState.apiKey) {
-    queryParams += `&Authorization=${AppState.apiKey}`;
-  } else if (CLOUDFLARE_PROXY_URL) {
+  if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, ''); // Remove trailing slash
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'https://' + baseUrl;
     }
+    // Pass personal API Key through the proxy if entered in Settings
+    if (AppState.apiKey) {
+      queryParams += `&Authorization=${AppState.apiKey}`;
+    }
+  } else if (AppState.apiKey) {
+    queryParams += `&Authorization=${AppState.apiKey}`;
   } else {
     return false; // No key or proxy available
   }
@@ -1401,13 +1405,16 @@ async function fetchCwaTownshipData(countyName) {
   let baseUrl = 'https://opendata.cwa.gov.tw';
   let queryParams = '?format=JSON';
   
-  if (AppState.apiKey) {
-    queryParams += `&Authorization=${AppState.apiKey}`;
-  } else if (CLOUDFLARE_PROXY_URL) {
+  if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'https://' + baseUrl;
     }
+    if (AppState.apiKey) {
+      queryParams += `&Authorization=${AppState.apiKey}`;
+    }
+  } else if (AppState.apiKey) {
+    queryParams += `&Authorization=${AppState.apiKey}`;
   } else {
     return false;
   }
