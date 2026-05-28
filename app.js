@@ -565,20 +565,24 @@ function applyObservationToCurrent(current, countyName, townName = '') {
   const obs = findObservation(countyName, townName);
   if (!obs || !obs.WeatherElement) return;
   
+  // Collect all three values first so we can do a proper apparent temp calculation
+  let obsTemp = null, obsRh = null, obsWs = null;
+  
   const tempVal = obs.WeatherElement.AirTemperature;
   const temp = parseFloat(tempVal);
   if (!isNaN(temp) && temp > -50 && temp < 60 && tempVal !== -99 && tempVal !== '-99') {
     current.temp = parseFloat(temp.toFixed(1));
-    current.apparentTemp = parseFloat(temp.toFixed(1));
+    obsTemp = temp;
   }
   
   const rhVal = obs.WeatherElement.RelativeHumidity;
   const rh = parseFloat(rhVal);
   if (!isNaN(rh) && rh >= 0 && rh <= 100 && rhVal !== -99 && rhVal !== '-99') {
     current.humidity = Math.round(rh);
+    obsRh = rh;
   }
   
-  const wsVal = obs.WeatherElement.WindSpeed;
+  const wsVal = obs.WeatherElement.WindSpeed; // m/s from observation
   const ws = parseFloat(wsVal);
   if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
     if (ws <= 1) current.windGrade = 0;
@@ -587,6 +591,18 @@ function applyObservationToCurrent(current, countyName, townName = '') {
     else if (ws <= 8) current.windGrade = 3;
     else if (ws <= 11) current.windGrade = 4;
     else current.windGrade = 5;
+    obsWs = ws;
+  }
+  
+  // ── Recalculate apparent temperature using real observed values ───────────
+  // Use actual observed T + RH + WS for the most accurate Heat Index / Wind Chill.
+  if (obsTemp !== null) {
+    const apparentT = calcApparentTemp(
+      obsTemp,
+      obsRh !== null ? obsRh : (current.humidity || 70),
+      obsWs !== null ? obsWs : windGradeToMs(current.windGrade || 2)
+    );
+    current.apparentTemp = apparentT;
   }
   
   // ── Override desc & icon from real-time observed sky condition ────────────
@@ -1116,113 +1132,115 @@ function renderApparentTempPerson(apparentTemp) {
   
   const T = Number(apparentTemp);
   
-  // Determine outfit and colors based on temperature
-  let outfit, skinColor, clothColor, extraDetails;
-  
+  // ── Shared anatomy (always drawn) ─────────────────────────────────────────
+  // Feet/shoes: two small rounded rects at the bottom, always visible
+  const feetSvg = `
+    <rect x="8.5"  y="25" width="4" height="1.8" rx="0.9" fill="#333"/>
+    <rect x="12.5" y="25" width="4" height="1.8" rx="0.9" fill="#333"/>
+  `;
+
+  // ── Outfit layers (body + legs + arms) ────────────────────────────────────
+  let skinColor, clothColor, bodyHtml;
+
   if (T >= 34) {
-    // Very hot: tank top + shorts, sun-kissed skin
-    outfit = 'scorching';
-    skinColor = '#FBBF8C';
-    clothColor = '#F97316';
-    extraDetails = `
-      <!-- tank top (thin straps) -->
-      <path d="M9.5 10 L9 17 L15 17 L14.5 10" fill="${clothColor}" stroke="none"/>
-      <!-- shorts -->
-      <path d="M9 17 L8.5 21 L11.5 21 L12 18.5 L12.5 21 L15.5 21 L15 17 Z" fill="${clothColor}" stroke="none"/>
-      <!-- bare arms -->
-      <line x1="9" y1="10.5" x2="7" y2="14" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="15" y1="10.5" x2="17" y2="14" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    skinColor = '#FBBF8C'; clothColor = '#F97316';
+    bodyHtml = `
+      <!-- Tank top -->
+      <path d="M9.5 10 L9 17 L15 17 L14.5 10" fill="${clothColor}"/>
+      <!-- Shorts end at y=22 leaving room for feet -->
+      <path d="M9 17 L8.5 22 L11.2 22 L12 20 L12.8 22 L15.5 22 L15 17 Z" fill="${clothColor}"/>
+      <!-- Bare upper-arms / forearms (skin) -->
+      <line x1="9"  y1="11" x2="7"  y2="15" stroke="${skinColor}" stroke-width="2" stroke-linecap="round"/>
+      <line x1="15" y1="11" x2="17" y2="15" stroke="${skinColor}" stroke-width="2" stroke-linecap="round"/>
+      <!-- Bare legs (skin colour from shorts to feet) -->
+      <line x1="10" y1="22" x2="10.5" y2="25" stroke="${skinColor}" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="14" y1="22" x2="13.5" y2="25" stroke="${skinColor}" stroke-width="2.2" stroke-linecap="round"/>
     `;
   } else if (T >= 28) {
-    // Hot: short-sleeve + shorts
-    outfit = 'hot';
-    skinColor = '#FBBF8C';
-    clothColor = '#3B82F6';
-    extraDetails = `
-      <!-- t-shirt body -->
-      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
-      <!-- shorts -->
-      <path d="M9.5 17 L9 21 L11.5 21 L12 18.5 L12.5 21 L15 21 L14.5 17 Z" fill="${clothColor}" stroke="none"/>
-      <!-- short sleeves + bare forearms -->
-      <line x1="8" y1="12" x2="6.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="16" y1="12" x2="17.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    skinColor = '#FBBF8C'; clothColor = '#3B82F6';
+    bodyHtml = `
+      <!-- T-shirt -->
+      <path d="M9 10 L8 12.5 L9.5 13 L9.5 17 L14.5 17 L14.5 13 L16 12.5 L15 10 Z" fill="${clothColor}"/>
+      <!-- Shorts -->
+      <path d="M9.5 17 L9 22 L11.5 22 L12 20 L12.5 22 L15 22 L14.5 17 Z" fill="${clothColor}"/>
+      <!-- Short sleeves (cloth) + bare forearms (skin) -->
+      <line x1="8"  y1="12" x2="7"  y2="14.5" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="16" y1="12" x2="17" y2="14.5" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="7"  y1="14.5" x2="6.5" y2="17" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="17" y1="14.5" x2="17.5" y2="17" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <!-- Bare legs -->
+      <line x1="10" y1="22" x2="10.5" y2="25" stroke="${skinColor}" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="14" y1="22" x2="13.5" y2="25" stroke="${skinColor}" stroke-width="2.2" stroke-linecap="round"/>
     `;
   } else if (T >= 22) {
-    // Warm: t-shirt + long pants
-    outfit = 'warm';
-    skinColor = '#FBBF8C';
-    clothColor = '#10B981';
-    extraDetails = `
-      <!-- t-shirt body -->
-      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
-      <!-- long pants -->
-      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#374151" stroke="none"/>
-      <!-- short sleeves + bare forearms -->
-      <line x1="8" y1="12" x2="6.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="16" y1="12" x2="17.5" y2="15" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+    skinColor = '#FBBF8C'; clothColor = '#10B981';
+    bodyHtml = `
+      <!-- T-shirt -->
+      <path d="M9 10 L8 12.5 L9.5 13 L9.5 17 L14.5 17 L14.5 13 L16 12.5 L15 10 Z" fill="${clothColor}"/>
+      <!-- Long pants (dark) -->
+      <path d="M9.5 17 L9 25 L11.5 25 L12 21 L12.5 25 L15 25 L14.5 17 Z" fill="#374151"/>
+      <!-- Short sleeves + bare forearms -->
+      <line x1="8"  y1="12" x2="7"  y2="14.5" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="16" y1="12" x2="17" y2="14.5" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="7"  y1="14.5" x2="6.5" y2="17" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="17" y1="14.5" x2="17.5" y2="17" stroke="${skinColor}" stroke-width="1.8" stroke-linecap="round"/>
     `;
   } else if (T >= 16) {
-    // Mild/Cool: long-sleeve + pants
-    outfit = 'mild';
-    skinColor = '#FBBF8C';
-    clothColor = '#8B5CF6';
-    extraDetails = `
-      <!-- long-sleeve shirt -->
-      <path d="M9 10 L8 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16 12 L15 10 Z" fill="${clothColor}" stroke="none"/>
-      <!-- long sleeves -->
-      <line x1="8.5" y1="11.5" x2="6.5" y2="17" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
-      <line x1="15.5" y1="11.5" x2="17.5" y2="17" stroke="${clothColor}" stroke-width="2.5" stroke-linecap="round"/>
-      <!-- long pants -->
-      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#374151" stroke="none"/>
+    skinColor = '#FBBF8C'; clothColor = '#8B5CF6';
+    bodyHtml = `
+      <!-- Long-sleeve shirt -->
+      <path d="M9 10 L8 12.5 L9.5 13 L9.5 17 L14.5 17 L14.5 13 L16 12.5 L15 10 Z" fill="${clothColor}"/>
+      <!-- Full long sleeves -->
+      <line x1="8"   y1="12"  x2="6"   y2="18" stroke="${clothColor}" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="16"  y1="12"  x2="18"  y2="18" stroke="${clothColor}" stroke-width="2.8" stroke-linecap="round"/>
+      <!-- Long pants -->
+      <path d="M9.5 17 L9 25 L11.5 25 L12 21 L12.5 25 L15 25 L14.5 17 Z" fill="#374151"/>
     `;
   } else if (T >= 8) {
-    // Cold: jacket + pants
-    outfit = 'cold';
-    skinColor = '#FBBF8C';
-    clothColor = '#6366F1';
-    extraDetails = `
-      <!-- jacket body with lapels -->
-      <path d="M8.5 10 L7.5 12 L9.5 12.5 L9.5 17 L14.5 17 L14.5 12.5 L16.5 12 L15.5 10 Z" fill="${clothColor}" stroke="none"/>
-      <path d="M10.5 10 L12 12 L13.5 10" fill="white" opacity="0.4" stroke="none"/>
-      <!-- jacket sleeves -->
-      <line x1="7.5" y1="11.5" x2="5.5" y2="17" stroke="${clothColor}" stroke-width="3" stroke-linecap="round"/>
-      <line x1="16.5" y1="11.5" x2="18.5" y2="17" stroke="${clothColor}" stroke-width="3" stroke-linecap="round"/>
-      <!-- pants -->
-      <path d="M9.5 17 L9 23 L11.5 23 L12 20 L12.5 23 L15 23 L14.5 17 Z" fill="#1F2937" stroke="none"/>
+    skinColor = '#FBBF8C'; clothColor = '#6366F1';
+    bodyHtml = `
+      <!-- Jacket with slight lapels -->
+      <path d="M8.5 10 L7.5 12.5 L9.5 13 L9.5 17 L14.5 17 L14.5 13 L16.5 12.5 L15.5 10 Z" fill="${clothColor}"/>
+      <path d="M10.5 10 L12 12.5 L13.5 10" fill="rgba(255,255,255,0.35)"/>
+      <!-- Thick jacket sleeves -->
+      <line x1="7.5"  y1="12"  x2="5.5"  y2="18.5" stroke="${clothColor}" stroke-width="3.2" stroke-linecap="round"/>
+      <line x1="16.5" y1="12"  x2="18.5" y2="18.5" stroke="${clothColor}" stroke-width="3.2" stroke-linecap="round"/>
+      <!-- Pants -->
+      <path d="M9.5 17 L9 25 L11.5 25 L12 21 L12.5 25 L15 25 L14.5 17 Z" fill="#1F2937"/>
     `;
   } else {
-    // Very cold: heavy coat + scarf
-    outfit = 'freezing';
-    skinColor = '#FBBF8C';
-    clothColor = '#DC2626';
-    extraDetails = `
-      <!-- heavy coat -->
-      <path d="M8 9.5 L7 12 L9.5 12.5 L9.5 17.5 L14.5 17.5 L14.5 12.5 L17 12 L16 9.5 Z" fill="${clothColor}" stroke="none"/>
-      <!-- thick sleeves -->
-      <line x1="7" y1="11.5" x2="5" y2="18" stroke="${clothColor}" stroke-width="4" stroke-linecap="round"/>
-      <line x1="17" y1="11.5" x2="19" y2="18" stroke="${clothColor}" stroke-width="4" stroke-linecap="round"/>
-      <!-- scarf around neck -->
-      <path d="M9 8.5 Q12 10.5 15 8.5" stroke="#FCD34D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-      <!-- pants (thick) -->
-      <path d="M9.5 17.5 L8.5 23 L11.5 23 L12 20 L12.5 23 L15.5 23 L14.5 17.5 Z" fill="#1F2937" stroke="none"/>
+    skinColor = '#FBBF8C'; clothColor = '#DC2626';
+    bodyHtml = `
+      <!-- Heavy coat -->
+      <path d="M8 9.5 L7 12.5 L9.5 13 L9.5 17.5 L14.5 17.5 L14.5 13 L17 12.5 L16 9.5 Z" fill="${clothColor}"/>
+      <!-- Scarf -->
+      <path d="M9.2 8.8 Q12 11 14.8 8.8" stroke="#FCD34D" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+      <!-- Very thick sleeves -->
+      <line x1="7"   y1="12"  x2="4.5"  y2="19" stroke="${clothColor}" stroke-width="4"   stroke-linecap="round"/>
+      <line x1="17"  y1="12"  x2="19.5" y2="19" stroke="${clothColor}" stroke-width="4"   stroke-linecap="round"/>
+      <!-- Thick trousers -->
+      <path d="M9.5 17.5 L8.5 25 L11.5 25 L12 21 L12.5 25 L15.5 25 L14.5 17.5 Z" fill="#1F2937"/>
     `;
   }
-  
+
   container.innerHTML = `
-    <svg width="22" height="24" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg"
+    <svg width="24" height="30" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"
          style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); transition: all 0.4s ease;">
       <!-- Head -->
-      <circle cx="12" cy="5" r="3" fill="${skinColor}" stroke="none"/>
-      <!-- Body/Outfit -->
-      ${extraDetails}
-      <!-- Face: eyes -->
-      <circle cx="10.8" cy="4.5" r="0.4" fill="#333" />
-      <circle cx="13.2" cy="4.5" r="0.4" fill="#333" />
-      <!-- Face: smile -->
-      <path d="M10.8 6 Q12 7 13.2 6" stroke="#333" stroke-width="0.5" stroke-linecap="round" fill="none"/>
+      <circle cx="12" cy="5" r="3" fill="${skinColor}"/>
+      <!-- Eyes -->
+      <circle cx="10.8" cy="4.5" r="0.45" fill="#333"/>
+      <circle cx="13.2" cy="4.5" r="0.45" fill="#333"/>
+      <!-- Smile -->
+      <path d="M10.8 6.2 Q12 7.4 13.2 6.2" stroke="#333" stroke-width="0.5" stroke-linecap="round" fill="none"/>
+      <!-- Outfit (body + arms + legs) -->
+      ${bodyHtml}
+      <!-- Feet / shoes (always visible) -->
+      ${feetSvg}
     </svg>
   `;
 }
+
 
 // Map active icon to background styles and trigger custom screen particles!
 function applyDynamicBackdropTheme(iconType) {
