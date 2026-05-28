@@ -1823,36 +1823,37 @@ let radarPlayInterval = null;
 let radarHistoryFrames = [];
 let radarCurrentFrameIndex = 0;
 
-// Dynamic UTC calculator for CWA historical radar images
+// Dynamic local time calculator for CWA historical radar images (CWA servers store files in local Taiwan time)
 function getRadarHistoryUrls() {
   const urls = [];
   const now = new Date();
   
   // Since CWA images take about 8 minutes to generate, let's offset by 8 minutes to be safe
-  // now.getTime() is already UTC epoch milliseconds!
-  const latestUtcMs = now.getTime() - (8 * 60 * 1000);
+  const latestLocalMs = now.getTime() - (8 * 60 * 1000);
   
   // We fetch the past 6 intervals (representing 1 hour, each 10 mins apart)
   for (let i = 0; i < 6; i++) {
-    const frameMs = latestUtcMs - (i * 10 * 60 * 1000);
+    const frameMs = latestLocalMs - (i * 10 * 60 * 1000);
     const frameDate = new Date(frameMs);
     
-    // Round down to the nearest 10 minutes in UTC!
-    const roundedMinutes = Math.floor(frameDate.getUTCMinutes() / 10) * 10;
-    frameDate.setUTCMinutes(roundedMinutes);
-    frameDate.setUTCSeconds(0);
-    frameDate.setUTCMilliseconds(0);
+    // Round down to the nearest 10 minutes in local time!
+    const roundedMinutes = Math.floor(frameDate.getMinutes() / 10) * 10;
+    frameDate.setMinutes(roundedMinutes);
+    frameDate.setSeconds(0);
+    frameDate.setMilliseconds(0);
     
-    // Format YYYYMMDDHHMM in UTC
-    const yyyy = frameDate.getUTCFullYear();
-    const mm = String(frameDate.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(frameDate.getUTCDate()).padStart(2, '0');
-    const hh = String(frameDate.getUTCHours()).padStart(2, '0');
-    const mi = String(frameDate.getUTCMinutes()).padStart(2, '0');
+    // Format YYYYMMDDHHMM in local Taiwan time (CWA server filename standard)
+    const yyyy = frameDate.getFullYear();
+    const mm = String(frameDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(frameDate.getDate()).padStart(2, '0');
+    const hh = String(frameDate.getHours()).padStart(2, '0');
+    const mi = String(frameDate.getMinutes()).padStart(2, '0');
     
     const timeStr = `${yyyy}${mm}${dd}${hh}${mi}`;
     const url = `https://www.cwa.gov.tw/Data/radar/CV1_3600_${timeStr}.png`;
-    urls.push({ url, label: `${hh}:${mi} (UTC)` });
+    
+    // The label is directly in local Taiwan time!
+    urls.push({ url, label: `${hh}:${mi}` });
   }
   
   // Reverse so they play from oldest to newest!
@@ -1932,12 +1933,8 @@ function startPlaybackLoop() {
     const frame = radarHistoryFrames[radarCurrentFrameIndex];
     radarImg.src = frame.url;
     
-    // Display local time for user convenience (convert UTC frame label back to local +8)
-    const [hh, mi] = frame.label.split(' ')[0].split(':');
-    let localHour = (parseInt(hh) + 8) % 24;
-    const formattedLocalTime = `${String(localHour).padStart(2, '0')}:${mi}`;
-    
-    timestampEl.textContent = `播放中：${formattedLocalTime}`;
+    // Display local Taiwan time directly
+    timestampEl.textContent = `播放中：${frame.label}`;
     
     radarCurrentFrameIndex = (radarCurrentFrameIndex + 1) % radarHistoryFrames.length;
   };
