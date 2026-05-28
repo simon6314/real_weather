@@ -11,8 +11,8 @@ const TAIWAN_COUNTIES = [
   { name: '臺北市', english: 'Taipei', lat: 25.0329, lon: 121.5654, region: '北部' },
   { name: '新北市', english: 'New Taipei', lat: 25.0142, lon: 121.4638, region: '北部' },
   { name: '桃園市', english: 'Taoyuan', lat: 24.9936, lon: 121.3009, region: '北部' },
-  { name: '台中市', english: 'Taichung', lat: 24.1477, lon: 120.6736, region: '中部' },
-  { name: '台南市', english: 'Tainan', lat: 22.9997, lon: 120.2270, region: '南部' },
+  { name: '臺中市', english: 'Taichung', lat: 24.1477, lon: 120.6736, region: '中部' },
+  { name: '臺南市', english: 'Tainan', lat: 22.9997, lon: 120.2270, region: '南部' },
   { name: '高雄市', english: 'Kaohsiung', lat: 22.6273, lon: 120.3014, region: '南部' },
   { name: '基隆市', english: 'Keelung', lat: 25.1283, lon: 121.7419, region: '北部' },
   { name: '新竹市', english: 'Hsinchu City', lat: 24.8138, lon: 120.9674, region: '北部' },
@@ -26,7 +26,7 @@ const TAIWAN_COUNTIES = [
   { name: '屏東縣', english: 'Pingtung', lat: 22.5515, lon: 120.5487, region: '南部' },
   { name: '宜蘭縣', english: 'Yilan', lat: 24.7021, lon: 121.7377, region: '東部' },
   { name: '花蓮縣', english: 'Hualien', lat: 23.9871, lon: 121.6015, region: '東部' },
-  { name: '台東縣', english: 'Taitung', lat: 22.7972, lon: 121.0772, region: '東部' },
+  { name: '臺東縣', english: 'Taitung', lat: 22.7972, lon: 121.0772, region: '東部' },
   { name: '澎湖縣', english: 'Penghu', lat: 23.5711, lon: 119.5793, region: '離島' },
   { name: '金門縣', english: 'Kinmen', lat: 24.4482, lon: 118.3764, region: '離島' },
   { name: '連江縣', english: 'Matsu', lat: 26.1519, lon: 119.9392, region: '離島' }
@@ -50,7 +50,7 @@ const AppState = {
   
   currentLocationCounty: '臺北市', // Default fallback
   currentWeather: {},            // Cached current weather for main display
-  addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '台中市', '高雄市'],
+  addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '臺中市', '高雄市'],
   allCountiesWeatherData: {},    // Map of countyName -> parsed weather profile
   
   activeTab: 'weather',          // 'weather' or 'radar'
