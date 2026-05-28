@@ -224,7 +224,7 @@
             <!-- Dynamic Radar Image Viewport -->
             <div class="radar-canvas-outer" id="radar-canvas-outer">
               <div class="radar-interactive-wrapper" id="radar-wrapper">
-                <img id="radar-img" src="" alt="中央氣象署雷達回波圖" crossorigin="anonymous">
+                <img id="radar-img" src="" alt="中央氣象署雷達回波圖">
               </div>
             </div>
             
@@ -259,7 +259,7 @@
 
     <!-- FOOTER -->
     <footer class="app-footer">
-      <p>&copy; 2026 天巡者 Weather Dashboard &bull; 設計美學與智慧 API 串接 &bull; 內建 22 縣市離線智慧模擬引擎</p>
+      <p>&copy; 2026 天巡者 Weather Dashboard &bull; 設計美學與智慧 CWA API 串接 &bull; 實時氣象觀測看板</p>
     </footer>
 
   </div>
@@ -334,22 +334,6 @@
             <input type="password" id="input-api-key" placeholder="請輸入 CWA-XXXX 授權碼..." autocomplete="off">
             <button type="button" id="btn-toggle-key-visible" class="toggle-password-btn">顯示</button>
             <p class="form-help">氣象署 API 金鑰是<b>完全免費</b>的！<a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noopener">點此前往氣象資料開放平臺</a> 註冊會員並於「會員中心」即可取得您專屬的金鑰。</p>
-          </div>
-          
-          <div class="form-group">
-            <label>資料載入模式</label>
-            <div class="radio-group">
-              <label class="radio-label">
-                <input type="radio" name="data-mode" value="auto" checked>
-                <span class="radio-custom"></span>
-                <span>自動（優先使用金鑰，無金鑰時自動切換至高擬真模擬模式）</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="data-mode" value="simulation">
-                <span class="radio-custom"></span>
-                <span>強制模擬模式（展示氣象局格式的完美波形與天氣）</span>
-              </label>
-            </div>
           </div>
           
           <div class="settings-actions">

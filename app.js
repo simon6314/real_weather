@@ -35,6 +35,56 @@ const TAIWAN_COUNTIES = [
 // Pre-configured default key (Left empty for GitHub security - user can input in Settings modal)
 const DEFAULT_API_KEY = '';
 
+const TOWNSHIP_DATA = {
+  "臺北市": "中正區 萬華區 大同區 中山區 松山區 大安區 信義區 內湖區 南港區 士林區 北投區 文山區",
+  "新北市": "板橋區 三重區 中和區 永和區 新莊區 新店區 土城區 蘆洲區 汐止區 樹林區 鶯歌區 三峽區 淡水區 瑞芳區 五股區 泰山區 林口區 深坑區 石碇區 坪林區 三芝區 石門區 八里區 平溪區 雙溪區 貢寮區 金山區 萬里區 烏來區",
+  "桃園市": "桃園區 中壢區 平鎮區 八德區 楊梅區 蘆竹區 大溪區 龍潭區 龜山區 大園區 觀音區 新屋區 復興區",
+  "臺中市": "中區 東區 南區 西區 北區 北屯區 西屯區 南屯區 太平區 大里區 霧峰區 烏日區 豐原區 后里區 石岡區 東勢區 和平區 新社區 潭子區 大雅區 神岡區 大肚區 沙鹿區 龍井區 梧棲區 清水區 大甲區 外埔區 大安區",
+  "臺南市": "新營區 鹽水區 白河區 柳營區 後壁區 東山區 麻豆區 下營區 六甲區 官田區 大內區 佳里區 學甲區 西港區 七股區 將軍區 北門區 新化區 善化區 新市區 安定區 山上區 玉井區 楠西區 南化區 左鎮區 仁德區 歸仁區 關廟區 龍崎區 永康區 安南區 安平區 中西區 北區 南區 東區",
+  "高雄市": "鹽埕區 鼓山區 左營區 楠梓區 三民區 新興區 前金區 苓雅區 前鎮區 旗津區 小港區 鳳山區 林園區 大寮區 大樹區 大社區 仁武區 鳥松區 岡山區 橋頭區 燕巢區 田寮區 阿蓮區 路竹區 湖內區 茄萣區 永安區 彌陀區 梓官區 旗山區 美濃區 六龜區 甲仙區 杉林區 內門區 茂林區 桃源區 那瑪夏區",
+  "基隆市": "中正區 信義區 仁愛區 中山區 安樂區 暖暖區 七堵區",
+  "新竹市": "東區 北區 香山區",
+  "嘉義市": "東區 西區",
+  "新竹縣": "竹北市 竹東鎮 新埔鎮 關西鎮 湖口鄉 新豐鄉 芎林鄉 橫山鄉 北埔鄉 寶山鄉 峨眉鄉 尖石鄉 五峰鄉",
+  "苗栗縣": "苗栗市 頭份市 竹南鎮 後龍鎮 通霄鎮 苑裡鎮 卓蘭鎮 造橋鄉 西湖鄉 頭屋鄉 公館鄉 銅鑼鄉 三義鄉 大湖鄉 獅潭鄉 三灣鄉 南庄鄉 泰安鄉",
+  "彰化縣": "彰化市 員林市 和美鎮 鹿港鎮 溪湖鎮 田中鎮 北斗鎮 二林鎮 線西鄉 伸港鄉 福興鄉 秀水鄉 花壇鄉 大村鄉 埔鹽鄉 埔心鄉 永靖鄉 社頭鄉 二水鄉 田尾鄉 埤頭鄉 芳苑鄉 大城鄉 竹塘鄉 溪州鄉 芬園鄉",
+  "南投縣": "南投市 草屯鎮 埔里鎮 竹山鎮 集集鎮 名間鄉 鹿谷鄉 中寮鄉 魚池鄉 國姓鄉 水里鄉 信義鄉 仁愛鄉",
+  "雲林縣": "斗六市 斗南鎮 虎尾鎮 西螺鎮 土庫鎮 北港鎮 古坑鄉 大埤鄉 莿桐鄉 林內鄉 二崙鄉 崙背鄉 麥寮鄉 東勢鄉 褒忠鄉 台西鄉 元長鄉 四湖鄉 口湖鄉 水林鄉",
+  "嘉義縣": "太保市 朴子市 布袋鎮 大林鎮 民雄鄉 溪口鄉 新港鄉 六腳鄉 東石鄉 義竹鄉 鹿草鄉 水上鄉 中埔鄉 竹崎鄉 梅山鄉 番路鄉 大埔鄉 阿里山鄉",
+  "屏東縣": "屏東市 潮州鎮 東港鎮 恆春鎮 萬丹鄉 長治鄉 麟洛鄉 九如鄉 里港鄉 鹽埔鄉 高樹鄉 萬巒鄉 內埔鄉 竹田鄉 新埤鄉 枋寮鄉 新園鄉 崁頂鄉 林邊鄉 南州鄉 佳冬鄉 琉球鄉 車城鄉 滿州鄉 枋山鄉 三地門鄉 霧台鄉 瑪家鄉 泰武鄉 來義鄉 春日鄉 獅子鄉 牡丹鄉",
+  "宜蘭縣": "宜蘭市 羅東鎮 蘇澳鎮 頭城鎮 礁溪鄉 壯圍鄉 員山鄉 冬山鄉 五結鄉 三星鄉 大同鄉 南澳鄉",
+  "花蓮縣": "花蓮市 鳳林鎮 玉里鎮 新城鄉 吉安鄉 壽豐鄉 光復鄉 豐濱鄉 瑞穗鄉 富里鄉 秀林鄉 萬榮鄉 卓溪鄉",
+  "臺東縣": "台東市 成功鎮 關山鎮 卑南鄉 大武鄉 太麻里鄉 東河鄉 長濱鄉 鹿野鄉 池上鄉 綠島鄉 延平鄉 海端鄉 達仁鄉 金峰鄉 蘭嶼鄉",
+  "澎湖縣": "馬公市 湖西鄉 白沙鄉 西嶼鄉 望安鄉 七美鄉",
+  "金門縣": "金城鎮 金湖鎮 金沙鎮 金寧鄉 烈嶼鄉 烏坵鄉",
+  "連江縣": "南竿鄉 北竿鄉 莒光鄉 東引鄉"
+};
+
+const COUNTY_TOWN_APIS = {
+  "宜蘭縣": { 3: "F-D0047-001", 7: "F-D0047-003" },
+  "桃園市": { 3: "F-D0047-005", 7: "F-D0047-007" },
+  "新竹縣": { 3: "F-D0047-009", 7: "F-D0047-011" },
+  "苗栗縣": { 3: "F-D0047-013", 7: "F-D0047-015" },
+  "彰化縣": { 3: "F-D0047-017", 7: "F-D0047-019" },
+  "南投縣": { 3: "F-D0047-021", 7: "F-D0047-023" },
+  "雲林縣": { 3: "F-D0047-025", 7: "F-D0047-027" },
+  "嘉義縣": { 3: "F-D0047-029", 7: "F-D0047-031" },
+  "屏東縣": { 3: "F-D0047-033", 7: "F-D0047-035" },
+  "臺東縣": { 3: "F-D0047-037", 7: "F-D0047-039" },
+  "花蓮縣": { 3: "F-D0047-041", 7: "F-D0047-043" },
+  "澎湖縣": { 3: "F-D0047-045", 7: "F-D0047-047" },
+  "基隆市": { 3: "F-D0047-049", 7: "F-D0047-051" },
+  "新竹市": { 3: "F-D0047-053", 7: "F-D0047-055" },
+  "嘉義市": { 3: "F-D0047-057", 7: "F-D0047-059" },
+  "臺北市": { 3: "F-D0047-061", 7: "F-D0047-063" },
+  "高雄市": { 3: "F-D0047-065", 7: "F-D0047-067" },
+  "新北市": { 3: "F-D0047-069", 7: "F-D0047-071" },
+  "臺中市": { 3: "F-D0047-073", 7: "F-D0047-075" },
+  "臺南市": { 3: "F-D0047-077", 7: "F-D0047-079" },
+  "連江縣": { 3: "F-D0047-081", 7: "F-D0047-083" },
+  "金門縣": { 3: "F-D0047-085", 7: "F-D0047-087" }
+};
+
 // Cloudflare Worker Proxy URL (Optional)
 // If you deploy a Cloudflare Worker to proxy CWA API and hide your API key, paste its URL here.
 // Example: 'https://taiwan-weather-proxy.yourname.workers.dev'
@@ -45,7 +95,7 @@ const CLOUDFLARE_PROXY_URL = 'https://wearther-proxy.simon6314.workers.dev';
 // --------------------------------------------------------------------------
 const AppState = {
   apiKey: localStorage.getItem('cwa_api_key') || DEFAULT_API_KEY,
-  dataMode: CLOUDFLARE_PROXY_URL ? 'auto' : (localStorage.getItem('cwa_data_mode') || 'auto'), // Force auto if proxy configured
+  dataMode: 'live', // Enforce live CWA only
   isSimulationActive: false,
   
   currentLocationCounty: '臺北市', // Default fallback
@@ -183,13 +233,13 @@ async function loadWeatherDashboard() {
       AppState.isSimulationActive = false;
       updateDataBadge('即時氣象署資料', 'live');
     } else {
-      AppState.isSimulationActive = true;
-      triggerSimulationMode('CWA API 金鑰失效或連線中斷，已啟動高擬真模擬展示模式');
+      AppState.isSimulationActive = false;
+      updateDataBadge('無法取得即時資料', 'error');
     }
   } catch (err) {
     console.error('Fatal load error:', err);
-    AppState.isSimulationActive = true;
-    triggerSimulationMode('系統連線錯誤，已自動啟動展示模擬模式');
+    AppState.isSimulationActive = false;
+    updateDataBadge('連線失敗', 'error');
   }
   
   // Render views from active state
@@ -220,8 +270,8 @@ function updateDataBadge(text, state) {
 
 // Main API fetching client with 1-hour caching logic
 async function fetchAllWeatherData() {
-  if (AppState.dataMode === 'simulation' || (!AppState.apiKey && !CLOUDFLARE_PROXY_URL)) {
-    return false; // Force simulation
+  if (!AppState.apiKey && !CLOUDFLARE_PROXY_URL) {
+    return false; // Requires API key or Cloudflare proxy
   }
   
   const cacheKey = 'cwa_weather_cache_v1';
@@ -305,16 +355,21 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
   
   try {
     // 1. Process 36h data
-    const locations36 = data36h.records.location || [];
+    const locations36 = (data36h && data36h.records) ? data36h.records.location || [] : [];
     for (const loc of locations36) {
       const cName = normalizeCountyName(loc.locationName);
       if (!merged[cName]) continue;
       
-      const elements = loc.weatherElement;
-      const wx = elements.find(el => el.elementName === 'Wx')?.time[0]?.parameter || {};
-      const pop = elements.find(el => el.elementName === 'PoP')?.time[0]?.parameter?.parameterName || '0';
-      const minT = elements.find(el => el.elementName === 'MinT')?.time[0]?.parameter?.parameterName || '--';
-      const maxT = elements.find(el => el.elementName === 'MaxT')?.time[0]?.parameter?.parameterName || '--';
+      const elements = loc.weatherElement || [];
+      const wxEl = elements.find(el => el.elementName === 'Wx');
+      const popEl = elements.find(el => el.elementName === 'PoP');
+      const minTEl = elements.find(el => el.elementName === 'MinT');
+      const maxTEl = elements.find(el => el.elementName === 'MaxT');
+      
+      const wx = wxEl?.time?.[0]?.parameter || {};
+      const pop = popEl?.time?.[0]?.parameter?.parameterName || '0';
+      const minT = minTEl?.time?.[0]?.parameter?.parameterName || '--';
+      const maxT = maxTEl?.time?.[0]?.parameter?.parameterName || '--';
       
       merged[cName].current = {
         temp: Math.round((parseInt(minT) + parseInt(maxT)) / 2) || 26,
@@ -342,7 +397,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       const cName = normalizeCountyName(loc.locationName);
       if (!merged[cName]) continue;
       
-      const elements = loc.weatherElement;
+      const elements = loc.weatherElement || [];
       const tempEl = elements.find(el => el.elementName === 'T');
       const rhEl = elements.find(el => el.elementName === 'RH');
       const wsEl = elements.find(el => el.elementName === 'WS'); // Wind speed
@@ -351,16 +406,24 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       
       // Build Hourly (up to 24 intervals = 72 hours)
       const hourlyList = [];
-      const len = tempEl ? tempEl.time.length : 0;
+      const len = (tempEl && tempEl.time) ? tempEl.time.length : 0;
       
       for (let i = 0; i < len; i++) {
-        const timeStr = tempEl.time[i].dataTime;
+        const timeItem = tempEl.time[i];
+        if (!timeItem) continue;
+        
+        const timeStr = timeItem.dataTime;
         const timeVal = new Date(timeStr);
-        const temp = parseInt(tempEl.time[i].elementValue[0].value);
-        const humidity = rhEl ? parseInt(rhEl.time[i].elementValue[0].value) : 70;
+        const temp = timeItem.elementValue?.[0] ? parseInt(timeItem.elementValue[0].value) : NaN;
+        if (isNaN(temp)) continue;
+        
+        let humidity = 70;
+        if (rhEl && rhEl.time && rhEl.time[i] && rhEl.time[i].elementValue && rhEl.time[i].elementValue[0]) {
+          humidity = parseInt(rhEl.time[i].elementValue[0].value) || 70;
+        }
         
         let wind = 2;
-        if (wsEl) {
+        if (wsEl && wsEl.time && wsEl.time[i] && wsEl.time[i].elementValue && wsEl.time[i].elementValue[0]) {
           const wsVal = wsEl.time[i].elementValue[0].value;
           const wsInt = parseInt(wsVal) || 0;
           // Rough convert m/s wind speed to Beaufort scale grade
@@ -372,19 +435,23 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           else wind = 5;
         }
         
-        const wx = wxEl ? wxEl.time[i].elementValue[0].value : '多雲';
-        const wxValue = wxEl ? wxEl.time[i].elementValue[1].value : '2';
+        let wx = '多雲';
+        let wxValue = '2';
+        if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
+          wx = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
+          wxValue = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+        }
         
         // Find rain pop matching this period
         let rainProb = 0;
-        if (popEl) {
+        if (popEl && popEl.time) {
           // Find the time interval that spans our hour
           const popMatch = popEl.time.find(p => {
             const start = new Date(p.startTime || p.dataTime);
             const end = p.endTime ? new Date(p.endTime) : new Date(start.getTime() + 6*3600000);
             return timeVal >= start && timeVal <= end;
           });
-          rainProb = popMatch ? parseInt(popMatch.elementValue[0].value) : 0;
+          rainProb = (popMatch && popMatch.elementValue && popMatch.elementValue[0]) ? parseInt(popMatch.elementValue[0].value) : 0;
         }
         
         hourlyList.push({
@@ -423,14 +490,14 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       const cName = normalizeCountyName(loc.locationName);
       if (!merged[cName]) continue;
       
-      const elements = loc.weatherElement;
+      const elements = loc.weatherElement || [];
       const minTEl = elements.find(el => el.elementName === 'MinT');
       const maxTEl = elements.find(el => el.elementName === 'MaxT');
       const wxEl = elements.find(el => el.elementName === 'Wx');
       const popEl = elements.find(el => el.elementName === 'PoP12h');
       
       const weeklyList = [];
-      const len = minTEl ? minTEl.time.length : 0;
+      const len = (minTEl && minTEl.time) ? minTEl.time.length : 0;
       
       // Weekly reports has morning/night subdivisions, we aggregate by day
       // time array lists: day 1 morning, day 1 night, day 2 morning, day 2 night...
@@ -438,25 +505,41 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       for (let i = 0; i < len; i += 2) {
         if (i >= len) break;
         
-        const dateStr = minTEl.time[i].startTime;
+        const timeItem = minTEl.time[i];
+        if (!timeItem) continue;
+        
+        const dateStr = timeItem.startTime || timeItem.dataTime;
         const dateVal = new Date(dateStr);
         
-        const minT1 = parseInt(minTEl.time[i].elementValue[0].value);
-        const minT2 = (i+1 < len) ? parseInt(minTEl.time[i+1].elementValue[0].value) : minT1;
+        const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
+        if (isNaN(minT1)) continue;
+        
+        let minT2 = minT1;
+        if (i+1 < len && minTEl.time[i+1] && minTEl.time[i+1].elementValue && minTEl.time[i+1].elementValue[0]) {
+          minT2 = parseInt(minTEl.time[i+1].elementValue[0].value) || minT1;
+        }
         const minT = Math.min(minT1, minT2);
         
-        const maxT1 = parseInt(maxTEl.time[i].elementValue[0].value);
-        const maxT2 = (i+1 < len) ? parseInt(maxTEl.time[i+1].elementValue[0].value) : maxT1;
+        let maxT1 = minT;
+        if (maxTEl && maxTEl.time && maxTEl.time[i] && maxTEl.time[i].elementValue && maxTEl.time[i].elementValue[0]) {
+          maxT1 = parseInt(maxTEl.time[i].elementValue[0].value) || minT;
+        }
+        let maxT2 = maxT1;
+        if (i+1 < len && maxTEl && maxTEl.time && maxTEl.time[i+1] && maxTEl.time[i+1].elementValue && maxTEl.time[i+1].elementValue[0]) {
+          maxT2 = parseInt(maxTEl.time[i+1].elementValue[0].value) || maxT1;
+        }
         const maxT = Math.max(maxT1, maxT2);
         
-        const wxVal = wxEl ? wxEl.time[i].elementValue[0].value : '多雲';
-        const wxIconVal = wxEl ? wxEl.time[i].elementValue[1].value : '2';
+        let wxVal = '多雲';
+        let wxIconVal = '2';
+        if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
+          wxVal = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
+          wxIconVal = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+        }
         
         let pop = 0;
-        if (popEl) {
-          const pop1 = popEl.time[i] ? parseInt(popEl.time[i].elementValue[0].value) : 0;
-          const pop2 = (i+1 < len && popEl.time[i+1]) ? parseInt(popEl.time[i+1].elementValue[0].value) : pop1;
-          pop = Math.max(isNaN(pop1)?0:pop1, isNaN(pop2)?0:pop2);
+        if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
+          pop = parseInt(popEl.time[i].elementValue[0].value) || 0;
         }
         
         weeklyList.push({
@@ -573,10 +656,10 @@ function triggerSimulationMode(reasonMsg) {
     
     // diurnal temp oscillation (high at 2 PM, low at 5 AM)
     const diurnalOffset = Math.sin((currentHour - 9) * Math.PI / 12) * 4;
-    const curTemp = Math.round(baseTemp + diurnalOffset);
-    const apparentTemp = Math.round(curTemp + (baseHumidity > 80 ? 1.5 : -1));
-    const minT = Math.round(baseTemp - 4);
-    const maxT = Math.round(baseTemp + 4);
+    const curTemp = parseFloat((baseTemp + diurnalOffset + (Math.random() * 0.4 - 0.2)).toFixed(1));
+    const apparentTemp = parseFloat((curTemp + (baseHumidity > 80 ? 1.2 : -0.8)).toFixed(1));
+    const minT = parseFloat((baseTemp - 4 + (Math.random() * 0.4 - 0.2)).toFixed(1));
+    const maxT = parseFloat((baseTemp + 4 + (Math.random() * 0.4 - 0.2)).toFixed(1));
     
     // Determine active weather condition based on region and season
     let activeIcon = 'sunny-cloudy';
@@ -627,7 +710,7 @@ function triggerSimulationMode(reasonMsg) {
       forecastDate.setHours(currentHour + h * 3);
       
       const forecastDiurnal = Math.sin((forecastHour - 9) * Math.PI / 12) * 4;
-      const hTemp = Math.round(baseTemp + forecastDiurnal + (Math.random() * 1 - 0.5));
+      const hTemp = parseFloat((baseTemp + forecastDiurnal + (Math.random() * 0.8 - 0.4)).toFixed(1));
       const hHum = Math.min(100, Math.max(30, Math.round(baseHumidity - forecastDiurnal * 3)));
       
       // Progressive weather change in timeline
@@ -667,8 +750,8 @@ function triggerSimulationMode(reasonMsg) {
       dayDate.setDate(now.getDate() + d);
       
       const dayName = d === 0 ? '今天' : weekdays[dayDate.getDay()];
-      const dayMin = minT + Math.round(Math.sin(d) * 1.5);
-      const dayMax = maxT + Math.round(Math.cos(d) * 1.5);
+      const dayMin = parseFloat((minT + Math.sin(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
+      const dayMax = parseFloat((maxT + Math.cos(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
       
       let dayIcon = activeIcon;
       let dayDesc = conditionText;
@@ -712,19 +795,36 @@ function renderMainLocationWeather() {
   const activeCountyName = AppState.currentLocationCounty;
   const countyData = AppState.allCountiesWeatherData[activeCountyName];
   
-  if (!countyData) {
+  if (!countyData || countyData.error || !countyData.current || Object.keys(countyData.current).length === 0) {
     console.error('No weather data loaded for location:', activeCountyName);
+    document.getElementById('current-location-name').textContent = activeCountyName;
+    document.getElementById('current-temp').textContent = '--';
+    document.getElementById('current-weather-desc').textContent = '無法取得即時氣象資料';
+    document.getElementById('current-temp-range').textContent = '請檢查網路連線或 API 金鑰配置';
+    
+    document.getElementById('current-apparent-temp').textContent = '--°C';
+    document.getElementById('current-humidity').textContent = '--%';
+    document.getElementById('current-wind-grade').textContent = '-- 級';
+    document.getElementById('current-rain-prob').textContent = '--%';
+    
+    const iconContainer = document.getElementById('hero-weather-icon');
+    iconContainer.innerHTML = `
+      <svg class="weather-icon-animated error" viewBox="0 0 64 64" width="128" height="128" style="animation: float 3s infinite ease-in-out;">
+        <path d="M32 12 L52 48 L12 48 Z" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linejoin="round"/>
+        <text x="32" y="38" font-size="16" fill="#ff6b6b" text-anchor="middle" font-weight="bold">!</text>
+      </svg>
+    `;
     return;
   }
   
   document.getElementById('current-location-name').textContent = activeCountyName;
   
   const cur = countyData.current;
-  document.getElementById('current-temp').textContent = cur.temp;
+  document.getElementById('current-temp').textContent = Number(cur.temp).toFixed(1);
   document.getElementById('current-weather-desc').textContent = cur.desc;
-  document.getElementById('current-temp-range').textContent = `最高 ${cur.tempMax}° | 最低 ${cur.tempMin}°`;
+  document.getElementById('current-temp-range').textContent = `最高 ${Number(cur.tempMax).toFixed(1)}° | 最低 ${Number(cur.tempMin).toFixed(1)}°`;
   
-  document.getElementById('current-apparent-temp').textContent = `${cur.apparentTemp}°C`;
+  document.getElementById('current-apparent-temp').textContent = `${Number(cur.apparentTemp).toFixed(1)}°C`;
   document.getElementById('current-humidity').textContent = `${cur.humidity}%`;
   document.getElementById('current-wind-grade').textContent = `${cur.windGrade} 級`;
   document.getElementById('current-rain-prob').textContent = `${cur.rainProb}%`;
@@ -802,34 +902,71 @@ function renderAddedRegionsList() {
     return;
   }
   
-  for (const rName of AppState.addedRegions) {
-    const data = AppState.allCountiesWeatherData[rName];
-    if (!data) continue;
+  for (const identifier of AppState.addedRegions) {
+    const data = AppState.allCountiesWeatherData[identifier];
+    
+    // If not loaded yet, fetch dynamically!
+    if (!data) {
+      loadWeatherForRegion(identifier).then(() => {
+        renderAddedRegionsList();
+      });
+      continue; // Skip rendering temporarily until loaded
+    }
+    
+    const parsed = parseIdentifier(identifier);
+    const nameLabel = parsed.type === 'town' ? parsed.town : parsed.county;
+    const badgeLabel = parsed.type === 'town' ? parsed.county : '縣市總覽';
+    
+    const card = document.createElement('div');
+    card.setAttribute('data-region', identifier);
+    
+    if (data.error) {
+      card.className = 'region-card glass-panel error-card';
+      card.innerHTML = `
+        <div class="region-card-left">
+          <span class="region-card-name">${nameLabel}</span>
+          <span class="region-card-meta" style="color: #ff6b6b;">${badgeLabel} &bull; 無法取得資料</span>
+        </div>
+        <div class="region-card-right">
+          <div class="region-card-temp">--°</div>
+          <div class="region-card-icon" style="color: #ff6b6b; font-size: 20px;">
+            ⚠️
+          </div>
+          <button class="delete-card-btn" title="刪除" onclick="event.stopPropagation(); deleteCustomRegion('${identifier}')">
+            &times;
+          </button>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        // Retry
+        loadWeatherForRegion(identifier).then(() => {
+          renderAddedRegionsList();
+        });
+      });
+      container.appendChild(card);
+      continue;
+    }
     
     const cur = data.current;
-    const card = document.createElement('div');
     card.className = 'region-card glass-panel';
-    card.setAttribute('data-region', rName);
-    
     card.innerHTML = `
       <div class="region-card-left">
-        <span class="region-card-name">${rName}</span>
-        <span class="region-card-meta">${cur.desc} &bull; 降雨 ${cur.rainProb}%</span>
+        <span class="region-card-name">${nameLabel}</span>
+        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}%</span>
       </div>
       <div class="region-card-right">
-        <div class="region-card-temp">${cur.temp}°</div>
+        <div class="region-card-temp">${Number(cur.temp).toFixed(1)}°</div>
         <div class="region-card-icon">
           ${getAnimatedSvgCode(cur.icon, 40, 40)}
         </div>
-        <button class="delete-card-btn" title="刪除" onclick="event.stopPropagation(); deleteCustomRegion('${rName}')">
+        <button class="delete-card-btn" title="刪除" onclick="event.stopPropagation(); deleteCustomRegion('${identifier}')">
           &times;
         </button>
       </div>
     `;
     
-    // Card click opens the details drawer
     card.addEventListener('click', () => {
-      openDrawerForecast(rName);
+      openDrawerForecast(identifier);
     });
     
     container.appendChild(card);
@@ -917,7 +1054,7 @@ function drawHourlySvgChart(hourlyData) {
   // Render labels and interaction nodes
   points.forEach(p => {
     // Temperature above coordinate node
-    svgCode += `<text x="${p.x}" y="${p.y - 12}" class="chart-label-temp">${p.temp}°</text>`;
+    svgCode += `<text x="${p.x}" y="${p.y - 12}" class="chart-label-temp">${Number(p.temp).toFixed(1)}°</text>`;
     
     // Coordinate circle point node
     svgCode += `<circle cx="${p.x}" cy="${p.y}" r="4" class="chart-point" />`;
@@ -980,8 +1117,8 @@ function renderAppleWeeklyRangeBars(weeklyList) {
         </div>
       </div>
       <div class="weekly-temp-labels">
-        <span class="weekly-min-temp">${day.tempMin}°</span>
-        <span class="weekly-max-temp">${day.tempMax}°</span>
+        <span class="weekly-min-temp">${Number(day.tempMin).toFixed(1)}°</span>
+        <span class="weekly-max-temp">${Number(day.tempMax).toFixed(1)}°</span>
       </div>
     `;
     
@@ -1006,14 +1143,47 @@ function initDetailsDrawer() {
   overlay.addEventListener('click', closeDrawer);
 }
 
-function openDrawerForecast(regionName) {
-  AppState.activeRegionDetailed = regionName;
-  const data = AppState.allCountiesWeatherData[regionName];
-  if (!data) return;
+function openDrawerForecast(identifier) {
+  AppState.activeRegionDetailed = identifier;
+  const data = AppState.allCountiesWeatherData[identifier];
+  
+  const parsed = parseIdentifier(identifier);
+  const title = parsed.type === 'town' ? `${parsed.county} ${parsed.town}` : parsed.county;
   
   // Set headers
-  document.getElementById('drawer-region-title').textContent = regionName;
-  document.getElementById('drawer-current-desc').textContent = `${data.current.desc} • 現在溫度 ${data.current.temp}°C`;
+  document.getElementById('drawer-region-title').textContent = title;
+  
+  const overlay = document.getElementById('details-drawer-overlay');
+  const drawer = document.getElementById('details-drawer');
+  
+  if (!data || data.error || !data.current || Object.keys(data.current).length === 0) {
+    document.getElementById('drawer-current-desc').textContent = `連線失敗 • 無法取得該地區天氣預報`;
+    document.getElementById('drawer-hero-icon').innerHTML = `
+      <span style="font-size: 32px; color: #ff6b6b">⚠️</span>
+    `;
+    
+    // Show error message in chart container
+    document.getElementById('svg-chart-container').innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); gap: 8px;">
+        <span style="font-size: 24px;">📡</span>
+        <p>無法取得即時 72 小時逐時預報資料</p>
+        <button class="primary-ctrl" onclick="retryDrawerLoad('${identifier}')" style="margin-top: 8px;">重新載入</button>
+      </div>
+    `;
+    
+    // Clear weekly list
+    document.getElementById('drawer-weekly-list').innerHTML = `
+      <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+        請確認您的 API 金鑰已在「設定」中正確設定，且網路連線正常。
+      </div>
+    `;
+    
+    overlay.classList.add('active');
+    drawer.classList.add('active');
+    return;
+  }
+  
+  document.getElementById('drawer-current-desc').textContent = `${data.current.desc} • 現在溫度 ${Number(data.current.temp).toFixed(1)}°C`;
   document.getElementById('drawer-hero-icon').innerHTML = getAnimatedSvgCode(data.current.icon, 64, 64);
   
   // Render SVG hourly chart
@@ -1023,8 +1193,8 @@ function openDrawerForecast(regionName) {
   renderAppleWeeklyRangeBars(data.weekly);
   
   // Open UI elements
-  document.getElementById('details-drawer-overlay').classList.add('active');
-  document.getElementById('details-drawer').classList.add('active');
+  overlay.classList.add('active');
+  drawer.classList.add('active');
 }
 
 // --------------------------------------------------------------------------
@@ -1107,7 +1277,7 @@ function loadRadarImage(force = false) {
   loader.style.opacity = '1';
   
   const cacheBust = force ? `?t=${new Date().getTime()}` : '';
-  radarImg.src = `https://www.cwa.gov.tw/Data/radar/CV1_3600.png${cacheBust}`;
+  radarImg.src = `https://opendata.cwa.gov.tw/opendata/observation/radar/CV1_3600.png${cacheBust}`;
   
   // Format current CWA standard update intervals (typically 10 min)
   const now = new Date();
@@ -1117,9 +1287,422 @@ function loadRadarImage(force = false) {
 }
 
 // --------------------------------------------------------------------------
+// 10.5 Taiwan 368 Townships Helpers & Core Loaders
+// --------------------------------------------------------------------------
+const SearchIndex = [];
+
+function parseIdentifier(id) {
+  const county = TAIWAN_COUNTIES.find(c => id.startsWith(c.name));
+  if (county && id.length > county.name.length) {
+    return {
+      type: 'town',
+      county: county.name,
+      town: id.substring(county.name.length)
+    };
+  }
+  return {
+    type: 'county',
+    county: id,
+    town: ''
+  };
+}
+
+function formatFriendlyName(id) {
+  const parsed = parseIdentifier(id);
+  return parsed.type === 'town' ? `${parsed.county} ${parsed.town}` : parsed.county;
+}
+
+function initSearchIndex() {
+  if (SearchIndex.length > 0) return; // Already built
+  
+  // Add 22 counties
+  for (const c of TAIWAN_COUNTIES) {
+    SearchIndex.push({
+      type: 'county',
+      name: c.name,
+      parent: '',
+      displayName: `${c.name} (${c.region})`,
+      searchTokens: c.name + c.english.toLowerCase() + c.region
+    });
+  }
+  
+  // Add 368 townships
+  for (const [county, townsStr] of Object.entries(TOWNSHIP_DATA)) {
+    const towns = townsStr.split(' ');
+    const region = TAIWAN_COUNTIES.find(c => c.name === county)?.region || '臺灣';
+    for (const t of towns) {
+      SearchIndex.push({
+        type: 'town',
+        name: t,
+        parent: county,
+        displayName: `${county} ${t}`,
+        searchTokens: county + t + region
+      });
+    }
+  }
+}
+
+async function loadWeatherForRegion(id) {
+  if (AppState.allCountiesWeatherData[id] && !AppState.allCountiesWeatherData[id].error) return; // Already loaded successfully!
+  
+  const parsed = parseIdentifier(id);
+  
+  if (parsed.type === 'county') {
+    const success = await fetchAllWeatherData();
+    if (!success) {
+      AppState.allCountiesWeatherData[id] = { error: true, name: parsed.county };
+    }
+    return;
+  }
+  
+  // Dynamic fetch for township
+  updateDataBadge(`載入 ${parsed.town}資料...`, 'loading');
+  try {
+    const success = await fetchCwaTownshipData(parsed.county);
+    if (success) {
+      updateDataBadge('即時氣象署資料', 'live');
+      if (AppState.allCountiesWeatherData[id] && AppState.allCountiesWeatherData[id].error) {
+        delete AppState.allCountiesWeatherData[id];
+      }
+    } else {
+      updateDataBadge('無法取得資料', 'error');
+      AppState.allCountiesWeatherData[id] = { error: true, name: parsed.town, parentCounty: parsed.county };
+    }
+  } catch (e) {
+    console.error('Failed loading township data:', e);
+    updateDataBadge('連線失敗', 'error');
+    AppState.allCountiesWeatherData[id] = { error: true, name: parsed.town, parentCounty: parsed.county };
+  }
+}
+
+async function fetchCwaTownshipData(countyName) {
+  const apis = COUNTY_TOWN_APIS[countyName];
+  if (!apis) return false;
+  
+  const cacheKey = `cwa_town_cache_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_${countyName}`;
+  const cachedDataStr = localStorage.getItem(cacheKey);
+  const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+  const now = new Date().getTime();
+  
+  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 3600000) {
+    try {
+      const parsedTowns = JSON.parse(cachedDataStr);
+      Object.assign(AppState.allCountiesWeatherData, parsedTowns);
+      return true;
+    } catch (e) {
+      console.warn('Failed parsing township cache.');
+    }
+  }
+  
+  console.log(`Fetching township data for ${countyName} from CWA API...`);
+  let baseUrl = 'https://opendata.cwa.gov.tw';
+  let queryParams = '?format=JSON';
+  
+  if (CLOUDFLARE_PROXY_URL) {
+    baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl;
+    }
+  } else {
+    queryParams += `&Authorization=${AppState.apiKey}`;
+  }
+  
+  try {
+    const res3 = await fetch(`${baseUrl}/api/v1/rest/datastore/${apis[3]}${queryParams}`);
+    if (!res3.ok) throw new Error('Township 3d API status ' + res3.status);
+    const data3 = await res3.json();
+    
+    const res7 = await fetch(`${baseUrl}/api/v1/rest/datastore/${apis[7]}${queryParams}`);
+    if (!res7.ok) throw new Error('Township 7d API status ' + res7.status);
+    const data7 = await res7.json();
+    
+    const parsedTowns = parseTownshipCwaResponse(countyName, data3, data7);
+    
+    if (Object.keys(parsedTowns).length > 0) {
+      Object.assign(AppState.allCountiesWeatherData, parsedTowns);
+      localStorage.setItem(cacheKey, JSON.stringify(parsedTowns));
+      localStorage.setItem(cacheTimeKey, String(now));
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed fetching township CWA:', err);
+    return false;
+  }
+}
+
+function parseTownshipCwaResponse(countyName, data3, data7) {
+  const parsed = {};
+  
+  let locations3 = [];
+  if (data3 && data3.records) {
+    if (data3.records.locations && data3.records.locations[0]) {
+      locations3 = data3.records.locations[0].location || data3.records.locations[0].locations || [];
+    } else if (data3.records.location) {
+      locations3 = data3.records.location;
+    }
+  }
+  
+  let locations7 = [];
+  if (data7 && data7.records) {
+    if (data7.records.locations && data7.records.locations[0]) {
+      locations7 = data7.records.locations[0].location || data7.records.locations[0].locations || [];
+    } else if (data7.records.location) {
+      locations7 = data7.records.location;
+    }
+  }
+  
+  for (const loc of locations3) {
+    const townName = loc.locationName;
+    const fullId = countyName + townName;
+    
+    parsed[fullId] = {
+      name: townName,
+      parentCounty: countyName,
+      isTownship: true,
+      current: {},
+      hourly: [],
+      weekly: []
+    };
+    
+    const elements = loc.weatherElement || [];
+    const tempEl = elements.find(el => el.elementName === 'T');
+    const rhEl = elements.find(el => el.elementName === 'RH');
+    const wsEl = elements.find(el => el.elementName === 'WS');
+    const wxEl = elements.find(el => el.elementName === 'Wx');
+    const popEl = elements.find(el => el.elementName === 'PoP6h') || elements.find(el => el.elementName === 'PoP12h');
+    
+    const hourlyList = [];
+    const len = (tempEl && tempEl.time) ? tempEl.time.length : 0;
+    
+    for (let i = 0; i < len; i++) {
+      const timeItem = tempEl.time[i];
+      if (!timeItem) continue;
+      
+      const timeStr = timeItem.dataTime;
+      const timeVal = new Date(timeStr);
+      const temp = timeItem.elementValue?.[0] ? parseInt(timeItem.elementValue[0].value) : NaN;
+      if (isNaN(temp)) continue;
+      
+      let humidity = 70;
+      if (rhEl && rhEl.time && rhEl.time[i] && rhEl.time[i].elementValue && rhEl.time[i].elementValue[0]) {
+        humidity = parseInt(rhEl.time[i].elementValue[0].value) || 70;
+      }
+      
+      let wind = 2;
+      if (wsEl && wsEl.time && wsEl.time[i] && wsEl.time[i].elementValue && wsEl.time[i].elementValue[0]) {
+        const wsInt = parseInt(wsEl.time[i].elementValue[0].value) || 0;
+        if (wsInt <= 1) wind = 0;
+        else if (wsInt <= 3) wind = 1;
+        else if (wsInt <= 5) wind = 2;
+        else if (wsInt <= 8) wind = 3;
+        else wind = 4;
+      }
+      
+      let wx = '多雲';
+      let wxValue = '2';
+      if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
+        wx = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
+        wxValue = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+      }
+      
+      let rainProb = 0;
+      if (popEl && popEl.time) {
+        const popMatch = popEl.time.find(p => {
+          const start = new Date(p.startTime || p.dataTime);
+          return timeVal >= start;
+        });
+        rainProb = (popMatch && popMatch.elementValue && popMatch.elementValue[0]) ? parseInt(popMatch.elementValue[0].value) : 0;
+      }
+      
+      hourlyList.push({
+        time: timeVal.getHours() + ':00',
+        displayTime: formatHourlyLabel(timeVal),
+        temp: temp,
+        humidity: humidity,
+        windGrade: wind,
+        desc: wx,
+        icon: mapWxToIcon(wxValue),
+        rainProb: isNaN(rainProb) ? 0 : rainProb
+      });
+    }
+    
+    parsed[fullId].hourly = hourlyList;
+    
+    if (hourlyList.length > 0) {
+      const curH = hourlyList[0];
+      parsed[fullId].current = {
+        temp: curH.temp,
+        tempMin: Math.min(...hourlyList.slice(0, 4).map(h=>h.temp)) || (curH.temp - 3),
+        tempMax: Math.max(...hourlyList.slice(0, 4).map(h=>h.temp)) || (curH.temp + 3),
+        desc: curH.desc,
+        icon: curH.icon,
+        rainProb: curH.rainProb,
+        humidity: curH.humidity,
+        windGrade: curH.windGrade,
+        apparentTemp: curH.temp
+      };
+    }
+  }
+  
+  for (const loc of locations7) {
+    const townName = loc.locationName;
+    const fullId = countyName + townName;
+    
+    if (!parsed[fullId]) continue;
+    
+    const elements = loc.weatherElement || [];
+    const minTEl = elements.find(el => el.elementName === 'MinT');
+    const maxTEl = elements.find(el => el.elementName === 'MaxT');
+    const wxEl = elements.find(el => el.elementName === 'Wx');
+    const popEl = elements.find(el => el.elementName === 'PoP12h');
+    
+    const weeklyList = [];
+    const len = (minTEl && minTEl.time) ? minTEl.time.length : 0;
+    
+    for (let i = 0; i < len; i += 2) {
+      if (i >= len) break;
+      
+      const timeItem = minTEl.time[i];
+      if (!timeItem) continue;
+      
+      const dateStr = timeItem.startTime || timeItem.dataTime;
+      const dateVal = new Date(dateStr);
+      
+      const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
+      if (isNaN(minT1)) continue;
+      
+      let minT2 = minT1;
+      if (i+1 < len && minTEl.time[i+1] && minTEl.time[i+1].elementValue && minTEl.time[i+1].elementValue[0]) {
+        minT2 = parseInt(minTEl.time[i+1].elementValue[0].value) || minT1;
+      }
+      const minT = Math.min(minT1, minT2);
+      
+      let maxT1 = minT;
+      if (maxTEl && maxTEl.time && maxTEl.time[i] && maxTEl.time[i].elementValue && maxTEl.time[i].elementValue[0]) {
+        maxT1 = parseInt(maxTEl.time[i].elementValue[0].value) || minT;
+      }
+      let maxT2 = maxT1;
+      if (i+1 < len && maxTEl && maxTEl.time && maxTEl.time[i+1] && maxTEl.time[i+1].elementValue && maxTEl.time[i+1].elementValue[0]) {
+        maxT2 = parseInt(maxTEl.time[i+1].elementValue[0].value) || maxT1;
+      }
+      const maxT = Math.max(maxT1, maxT2);
+      
+      let wxVal = '多雲';
+      let wxIconVal = '2';
+      if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
+        wxVal = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
+        wxIconVal = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+      }
+      
+      let pop = 0;
+      if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
+        pop = parseInt(popEl.time[i].elementValue[0].value) || 0;
+      }
+      
+      weeklyList.push({
+        date: `${dateVal.getMonth()+1}/${dateVal.getDate()}`,
+        dayOfWeek: formatWeeklyDayLabel(dateVal, i === 0),
+        tempMin: minT,
+        tempMax: maxT,
+        desc: wxVal,
+        icon: mapWxToIcon(wxIconVal),
+        rainProb: pop
+      });
+    }
+    
+    parsed[fullId].weekly = weeklyList;
+    if (weeklyList.length > 0) {
+      parsed[fullId].current.tempMin = weeklyList[0].tempMin;
+      parsed[fullId].current.tempMax = weeklyList[0].tempMax;
+    }
+  }
+  
+  return parsed;
+}
+
+function simulateRegionWeather(id) {
+  const parsed = parseIdentifier(id);
+  const now = new Date();
+  const currentHour = now.getHours();
+  
+  let baseTemp = 23;
+  let baseHumidity = 75;
+  let rainProbBase = 30;
+  
+  const parentCountyObj = TAIWAN_COUNTIES.find(c => c.name === parsed.county) || TAIWAN_COUNTIES[0];
+  if (parentCountyObj.region === '北部') {
+    baseTemp -= 1; baseHumidity += 5; rainProbBase += 15;
+  } else if (parentCountyObj.region === '南部') {
+    baseTemp += 1.5; baseHumidity -= 5; rainProbBase -= 10;
+  }
+  
+  const diurnalOffset = Math.sin((currentHour - 9) * Math.PI / 12) * 4;
+  const curTemp = parseFloat((baseTemp + diurnalOffset + (Math.random() * 0.4 - 0.2)).toFixed(1));
+  const minT = parseFloat((baseTemp - 3 + (Math.random() * 0.4 - 0.2)).toFixed(1));
+  const maxT = parseFloat((baseTemp + 3 + (Math.random() * 0.4 - 0.2)).toFixed(1));
+  
+  const simulated = {
+    name: parsed.type === 'town' ? parsed.town : parsed.county,
+    parentCounty: parsed.type === 'town' ? parsed.county : '',
+    isTownship: parsed.type === 'town',
+    current: {
+      temp: curTemp,
+      tempMin: minT,
+      tempMax: maxT,
+      desc: rainProbBase > 40 ? '多雲短暫雨' : '晴時多雲',
+      icon: rainProbBase > 40 ? 'rainy' : 'sunny-cloudy',
+      rainProb: rainProbBase,
+      humidity: baseHumidity,
+      windGrade: 2,
+      apparentTemp: curTemp
+    },
+    hourly: [],
+    weekly: []
+  };
+  
+  for (let h = 0; h < 24; h++) {
+    const forecastHour = (currentHour + h * 3) % 24;
+    const forecastDate = new Date();
+    forecastDate.setHours(currentHour + h * 3);
+    const offset = Math.sin((forecastHour - 9) * Math.PI / 12) * 4;
+    
+    simulated.hourly.push({
+      time: `${forecastHour}:00`,
+      displayTime: formatHourlyLabel(forecastDate),
+      temp: parseFloat((baseTemp + offset + (Math.random() * 0.6 - 0.3)).toFixed(1)),
+      humidity: baseHumidity,
+      windGrade: 2,
+      desc: rainProbBase > 40 ? '短暫雨' : '多雲',
+      icon: rainProbBase > 40 ? 'rainy' : 'sunny-cloudy',
+      rainProb: rainProbBase
+    });
+  }
+  
+  const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+  for (let d = 0; d < 7; d++) {
+    const dayDate = new Date();
+    dayDate.setDate(now.getDate() + d);
+    simulated.weekly.push({
+      date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
+      dayOfWeek: d === 0 ? '今天' : weekdays[dayDate.getDay()],
+      tempMin: parseFloat((minT + Math.sin(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+      tempMax: parseFloat((maxT + Math.cos(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+      desc: '多雲時晴',
+      icon: 'sunny-cloudy',
+      rainProb: 15
+    });
+  }
+  
+  AppState.allCountiesWeatherData[id] = simulated;
+}
+
+// --------------------------------------------------------------------------
 // 11. Custom Added Regions Search bar & Storage
 // --------------------------------------------------------------------------
 function initSearch() {
+  initSearchIndex();
   const searchInput = document.getElementById('search-input');
   const clearBtn = document.getElementById('btn-search-clear');
   const dropdown = document.getElementById('search-results');
@@ -1135,12 +1718,12 @@ function initSearch() {
     
     clearBtn.style.display = 'block';
     
-    // Filter matching counties
-    const matches = TAIWAN_COUNTIES.filter(c => 
-      c.name.includes(val) || 
-      c.english.toLowerCase().includes(val.toLowerCase()) ||
-      c.region.includes(val)
-    );
+    // Filter matching counties & townships from SearchIndex
+    const matches = SearchIndex.filter(item => 
+      item.searchTokens.includes(val) || 
+      item.displayName.includes(val) ||
+      item.name.includes(val)
+    ).slice(0, 10); // Limit to top 10 results for visual excellence
     
     renderSearchResults(matches);
   });
@@ -1164,35 +1747,41 @@ function renderSearchResults(matches) {
   dropdown.innerHTML = '';
   
   if (matches.length === 0) {
-    dropdown.innerHTML = `<div class="search-result-item empty-result">找不到對應的縣市</div>`;
+    dropdown.innerHTML = `<div class="search-result-item empty-result">找不到對應的縣市或鄉鎮</div>`;
   } else {
-    matches.forEach(county => {
-      const item = document.createElement('div');
-      item.className = 'search-result-item';
-      item.textContent = `${county.name} (${county.region})`;
+    matches.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'search-result-item';
+      el.textContent = item.displayName;
       
-      item.addEventListener('click', () => {
-        addCustomRegion(county.name);
+      el.addEventListener('click', () => {
+        const identifier = item.type === 'town' ? `${item.parent}${item.name}` : item.name;
+        addCustomRegion(identifier);
         document.getElementById('search-input').value = '';
         document.getElementById('btn-search-clear').style.display = 'none';
         dropdown.style.display = 'none';
       });
-      dropdown.appendChild(item);
+      dropdown.appendChild(el);
     });
   }
   
   dropdown.style.display = 'block';
 }
 
-function addCustomRegion(countyName) {
-  if (AppState.addedRegions.includes(countyName)) {
-    alert(`${countyName} 已經在自選追蹤清單中囉！`);
+function addCustomRegion(identifier) {
+  if (AppState.addedRegions.includes(identifier)) {
+    const friendlyName = formatFriendlyName(identifier);
+    alert(`${friendlyName} 已經在自選追蹤清單中囉！`);
     return;
   }
   
-  AppState.addedRegions.push(countyName);
+  AppState.addedRegions.push(identifier);
   localStorage.setItem('cwa_added_regions', JSON.stringify(AppState.addedRegions));
-  renderAddedRegionsList();
+  
+  // Dynamic fetch and load before render
+  loadWeatherForRegion(identifier).then(() => {
+    renderAddedRegionsList();
+  });
 }
 
 // Global scope bindings for inline onclick events in list items
@@ -1217,8 +1806,6 @@ function initSettings() {
   
   // Fill values from App State
   apiKeyInput.value = AppState.apiKey;
-  const activeModeRadio = document.querySelector(`input[name="data-mode"][value="${AppState.dataMode}"]`);
-  if (activeModeRadio) activeModeRadio.checked = true;
   
   settingsBtn.addEventListener('click', () => {
     modal.classList.add('active');
@@ -1247,13 +1834,12 @@ function initSettings() {
   // Save handler
   saveBtn.addEventListener('click', () => {
     const rawKey = apiKeyInput.value.trim();
-    const dataMode = document.querySelector('input[name="data-mode"]:checked').value;
     
     AppState.apiKey = rawKey;
-    AppState.dataMode = dataMode;
+    AppState.dataMode = 'live';
     
     localStorage.setItem('cwa_api_key', rawKey);
-    localStorage.setItem('cwa_data_mode', dataMode);
+    localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
     localStorage.removeItem('cwa_weather_cache_v1');
@@ -1270,7 +1856,7 @@ function initSettings() {
     apiKeyInput.value = '';
     AppState.apiKey = '';
     localStorage.removeItem('cwa_api_key');
-    alert('金鑰已清除，系統將自動啟動展示模擬模式。');
+    alert('金鑰已清除，請在「設定」中重新輸入以獲取即時資料。');
   });
 }
 
@@ -1310,3 +1896,14 @@ function getAnimatedSvgCode(iconName, width = 64, height = 64) {
     </svg>
   `;
 }
+
+// Global scope bindings for drawer reload retry
+window.retryDrawerLoad = function(id) {
+  const container = document.getElementById('svg-chart-container');
+  container.innerHTML = `<div class="loading-spinner" style="margin: 30px auto;"></div>`;
+  
+  loadWeatherForRegion(id).then(() => {
+    openDrawerForecast(id);
+    renderAddedRegionsList();
+  });
+};
