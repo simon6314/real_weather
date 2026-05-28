@@ -197,8 +197,8 @@ function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v4';
-  const countyTimeKey = 'cwa_weather_cache_time_v4';
+  const countyCacheKey = 'cwa_weather_cache_v8';
+  const countyTimeKey = 'cwa_weather_cache_time_v8';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -226,7 +226,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v4_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v8_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -251,7 +251,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v4_', 'cwa_town_cache_time_v4_');
+    const timeKey = key.replace('cwa_town_cache_v8_', 'cwa_town_cache_time_v8_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -457,8 +457,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v4';
-  const cacheTimeKey = 'cwa_weather_cache_time_v4';
+  const cacheKey = 'cwa_weather_cache_v8';
+  const cacheTimeKey = 'cwa_weather_cache_time_v8';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -857,7 +857,14 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         if (!timeItem) continue;
         
         const timeStr = timeItem.dataTime;
-        const timeVal = new Date(timeStr);
+        let formattedTimeStr = timeStr;
+        if (typeof timeStr === 'string') {
+          formattedTimeStr = timeStr.trim().replace(' ', 'T');
+          if (!formattedTimeStr.includes('+') && !formattedTimeStr.includes('Z')) {
+            formattedTimeStr += '+08:00';
+          }
+        }
+        const timeVal = new Date(formattedTimeStr);
         
         // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
         if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
@@ -887,9 +894,33 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         
         let wx = '多雲';
         let wxValue = '2';
-        if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
-          wx = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
-          wxValue = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+        if (wxEl && wxEl.time) {
+          const wxMatch = wxEl.time.find(item => {
+            const startStr = item.startTime || item.dataTime;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
+            const endStr = item.endTime;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 3*3600000);
+            return timeVal >= start && timeVal < end;
+          });
+          
+          if (wxMatch && wxMatch.elementValue) {
+            wx = wxMatch.elementValue[0] ? wxMatch.elementValue[0].value : '多雲';
+            wxValue = wxMatch.elementValue[1] ? wxMatch.elementValue[1].value : '2';
+          }
         }
         
         // Find rain pop matching this period
@@ -897,9 +928,25 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         if (popEl && popEl.time) {
           // Find the time interval that spans our hour
           const popMatch = popEl.time.find(p => {
-            const start = new Date(p.startTime || p.dataTime);
-            const end = p.endTime ? new Date(p.endTime) : new Date(start.getTime() + 6*3600000);
-            return timeVal >= start && timeVal <= end;
+            const startStr = p.startTime || p.dataTime;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
+            const endStr = p.endTime;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 6*3600000);
+            return timeVal >= start && timeVal < end;
           });
           rainProb = (popMatch && popMatch.elementValue && popMatch.elementValue[0]) ? parseInt(popMatch.elementValue[0].value) : 0;
         }
@@ -962,7 +1009,14 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         if (!timeItem) continue;
         
         const dateStr = timeItem.startTime || timeItem.dataTime;
-        const dateVal = new Date(dateStr);
+        let formattedDateStr = dateStr;
+        if (typeof dateStr === 'string') {
+          formattedDateStr = dateStr.trim().replace(' ', 'T');
+          if (!formattedDateStr.includes('+') && !formattedDateStr.includes('Z')) {
+            formattedDateStr += '+08:00';
+          }
+        }
+        const dateVal = new Date(formattedDateStr);
         
         const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
         if (isNaN(minT1)) continue;
@@ -1004,7 +1058,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         
         weeklyList.push({
-          date: `${dateVal.getMonth()+1}/${dateVal.getDate()}`,
+          date: getTaiwanMonthAndDate(dateVal),
           dayOfWeek: formatWeeklyDayLabel(dateVal, i === 0),
           tempMin: minT,
           tempMax: maxT,
@@ -1043,6 +1097,140 @@ function getTaiwanHour(date) {
   }
 }
 
+function getTaiwanMonthAndDate(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      month: 'numeric',
+      day: 'numeric'
+    });
+    return formatter.format(date);
+  } catch (e) {
+    return `${date.getMonth()+1}/${date.getDate()}`;
+  }
+}
+
+function getTaiwanDayOfWeek(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      weekday: 'short'
+    });
+    return formatter.format(date);
+  } catch (e) {
+    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    return days[date.getDay()];
+  }
+}
+
+function getTaiwanDateTimeParts(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(date);
+    const getVal = (type) => parts.find(p => p.type === type).value;
+    return {
+      year: getVal('year'),
+      month: getVal('month'),
+      day: getVal('day'),
+      hour: getVal('hour'),
+      minute: getVal('minute')
+    };
+  } catch (e) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return {
+      year: String(date.getFullYear()),
+      month: pad(date.getMonth() + 1),
+      day: pad(date.getDate()),
+      hour: pad(date.getHours()),
+      minute: pad(date.getMinutes())
+    };
+  }
+}
+
+function getChartIconSvg(iconName, x, y, size = 20) {
+  let innerPaths = '';
+  
+  if (iconName === 'sunny') {
+    innerPaths = `
+      <circle cx="32" cy="32" r="10" fill="url(#grad-sun)" />
+      <g stroke="url(#grad-sun-rays)" stroke-width="3" stroke-linecap="round" class="anim-sun-rays">
+        <line x1="32" y1="12" x2="32" y2="4" />
+        <line x1="32" y1="52" x2="32" y2="60" />
+        <line x1="12" y1="32" x2="4" y2="32" />
+        <line x1="52" y1="32" x2="60" y2="32" />
+        <line x1="17.86" y1="17.86" x2="12.2" y2="12.2" />
+        <line x1="46.14" y1="46.14" x2="51.8" y2="51.8" />
+        <line x1="17.86" y1="46.14" x2="12.2" y2="51.8" />
+        <line x1="46.14" y1="17.86" x2="51.8" y2="12.2" />
+      </g>
+    `;
+  } else if (iconName === 'sunny-cloudy') {
+    innerPaths = `
+      <!-- Back Cloud -->
+      <path d="M24 38c-3.3 0-6-2.7-6-6 0-3 2.2-5.5 5.1-5.9.8-3.4 3.8-6.1 7.4-6.1 3 0 5.6 1.8 6.7 4.4C38 24 39.8 25.5 40 27.5c1.7.5 3 2.1 3 4 0 2.5-2 4.5-4.5 4.5" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
+      <!-- Front Cloud -->
+      <path d="M18 44c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 26 39.5 28 40 30.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" class="anim-cloud-drift-front" />
+    `;
+  } else if (iconName === 'cloudy') {
+    innerPaths = `
+      <!-- Back Cloud -->
+      <path d="M24 38c-3.3 0-6-2.7-6-6 0-3 2.2-5.5 5.1-5.9.8-3.4 3.8-6.1 7.4-6.1 3 0 5.6 1.8 6.7 4.4C38 24 39.8 25.5 40 27.5c1.7.5 3 2.1 3 4 0 2.5-2 4.5-4.5 4.5" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
+      <!-- Front Cloud -->
+      <path d="M18 44c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 26 39.5 28 40 30.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" class="anim-cloud-drift-front" />
+    `;
+  } else if (iconName === 'rainy') {
+    innerPaths = `
+      <!-- Cloud -->
+      <path d="M18 36c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 18 39.5 20 40 22.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" />
+      <!-- Rain Drops -->
+      <g stroke="url(#grad-rain)" stroke-width="2.5" stroke-linecap="round" fill="none" class="anim-rain">
+        <line x1="20" y1="42" x2="17" y2="49" class="rain-1" />
+        <line x1="28" y1="42" x2="25" y2="49" class="rain-2" />
+        <line x1="36" y1="42" x2="33" y2="49" class="rain-3" />
+      </g>
+    `;
+  } else if (iconName === 'thunderstorm') {
+    innerPaths = `
+      <!-- Dark Cloud -->
+      <path d="M18 36c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 18 39.5 20 40 22.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-dark)" />
+      <!-- Lightning Bolt -->
+      <polygon points="28,34 22,44 27,44 24,54 34,42 29,42" fill="url(#grad-lightning)" class="anim-lightning" />
+    `;
+  } else if (iconName === 'windy') {
+    innerPaths = `
+      <!-- Light clouds with wind lines -->
+      <path d="M12 28c-2.2 0-4-1.8-4-4 0-2 1.5-3.7 3.5-3.9A4.9 4.9 0 0 1 20 18c2 0 3.8 1.2 4.5 3 1.2 0 2.2 1 2.5 2.2c1 .3 2 1.2 2 2.3v.5H12z" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
+      <g stroke="url(#grad-wind)" stroke-width="2.5" stroke-linecap="round" fill="none" class="anim-wind">
+        <path d="M10,34 C18,34 25,32 30,34 C33,35 34,37 32,38 C30,39 28,37 29,35" class="wind-line-1" />
+        <path d="M6,42 C16,42 22,40 28,42 C30,43 31,45 29,46 C27,47 25,45 26,43" class="wind-line-2" />
+      </g>
+    `;
+  } else if (iconName === 'night') {
+    innerPaths = `
+      <path d="M36 40c-9.9 0-18-8.1-18-18 0-4.6 1.7-8.8 4.6-12C14.7 11.2 10 18.1 10 26c0 9.9 8.1 18 18 18 7.9 0 14.8-4.7 16-12.6-3.2 2.9-7.4 4.6-12 4.6z" fill="url(#grad-moon)" />
+      <g fill="#FFF" class="anim-stars">
+        <polygon points="18,12 19,14 21,14 19,15 20,17 18,16 16,17 17,15 15,14 17,14" class="star-1" />
+        <polygon points="36,12 37,13 39,13 37,14 38,16 36,15 34,16 35,14 33,13 35,13" class="star-2" />
+        <polygon points="42,24 43,25 45,25 43,26 44,28 42,27 40,28 41,26 39,25 41,25" class="star-3" />
+      </g>
+    `;
+  }
+  
+  return `
+    <g transform="translate(${x - size/2}, ${y - size/2}) scale(${size / 64})">
+      ${innerPaths}
+    </g>
+  `;
+}
+
 function formatHourlyLabel(date) {
   const hour = getTaiwanHour(date);
   if (hour === 0) return '半夜';
@@ -1052,8 +1240,7 @@ function formatHourlyLabel(date) {
 
 function formatWeeklyDayLabel(date, isToday) {
   if (isToday) return '今天';
-  const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-  return days[date.getDay()];
+  return getTaiwanDayOfWeek(date);
 }
 
 // Map Central Weather Administration's "Wx Parameter Value" to our dynamic icons
@@ -1613,6 +1800,46 @@ function drawHourlySvgChart(hourlyData) {
         <filter id="glow-shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="var(--color-accent-glow)" flood-opacity="0.8" />
         </filter>
+        
+        <!-- Re-declared Gradients for bulletproof self-contained rendering -->
+        <linearGradient id="grad-sun" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FFD269" />
+          <stop offset="100%" stop-color="#FF9E00" />
+        </linearGradient>
+        <linearGradient id="grad-sun-rays" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FFA800" />
+          <stop offset="100%" stop-color="#FF5100" />
+        </linearGradient>
+        <linearGradient id="grad-cloud-front" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#FFFFFF" />
+          <stop offset="100%" stop-color="#B0C4DE" />
+        </linearGradient>
+        <linearGradient id="grad-cloud-back" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#F5F5F5" stop-opacity="0.8" />
+          <stop offset="100%" stop-color="#9CB3C9" stop-opacity="0.8" />
+        </linearGradient>
+        <linearGradient id="grad-cloud-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#697C91" />
+          <stop offset="100%" stop-color="#32404F" />
+        </linearGradient>
+        <linearGradient id="grad-rain" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#7EA5F0" />
+          <stop offset="100%" stop-color="#3B6FCB" />
+        </linearGradient>
+        <linearGradient id="grad-lightning" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#FFE135" />
+          <stop offset="100%" stop-color="#FF9900" />
+        </linearGradient>
+        <linearGradient id="grad-wind" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#EAEAEA" stop-opacity="0.2" />
+          <stop offset="50%" stop-color="#D3E0EA" stop-opacity="0.9" />
+          <stop offset="100%" stop-color="#EAEAEA" stop-opacity="0.2" />
+        </linearGradient>
+        <linearGradient id="grad-moon" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FDFDED" />
+          <stop offset="60%" stop-color="#ECEB9D" />
+          <stop offset="100%" stop-color="#C2C056" />
+        </linearGradient>
       </defs>
   `;
   
@@ -1653,17 +1880,8 @@ function drawHourlySvgChart(hourlyData) {
     // Coordinate circle point node
     svgCode += `<circle cx="${p.x}" cy="${p.y}" r="4" class="chart-point" />`;
     
-    // Render mini vector weather icon from SVG Defs sprite library at the bottom of the chart
-    let iconRef = '#svg-cloudy';
-    if (p.icon === 'sunny') iconRef = '#svg-sunny';
-    else if (p.icon === 'sunny-cloudy') iconRef = '#svg-cloudy';
-    else if (p.icon === 'cloudy') iconRef = '#svg-cloudy';
-    else if (p.icon === 'rainy') iconRef = '#svg-rainy';
-    else if (p.icon === 'thunderstorm') iconRef = '#svg-thunderstorm';
-    else if (p.icon === 'windy') iconRef = '#svg-windy';
-    else if (p.icon === 'night') iconRef = '#svg-night';
-    
-    svgCode += `<use href="${iconRef}" x="${p.x - 10}" y="${svgHeight - 46}" width="20" height="20" />`;
+    // Render inlined vector weather icon with animations!
+    svgCode += getChartIconSvg(p.icon, p.x, svgHeight - 36, 20);
     
     // Time label below bottom boundary
     svgCode += `<text x="${p.x}" y="${svgHeight - 10}" class="chart-label-time">${p.time}</text>`;
@@ -1945,11 +2163,12 @@ function loadRadarImage(force = false) {
   const cacheBust = force ? `?t=${new Date().getTime()}` : '';
   radarImg.src = `https://www.cwa.gov.tw/Data/radar/CV1_3600.png${cacheBust}`;
   
-  // Format current CWA standard update intervals (typically 10 min)
+  // Format current CWA standard update intervals (typically 10 min) locked to Taiwan timezone
   const now = new Date();
+  const twParts = getTaiwanDateTimeParts(now);
+  const lastTenMin = Math.floor(parseInt(twParts.minute) / 10) * 10;
   const pad = (n) => String(n).padStart(2, '0');
-  const lastTenMin = Math.floor(now.getMinutes() / 10) * 10;
-  timestampEl.textContent = `最後更新時間：${now.getHours()}:${pad(lastTenMin)}`;
+  timestampEl.textContent = `最後更新時間：${twParts.hour}:${pad(lastTenMin)}`;
 }
 
 // State for radar animation play
@@ -1970,18 +2189,23 @@ function getRadarHistoryUrls() {
     const frameMs = latestLocalMs - (i * 10 * 60 * 1000);
     const frameDate = new Date(frameMs);
     
-    // Round down to the nearest 10 minutes in local time!
-    const roundedMinutes = Math.floor(frameDate.getMinutes() / 10) * 10;
-    frameDate.setMinutes(roundedMinutes);
+    // Round down to the nearest 10 minutes in Taiwan local time
+    const twParts = getTaiwanDateTimeParts(frameDate);
+    const roundedMinutes = Math.floor(parseInt(twParts.minute) / 10) * 10;
+    
+    // Adjust frameDate to match the rounded minute in local Taiwan time
+    const minDiff = roundedMinutes - parseInt(twParts.minute);
+    frameDate.setMinutes(frameDate.getMinutes() + minDiff);
     frameDate.setSeconds(0);
     frameDate.setMilliseconds(0);
     
-    // Format YYYYMMDDHHMM in local Taiwan time (CWA server filename standard)
-    const yyyy = frameDate.getFullYear();
-    const mm = String(frameDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(frameDate.getDate()).padStart(2, '0');
-    const hh = String(frameDate.getHours()).padStart(2, '0');
-    const mi = String(frameDate.getMinutes()).padStart(2, '0');
+    const finalTw = getTaiwanDateTimeParts(frameDate);
+    
+    const yyyy = finalTw.year;
+    const mm = finalTw.month;
+    const dd = finalTw.day;
+    const hh = finalTw.hour;
+    const mi = finalTw.minute;
     
     const timeStr = `${yyyy}${mm}${dd}${hh}${mi}`;
     const url = `https://www.cwa.gov.tw/Data/radar/CV1_3600_${timeStr}.png`;
@@ -2180,8 +2404,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v4_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v4_${countyName}`;
+  const cacheKey = `cwa_town_cache_v8_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v8_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2378,7 +2602,14 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       if (!timeItem) continue;
       
       const timeStr = timeItem.DataTime || timeItem.dataTime;
-      const timeVal = new Date(timeStr);
+      let formattedTimeStr = timeStr;
+      if (typeof timeStr === 'string') {
+        formattedTimeStr = timeStr.trim().replace(' ', 'T');
+        if (!formattedTimeStr.includes('+') && !formattedTimeStr.includes('Z')) {
+          formattedTimeStr += '+08:00';
+        }
+      }
+      const timeVal = new Date(formattedTimeStr);
       
       // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
       if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
@@ -2431,8 +2662,26 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const wxTime = wxEl.Time || wxEl.time;
         if (wxTime) {
           const wxItem = wxTime.find(item => {
-            const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
-            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+            const startStr = item.StartTime || item.startTime || item.DataTime || item.dataTime;
+            if (!startStr) return false;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
+            const endStr = item.EndTime || item.endTime;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 3 * 3600000);
+            return timeVal >= start && timeVal < end;
           });
           const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
           if (wxValArr) {
@@ -2447,10 +2696,25 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         const popTime = popEl.Time || popEl.time;
         if (popTime) {
           const popMatch = popTime.find(p => {
-            const start = new Date(p.StartTime || p.startTime || p.DataTime || p.dataTime);
+            const startStr = p.StartTime || p.startTime || p.DataTime || p.dataTime;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
             const endStr = p.EndTime || p.endTime;
-            const end = endStr ? new Date(endStr) : new Date(start.getTime() + 6 * 3600000);
-            return timeVal >= start && timeVal <= end;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 6 * 3600000);
+            return timeVal >= start && timeVal < end;
           });
           const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
           if (popValArr) {
@@ -2529,7 +2793,14 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       if (!timeItem) continue;
       
       const dateStr = timeItem.StartTime || timeItem.startTime || timeItem.DataTime || timeItem.dataTime;
-      const dateVal = new Date(dateStr);
+      let formattedDateStr = dateStr;
+      if (typeof dateStr === 'string') {
+        formattedDateStr = dateStr.trim().replace(' ', 'T');
+        if (!formattedDateStr.includes('+') && !formattedDateStr.includes('Z')) {
+          formattedDateStr += '+08:00';
+        }
+      }
+      const dateVal = new Date(formattedDateStr);
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
       const minT1 = parseFloat(getValueFromCwaArray(valArr));
@@ -2595,7 +2866,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       }
       
       weeklyList.push({
-        date: `${dateVal.getMonth()+1}/${dateVal.getDate()}`,
+        date: getTaiwanMonthAndDate(dateVal),
         dayOfWeek: formatWeeklyDayLabel(dateVal, i === 0),
         tempMin: minT,
         tempMax: maxT,
@@ -2835,8 +3106,8 @@ function initSettings() {
     localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
-    localStorage.removeItem('cwa_weather_cache_v4');
-    localStorage.removeItem('cwa_weather_cache_time_v4');
+    localStorage.removeItem('cwa_weather_cache_v7');
+    localStorage.removeItem('cwa_weather_cache_time_v7');
     
     closeModal();
     
