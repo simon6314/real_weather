@@ -532,10 +532,10 @@ async function fetchAllWeatherData() {
     if (!res36h.ok) throw new Error('CWA 36h API returned status ' + res36h.status);
     const data36h = await res36h.json();
     
-    // 2. Fetch 72h forecast (F-D0047-089) - township level but we parse county summaries
-    const res72h = await fetch(`${baseUrl}/api/v1/rest/datastore/F-D0047-089${queryParams}`);
-    if (!res72h.ok) throw new Error('CWA 72h API returned status ' + res72h.status);
-    const data72h = await res72h.json();
+    // We omit the giant F-D0047-089 API request here because it is a massive 10MB+ file
+    // that causes severe boot latency and frequent timeouts. Township-level detailed
+    // forecasts are instead dynamically fetched on-demand when the user opens them.
+    const data72h = null;
     
     // 3. Fetch 7-day forecast (F-D0047-091)
     const res7d = await fetch(`${baseUrl}/api/v1/rest/datastore/F-D0047-091${queryParams}`);
@@ -575,6 +575,49 @@ async function fetchAllWeatherData() {
   }
 }
 
+// Case-insensitive, robust helper to extract weather elements from station observations
+function getObsElementValue(obs, elementName) {
+  if (!obs) return null;
+  const elements = obs.WeatherElement || obs.weatherElement;
+  if (!elements) return null;
+  
+  // Case 1: elements is an array
+  if (Array.isArray(elements)) {
+    const el = elements.find(item => {
+      const name = (item.ElementName || item.elementName || '').toUpperCase();
+      return name === elementName.toUpperCase();
+    });
+    if (el) {
+      const val = el.ElementValue !== undefined ? el.ElementValue : (el.elementValue !== undefined ? el.elementValue : (el.Value !== undefined ? el.Value : el.value));
+      if (val !== undefined && val !== null) {
+        if (Array.isArray(val) && val[0]) {
+          return val[0].value !== undefined ? val[0].value : val[0].Value;
+        }
+        return val;
+      }
+    }
+  } 
+  // Case 2: elements is a flat object
+  else if (typeof elements === 'object') {
+    const keys = Object.keys(elements);
+    const matchedKey = keys.find(k => k.toUpperCase() === elementName.toUpperCase());
+    if (matchedKey) {
+      const valObj = elements[matchedKey];
+      if (valObj && typeof valObj === 'object') {
+        if (valObj.value !== undefined) return valObj.value;
+        if (valObj.Value !== undefined) return valObj.Value;
+        const subKeys = Object.keys(valObj);
+        if (subKeys.includes('elementValue') || subKeys.includes('ElementValue')) {
+          const arr = valObj.elementValue || valObj.ElementValue;
+          if (arr && arr[0]) return arr[0].value !== undefined ? arr[0].value : arr[0].Value;
+        }
+      }
+      return valObj;
+    }
+  }
+  return null;
+}
+
 // Helper to find a matching automatic weather station observation
 function findObservation(countyName, townName = '') {
   if (!AppState.observations || AppState.observations.length === 0) return null;
@@ -587,7 +630,7 @@ function findObservation(countyName, townName = '') {
     const match = AppState.observations.find(obs => {
       const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
       const obsTown = (obs.GeoInfo?.TownName || obs.geoInfo?.townName || '').replace('台', '臺');
-      const tempVal = obs.WeatherElement?.AirTemperature;
+      const tempVal = getObsElementValue(obs, 'AirTemperature');
       const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
       return obsCounty === normCounty && obsTown === normTown && hasTemp;
     });
@@ -597,7 +640,7 @@ function findObservation(countyName, townName = '') {
   // 2. Fallback: Find the first station in the county with a valid temperature
   const countyMatch = AppState.observations.find(obs => {
     const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
-    const tempVal = obs.WeatherElement?.AirTemperature;
+    const tempVal = getObsElementValue(obs, 'AirTemperature');
     const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
     return obsCounty === normCounty && hasTemp;
   });
@@ -680,26 +723,26 @@ function mapObsWeatherToIcon(obsWeather) {
 // Helper to apply real-time observation values to current weather state
 function applyObservationToCurrent(current, countyName, townName = '') {
   const obs = findObservation(countyName, townName);
-  if (!obs || !obs.WeatherElement) return;
+  if (!obs) return;
   
   // Collect all three values first so we can do a proper apparent temp calculation
   let obsTemp = null, obsRh = null, obsWs = null;
   
-  const tempVal = obs.WeatherElement.AirTemperature;
+  const tempVal = getObsElementValue(obs, 'AirTemperature');
   const temp = parseFloat(tempVal);
   if (!isNaN(temp) && temp > -50 && temp < 60 && tempVal !== -99 && tempVal !== '-99') {
     current.temp = parseFloat(temp.toFixed(1));
     obsTemp = temp;
   }
   
-  const rhVal = obs.WeatherElement.RelativeHumidity;
+  const rhVal = getObsElementValue(obs, 'RelativeHumidity');
   const rh = parseFloat(rhVal);
   if (!isNaN(rh) && rh >= 0 && rh <= 100 && rhVal !== -99 && rhVal !== '-99') {
     current.humidity = Math.round(rh);
     obsRh = rh;
   }
   
-  const wsVal = obs.WeatherElement.WindSpeed; // m/s from observation
+  const wsVal = getObsElementValue(obs, 'WindSpeed'); // m/s from observation
   const ws = parseFloat(wsVal);
   if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
     if (ws <= 1) current.windGrade = 0;
@@ -725,7 +768,8 @@ function applyObservationToCurrent(current, countyName, townName = '') {
   // ── Override desc & icon from real-time observed sky condition ────────────
   // The observation station returns a human-readable Weather string (e.g. '晴', '多雲', '陰有雨').
   // Use it to override the *forecast* description so the card shows actual sky conditions.
-  const obsWeather = (obs.WeatherElement.Weather || '').trim();
+  const obsWeatherVal = getObsElementValue(obs, 'Weather');
+  const obsWeather = obsWeatherVal ? String(obsWeatherVal).trim() : '';
   if (obsWeather && obsWeather !== '-99' && obsWeather.length > 0) {
     const obsIcon = mapObsWeatherToIcon(obsWeather);
     if (obsIcon) {
@@ -946,8 +990,16 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         
         let pop = 0;
-        if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
-          pop = parseInt(popEl.time[i].elementValue[0].value) || 0;
+        if (popEl && popEl.time) {
+          let pop1 = 0;
+          let pop2 = 0;
+          if (popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
+            pop1 = parseInt(popEl.time[i].elementValue[0].value) || 0;
+          }
+          if (i+1 < popEl.time.length && popEl.time[i+1] && popEl.time[i+1].elementValue && popEl.time[i+1].elementValue[0]) {
+            pop2 = parseInt(popEl.time[i+1].elementValue[0].value) || 0;
+          }
+          pop = Math.max(pop1, pop2);
         }
         
         weeklyList.push({
@@ -1672,10 +1724,60 @@ function initDetailsDrawer() {
 }
 
 function openDrawerForecast(identifier) {
+  const parsed = parseIdentifier(identifier);
+  
+  // Dynamic Redirection for County Overview cards:
+  // If the user clicks a county (like '新北市', '臺中市'), automatically redirect to its capital/central township 
+  // (like '新北市板橋區', '臺中市西區') to display a beautiful, fully populated 72-hour detailed forecast chart.
+  if (parsed.type === 'county') {
+    const capital = COUNTY_CAPITALS[parsed.county];
+    if (capital) {
+      const capitalId = parsed.county + capital;
+      console.log(`Redirecting county drawer forecast from ${parsed.county} to capital township ${capitalId}`);
+      
+      const capitalData = AppState.allCountiesWeatherData[capitalId];
+      if (capitalData && !capitalData.error && capitalData.hourly && capitalData.hourly.length > 0) {
+        // Already loaded successfully, open it directly!
+        openDrawerForecast(capitalId);
+      } else {
+        // Not loaded or error state, show loading spinner in drawer and fetch township details in the background
+        const overlay = document.getElementById('details-drawer-overlay');
+        const drawer = document.getElementById('details-drawer');
+        
+        // Render detailed drawer in-progress state
+        document.getElementById('drawer-region-title').textContent = `${parsed.county} ${capital}`;
+        document.getElementById('drawer-current-desc').textContent = `載入預報資料中...`;
+        document.getElementById('drawer-hero-icon').innerHTML = `<div class="loading-spinner" style="margin: 0 auto; width: 40px; height: 40px;"></div>`;
+        document.getElementById('svg-chart-container').innerHTML = `<div class="loading-spinner" style="margin: 30px auto;"></div>`;
+        document.getElementById('drawer-weekly-list').innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted);">正在取得該地區逐時預報...</div>`;
+        
+        overlay.classList.add('active');
+        drawer.classList.add('active');
+        
+        loadWeatherForRegion(capitalId).then(() => {
+          const loadedData = AppState.allCountiesWeatherData[capitalId];
+          if (loadedData && !loadedData.error) {
+            openDrawerForecast(capitalId);
+          } else {
+            // Render error fallback in drawer
+            document.getElementById('drawer-current-desc').textContent = `連線失敗 • 無法取得該地區天氣預報`;
+            document.getElementById('drawer-hero-icon').innerHTML = `<span style="font-size: 32px; color: #ff6b6b">⚠️</span>`;
+            document.getElementById('svg-chart-container').innerHTML = `
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); gap: 8px;">
+                <span style="font-size: 24px;">📡</span>
+                <p>無法取得即時 72 小時逐時預報資料</p>
+                <button class="primary-ctrl" onclick="retryDrawerLoad('${capitalId}')" style="margin-top: 8px;">重新載入</button>
+              </div>
+            `;
+          }
+        });
+      }
+      return;
+    }
+  }
+
   AppState.activeRegionDetailed = identifier;
   const data = AppState.allCountiesWeatherData[identifier];
-  
-  const parsed = parseIdentifier(identifier);
   const title = parsed.type === 'town' ? `${parsed.county} ${parsed.town}` : parsed.county;
   
   // Set headers
@@ -2433,11 +2535,19 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       let pop = 0;
       if (popEl) {
         const popTime = popEl.Time || popEl.time;
-        const popItem = popTime?.[i];
-        const popValArr = popItem ? (popItem.ElementValue || popItem.elementValue) : null;
-        if (popValArr) {
-          pop = parseInt(getValueFromCwaArray(popValArr)) || 0;
+        const popItem1 = popTime?.[i];
+        const popItem2 = popTime?.[i+1];
+        let pop1 = 0;
+        let pop2 = 0;
+        if (popItem1) {
+          const popValArr = popItem1.ElementValue || popItem1.elementValue;
+          if (popValArr) pop1 = parseInt(getValueFromCwaArray(popValArr)) || 0;
         }
+        if (popItem2) {
+          const popValArr = popItem2.ElementValue || popItem2.elementValue;
+          if (popValArr) pop2 = parseInt(getValueFromCwaArray(popValArr)) || 0;
+        }
+        pop = Math.max(pop1, pop2);
       }
       
       weeklyList.push({
