@@ -1462,26 +1462,32 @@ async function fetchCwaTownshipData(countyName) {
 function parseTownshipCwaResponse(countyName, data3, data7) {
   const parsed = {};
   
+  // Support both Capitalized and lowercase keys dynamically
   let locations3 = [];
   if (data3 && data3.records) {
-    if (data3.records.locations && data3.records.locations[0]) {
-      locations3 = data3.records.locations[0].location || data3.records.locations[0].locations || [];
-    } else if (data3.records.location) {
-      locations3 = data3.records.location;
+    const records = data3.records;
+    const locsArray = records.locations || records.Locations;
+    if (locsArray && locsArray[0]) {
+      locations3 = locsArray[0].location || locsArray[0].Location || locsArray[0].locations || locsArray[0].Locations || [];
+    } else {
+      locations3 = records.location || records.Location || [];
     }
   }
   
   let locations7 = [];
   if (data7 && data7.records) {
-    if (data7.records.locations && data7.records.locations[0]) {
-      locations7 = data7.records.locations[0].location || data7.records.locations[0].locations || [];
-    } else if (data7.records.location) {
-      locations7 = data7.records.location;
+    const records = data7.records;
+    const locsArray = records.locations || records.Locations;
+    if (locsArray && locsArray[0]) {
+      locations7 = locsArray[0].location || locsArray[0].Location || locsArray[0].locations || locsArray[0].Locations || [];
+    } else {
+      locations7 = records.location || records.Location || [];
     }
   }
   
   for (const loc of locations3) {
-    const townName = loc.locationName;
+    const townName = loc.LocationName || loc.locationName;
+    if (!townName) continue;
     const fullId = countyName + townName;
     
     parsed[fullId] = {
@@ -1493,54 +1499,79 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       weekly: []
     };
     
-    const elements = loc.weatherElement || [];
-    const tempEl = elements.find(el => el.elementName === 'T');
-    const rhEl = elements.find(el => el.elementName === 'RH');
-    const wsEl = elements.find(el => el.elementName === 'WS');
-    const wxEl = elements.find(el => el.elementName === 'Wx');
-    const popEl = elements.find(el => el.elementName === 'PoP6h') || elements.find(el => el.elementName === 'PoP12h');
+    const elements = loc.WeatherElement || loc.weatherElement || [];
+    const tempEl = elements.find(el => (el.ElementName || el.elementName) === 'T');
+    const rhEl = elements.find(el => (el.ElementName || el.elementName) === 'RH');
+    const wsEl = elements.find(el => (el.ElementName || el.elementName) === 'WS');
+    const wxEl = elements.find(el => (el.ElementName || el.elementName) === 'Wx');
+    const popEl = elements.find(el => (el.ElementName || el.elementName) === 'PoP6h') || elements.find(el => (el.ElementName || el.elementName) === 'PoP12h');
     
     const hourlyList = [];
-    const len = (tempEl && tempEl.time) ? tempEl.time.length : 0;
+    const tempTime = tempEl ? (tempEl.Time || tempEl.time) : null;
+    const len = tempTime ? tempTime.length : 0;
     
     for (let i = 0; i < len; i++) {
-      const timeItem = tempEl.time[i];
+      const timeItem = tempTime[i];
       if (!timeItem) continue;
       
-      const timeStr = timeItem.dataTime;
+      const timeStr = timeItem.DataTime || timeItem.dataTime;
       const timeVal = new Date(timeStr);
-      const temp = timeItem.elementValue?.[0] ? parseInt(timeItem.elementValue[0].value) : NaN;
+      
+      const valArr = timeItem.ElementValue || timeItem.elementValue;
+      const temp = valArr?.[0] ? parseFloat(valArr[0].Value || valArr[0].value) : NaN;
       if (isNaN(temp)) continue;
       
       let humidity = 70;
-      if (rhEl && rhEl.time && rhEl.time[i] && rhEl.time[i].elementValue && rhEl.time[i].elementValue[0]) {
-        humidity = parseInt(rhEl.time[i].elementValue[0].value) || 70;
+      if (rhEl) {
+        const rhTime = rhEl.Time || rhEl.time;
+        const rhItem = rhTime?.[i];
+        const rhValArr = rhItem ? (rhItem.ElementValue || rhItem.elementValue) : null;
+        if (rhValArr && rhValArr[0]) {
+          humidity = parseInt(rhValArr[0].Value || rhValArr[0].value) || 70;
+        }
       }
       
       let wind = 2;
-      if (wsEl && wsEl.time && wsEl.time[i] && wsEl.time[i].elementValue && wsEl.time[i].elementValue[0]) {
-        const wsInt = parseInt(wsEl.time[i].elementValue[0].value) || 0;
-        if (wsInt <= 1) wind = 0;
-        else if (wsInt <= 3) wind = 1;
-        else if (wsInt <= 5) wind = 2;
-        else if (wsInt <= 8) wind = 3;
-        else wind = 4;
+      if (wsEl) {
+        const wsTime = wsEl.Time || wsEl.time;
+        const wsItem = wsTime?.[i];
+        const wsValArr = wsItem ? (wsItem.ElementValue || wsItem.elementValue) : null;
+        if (wsValArr && wsValArr[0]) {
+          const wsVal = wsValArr[0].Value || wsValArr[0].value;
+          const wsInt = parseInt(wsVal) || 0;
+          if (wsInt <= 1) wind = 0;
+          else if (wsInt <= 3) wind = 1;
+          else if (wsInt <= 5) wind = 2;
+          else if (wsInt <= 8) wind = 3;
+          else wind = 4;
+        }
       }
       
       let wx = '多雲';
       let wxValue = '2';
-      if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
-        wx = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
-        wxValue = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+      if (wxEl) {
+        const wxTime = wxEl.Time || wxEl.time;
+        const wxItem = wxTime?.[i];
+        const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
+        if (wxValArr) {
+          wx = wxValArr[0] ? (wxValArr[0].Value || wxValArr[0].value) : '多雲';
+          wxValue = wxValArr[1] ? (wxValArr[1].Value || wxValArr[1].value) : '2';
+        }
       }
       
       let rainProb = 0;
-      if (popEl && popEl.time) {
-        const popMatch = popEl.time.find(p => {
-          const start = new Date(p.startTime || p.dataTime);
-          return timeVal >= start;
-        });
-        rainProb = (popMatch && popMatch.elementValue && popMatch.elementValue[0]) ? parseInt(popMatch.elementValue[0].value) : 0;
+      if (popEl) {
+        const popTime = popEl.Time || popEl.time;
+        if (popTime) {
+          const popMatch = popTime.find(p => {
+            const start = new Date(p.StartTime || p.startTime || p.DataTime || p.dataTime);
+            return timeVal >= start;
+          });
+          const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
+          if (popValArr && popValArr[0]) {
+            rainProb = parseInt(popValArr[0].Value || popValArr[0].value) || 0;
+          }
+        }
       }
       
       hourlyList.push({
@@ -1574,58 +1605,84 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
   }
   
   for (const loc of locations7) {
-    const townName = loc.locationName;
+    const townName = loc.LocationName || loc.locationName;
+    if (!townName) continue;
     const fullId = countyName + townName;
     
     if (!parsed[fullId]) continue;
     
-    const elements = loc.weatherElement || [];
-    const minTEl = elements.find(el => el.elementName === 'MinT');
-    const maxTEl = elements.find(el => el.elementName === 'MaxT');
-    const wxEl = elements.find(el => el.elementName === 'Wx');
-    const popEl = elements.find(el => el.elementName === 'PoP12h');
+    const elements = loc.WeatherElement || loc.weatherElement || [];
+    const minTEl = elements.find(el => (el.ElementName || el.elementName) === 'MinT');
+    const maxTEl = elements.find(el => (el.ElementName || el.elementName) === 'MaxT');
+    const wxEl = elements.find(el => (el.ElementName || el.elementName) === 'Wx');
+    const popEl = elements.find(el => (el.ElementName || el.elementName) === 'PoP12h');
     
     const weeklyList = [];
-    const len = (minTEl && minTEl.time) ? minTEl.time.length : 0;
+    const minTTime = minTEl ? (minTEl.Time || minTEl.time) : null;
+    const len = minTTime ? minTTime.length : 0;
     
     for (let i = 0; i < len; i += 2) {
       if (i >= len) break;
       
-      const timeItem = minTEl.time[i];
+      const timeItem = minTTime[i];
       if (!timeItem) continue;
       
-      const dateStr = timeItem.startTime || timeItem.dataTime;
+      const dateStr = timeItem.StartTime || timeItem.startTime || timeItem.DataTime || timeItem.dataTime;
       const dateVal = new Date(dateStr);
       
-      const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
+      const valArr = timeItem.ElementValue || timeItem.elementValue;
+      const minT1 = valArr?.[0] ? parseFloat(valArr[0].Value || valArr[0].value) : NaN;
       if (isNaN(minT1)) continue;
       
       let minT2 = minT1;
-      if (i+1 < len && minTEl.time[i+1] && minTEl.time[i+1].elementValue && minTEl.time[i+1].elementValue[0]) {
-        minT2 = parseInt(minTEl.time[i+1].elementValue[0].value) || minT1;
+      if (i+1 < len && minTTime[i+1]) {
+        const nextValArr = minTTime[i+1].ElementValue || minTTime[i+1].elementValue;
+        if (nextValArr && nextValArr[0]) {
+          minT2 = parseFloat(nextValArr[0].Value || nextValArr[0].value) || minT1;
+        }
       }
       const minT = Math.min(minT1, minT2);
       
       let maxT1 = minT;
-      if (maxTEl && maxTEl.time && maxTEl.time[i] && maxTEl.time[i].elementValue && maxTEl.time[i].elementValue[0]) {
-        maxT1 = parseInt(maxTEl.time[i].elementValue[0].value) || minT;
+      if (maxTEl) {
+        const maxTTime = maxTEl.Time || maxTEl.time;
+        const maxTItem = maxTTime?.[i];
+        const maxTValArr = maxTItem ? (maxTItem.ElementValue || maxTItem.elementValue) : null;
+        if (maxTValArr && maxTValArr[0]) {
+          maxT1 = parseFloat(maxTValArr[0].Value || maxTValArr[0].value) || minT;
+        }
       }
       let maxT2 = maxT1;
-      if (i+1 < len && maxTEl && maxTEl.time && maxTEl.time[i+1] && maxTEl.time[i+1].elementValue && maxTEl.time[i+1].elementValue[0]) {
-        maxT2 = parseInt(maxTEl.time[i+1].elementValue[0].value) || maxT1;
+      if (i+1 < len && maxTEl) {
+        const maxTTime = maxTEl.Time || maxTEl.time;
+        const nextMaxTItem = maxTTime?.[i+1];
+        const nextMaxTValArr = nextMaxTItem ? (nextMaxTItem.ElementValue || nextMaxTItem.elementValue) : null;
+        if (nextMaxTValArr && nextMaxTValArr[0]) {
+          maxT2 = parseFloat(nextMaxTValArr[0].Value || nextMaxTValArr[0].value) || maxT1;
+        }
       }
       const maxT = Math.max(maxT1, maxT2);
       
       let wxVal = '多雲';
       let wxIconVal = '2';
-      if (wxEl && wxEl.time && wxEl.time[i] && wxEl.time[i].elementValue) {
-        wxVal = wxEl.time[i].elementValue[0] ? wxEl.time[i].elementValue[0].value : '多雲';
-        wxIconVal = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
+      if (wxEl) {
+        const wxTime = wxEl.Time || wxEl.time;
+        const wxItem = wxTime?.[i];
+        const wxValArr = wxItem ? (wxItem.ElementValue || wxItem.elementValue) : null;
+        if (wxValArr) {
+          wxVal = wxValArr[0] ? (wxValArr[0].Value || wxValArr[0].value) : '多雲';
+          wxIconVal = wxValArr[1] ? (wxValArr[1].Value || wxValArr[1].value) : '2';
+        }
       }
       
       let pop = 0;
-      if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
-        pop = parseInt(popEl.time[i].elementValue[0].value) || 0;
+      if (popEl) {
+        const popTime = popEl.Time || popEl.time;
+        const popItem = popTime?.[i];
+        const popValArr = popItem ? (popItem.ElementValue || popItem.elementValue) : null;
+        if (popValArr && popValArr[0]) {
+          pop = parseInt(popValArr[0].Value || popValArr[0].value) || 0;
+        }
       }
       
       weeklyList.push({
