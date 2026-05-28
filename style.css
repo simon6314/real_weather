@@ -375,6 +375,13 @@ body {
 .main-panel {
   display: flex;
   flex-direction: column;
+  transition: var(--transition-bounce);
+}
+
+.main-panel:hover {
+  transform: translateY(-4px) scale(1.005);
+  border-color: var(--color-accent);
+  box-shadow: 0 12px 40px 0 var(--color-accent-glow);
 }
 
 .location-badge {

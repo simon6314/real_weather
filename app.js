@@ -98,7 +98,7 @@ const AppState = {
   dataMode: 'live', // Enforce live CWA only
   isSimulationActive: false,
   
-  currentLocationCounty: '臺北市', // Default fallback
+  currentLocationCounty: '臺北市中正區', // Default fallback
   currentWeather: {},            // Cached current weather for main display
   addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '臺中市', '高雄市'],
   allCountiesWeatherData: {},    // Map of countyName -> parsed weather profile
@@ -126,6 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch();
   initRadarControls();
   initDetailsDrawer();
+  
+  // Make main location panel clickable to open detailed forecast
+  const mainPanel = document.querySelector('.main-panel');
+  if (mainPanel) {
+    mainPanel.style.cursor = 'pointer';
+    mainPanel.addEventListener('click', () => {
+      openDrawerForecast(AppState.currentLocationCounty);
+    });
+  }
   
   // Initial Boot Sequence
   startupSequence();
@@ -249,29 +258,41 @@ function startupSequence() {
   
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
-        const matchedCounty = getClosestTaiwanCounty(latitude, longitude);
-        console.log(`GPS Location: (${latitude}, ${longitude}) matched to ${matchedCounty.name}`);
-        AppState.currentLocationCounty = matchedCounty.name;
+        console.log(`GPS Coordinates received: Lat ${latitude}, Lon ${longitude}`);
+        
+        // Try reverse geocoding to get township-level details
+        const geocoded = await reverseGeocodeTownship(latitude, longitude);
+        
+        if (geocoded) {
+          AppState.currentLocationCounty = geocoded.county + geocoded.town;
+          console.log(`Geocoded location: ${AppState.currentLocationCounty}`);
+        } else {
+          // Fallback to geometric matching
+          const matchedCounty = getClosestTaiwanCounty(latitude, longitude);
+          const fallbackTown = COUNTY_CAPITALS[matchedCounty.name] || '中正區';
+          AppState.currentLocationCounty = matchedCounty.name + fallbackTown;
+          console.log(`Geocoding failed. Geometric fallback: ${AppState.currentLocationCounty}`);
+        }
         
         // Load data for the matched location
         loadWeatherDashboard();
       },
       (error) => {
         console.warn('Geolocation failed or denied. Defaulting to Taipei City. Code:', error.code);
-        AppState.currentLocationCounty = '臺北市';
+        AppState.currentLocationCounty = '臺北市中正區';
         loadWeatherDashboard();
       },
       { timeout: 8000, enableHighAccuracy: false }
     );
   } else {
-    AppState.currentLocationCounty = '臺北市';
+    AppState.currentLocationCounty = '臺北市中正區';
     loadWeatherDashboard();
   }
 }
 
-// Find closest Taiwan county using basic 2D Euclidean distance
+// Find closest Taiwan county using basic 2D Euclidean distance (used as offline fallback)
 function getClosestTaiwanCounty(lat, lon) {
   let closest = TAIWAN_COUNTIES[0];
   let minDistance = Infinity;
@@ -286,6 +307,92 @@ function getClosestTaiwanCounty(lat, lon) {
   return closest;
 }
 
+// Default capital/central township for each county (offline fallback)
+const COUNTY_CAPITALS = {
+  '臺北市': '中正區',
+  '新北市': '板橋區',
+  '桃園市': '桃園區',
+  '臺中市': '西區',
+  '臺南市': '安平區',
+  '高雄市': '苓雅區',
+  '基隆市': '中正區',
+  '新竹市': '東區',
+  '新竹縣': '竹北市',
+  '苗栗縣': '苗栗市',
+  '彰化縣': '彰化市',
+  '南投縣': '南投市',
+  '雲林縣': '斗六市',
+  '嘉義市': '東區',
+  '嘉義縣': '太保市',
+  '屏東縣': '屏東市',
+  '宜蘭縣': '宜蘭市',
+  '花蓮縣': '花蓮市',
+  '臺東縣': '臺東市',
+  '澎湖縣': '馬公市',
+  '金門縣': '金城鎮',
+  '連江縣': '南竿鄉'
+};
+
+// Double-layered client-side reverse geocoding API fetcher
+async function reverseGeocodeTownship(lat, lon) {
+  // Layer 1: BigDataCloud (Fast, client-side friendly API, high limits under fair use)
+  try {
+    const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`);
+    if (res.ok) {
+      const data = await res.json();
+      let county = data.city || data.principalSubdivision || '';
+      let town = data.locality || '';
+      
+      county = county.replace('台', '臺').trim();
+      town = town.replace('台', '臺').trim();
+      
+      const matchedCounty = TAIWAN_COUNTIES.find(c => county.includes(c.name) || c.name.includes(county));
+      if (matchedCounty) {
+        const countyTowns = TOWNSHIP_DATA[matchedCounty.name] ? TOWNSHIP_DATA[matchedCounty.name].split(' ') : [];
+        const matchedTown = countyTowns.find(t => town.includes(t) || t.includes(town));
+        if (matchedTown) {
+          return { county: matchedCounty.name, town: matchedTown };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('BigDataCloud reverse geocode failed, trying Nominatim...', e);
+  }
+
+  // Layer 2: OpenStreetMap Nominatim (Accurate point-in-polygon matching)
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`, {
+      headers: {
+        'Accept-Language': 'zh-TW,zh;q=0.9'
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.address) {
+        const addr = data.address;
+        let county = addr.county || addr.city || addr.state || addr.town || '';
+        let town = addr.town || addr.suburb || addr.district || addr.city_district || addr.neighbourhood || '';
+        
+        county = county.replace('台', '臺').trim();
+        town = town.replace('台', '臺').trim();
+        
+        const matchedCounty = TAIWAN_COUNTIES.find(c => county.includes(c.name) || c.name.includes(county));
+        if (matchedCounty) {
+          const countyTowns = TOWNSHIP_DATA[matchedCounty.name] ? TOWNSHIP_DATA[matchedCounty.name].split(' ') : [];
+          const matchedTown = countyTowns.find(t => town.includes(t) || t.includes(town));
+          if (matchedTown) {
+            return { county: matchedCounty.name, town: matchedTown };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Nominatim reverse geocode failed...', e);
+  }
+
+  return null;
+}
+
 // --------------------------------------------------------------------------
 // 5. CWA API Fetching & LocalStorage Caching Client
 // --------------------------------------------------------------------------
@@ -294,6 +401,12 @@ async function loadWeatherDashboard() {
   
   try {
     const dataSuccess = await fetchAllWeatherData();
+    
+    // Also load township data if current location is a township
+    const parsed = parseIdentifier(AppState.currentLocationCounty);
+    if (parsed.type === 'town') {
+      await loadWeatherForRegion(AppState.currentLocationCounty);
+    }
     
     if (dataSuccess) {
       AppState.isSimulationActive = false;
