@@ -45,7 +45,7 @@ const CLOUDFLARE_PROXY_URL = 'https://wearther-proxy.simon6314.workers.dev';
 // --------------------------------------------------------------------------
 const AppState = {
   apiKey: localStorage.getItem('cwa_api_key') || DEFAULT_API_KEY,
-  dataMode: localStorage.getItem('cwa_data_mode') || 'auto', // 'auto' or 'simulation'
+  dataMode: CLOUDFLARE_PROXY_URL ? 'auto' : (localStorage.getItem('cwa_data_mode') || 'auto'), // Force auto if proxy configured
   isSimulationActive: false,
   
   currentLocationCounty: '臺北市', // Default fallback
@@ -330,7 +330,14 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
     }
     
     // 2. Process 72h detailed data (F-D0047-089)
-    const locations72 = data72h.records.locations[0].location || [];
+    let locations72 = [];
+    if (data72h && data72h.records) {
+      if (data72h.records.locations && data72h.records.locations[0]) {
+        locations72 = data72h.records.locations[0].location || data72h.records.locations[0].locations || [];
+      } else if (data72h.records.location) {
+        locations72 = data72h.records.location;
+      }
+    }
     for (const loc of locations72) {
       const cName = normalizeCountyName(loc.locationName);
       if (!merged[cName]) continue;
@@ -404,7 +411,14 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
     }
     
     // 3. Process 7-day data (F-D0047-091)
-    const locations7d = data7d.records.locations[0].location || [];
+    let locations7d = [];
+    if (data7d && data7d.records) {
+      if (data7d.records.locations && data7d.records.locations[0]) {
+        locations7d = data7d.records.locations[0].location || data7d.records.locations[0].locations || [];
+      } else if (data7d.records.location) {
+        locations7d = data7d.records.location;
+      }
+    }
     for (const loc of locations7d) {
       const cName = normalizeCountyName(loc.locationName);
       if (!merged[cName]) continue;
