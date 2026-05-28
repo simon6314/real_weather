@@ -2459,8 +2459,9 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         }
       }
       
+      const twHour = getTaiwanHour(timeVal);
       hourlyList.push({
-        time: timeVal.getHours() + ':00',
+        time: twHour + ':00',
         displayTime: formatHourlyLabel(timeVal),
         temp: temp,
         humidity: humidity,
