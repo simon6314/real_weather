@@ -1828,29 +1828,27 @@ function getRadarHistoryUrls() {
   const urls = [];
   const now = new Date();
   
-  // Radar data is stored in UTC, convert local time to UTC ms
-  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
-  
   // Since CWA images take about 8 minutes to generate, let's offset by 8 minutes to be safe
-  const latestUtcMs = utcMs - (8 * 60 * 1000);
+  // now.getTime() is already UTC epoch milliseconds!
+  const latestUtcMs = now.getTime() - (8 * 60 * 1000);
   
   // We fetch the past 6 intervals (representing 1 hour, each 10 mins apart)
   for (let i = 0; i < 6; i++) {
     const frameMs = latestUtcMs - (i * 10 * 60 * 1000);
     const frameDate = new Date(frameMs);
     
-    // Round down to the nearest 10 minutes
-    const roundedMinutes = Math.floor(frameDate.getMinutes() / 10) * 10;
-    frameDate.setMinutes(roundedMinutes);
-    frameDate.setSeconds(0);
-    frameDate.setMilliseconds(0);
+    // Round down to the nearest 10 minutes in UTC!
+    const roundedMinutes = Math.floor(frameDate.getUTCMinutes() / 10) * 10;
+    frameDate.setUTCMinutes(roundedMinutes);
+    frameDate.setUTCSeconds(0);
+    frameDate.setUTCMilliseconds(0);
     
-    // Format YYYYMMDDHHMM
-    const yyyy = frameDate.getFullYear();
-    const mm = String(frameDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(frameDate.getDate()).padStart(2, '0');
-    const hh = String(frameDate.getHours()).padStart(2, '0');
-    const mi = String(frameDate.getMinutes()).padStart(2, '0');
+    // Format YYYYMMDDHHMM in UTC
+    const yyyy = frameDate.getUTCFullYear();
+    const mm = String(frameDate.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(frameDate.getUTCDate()).padStart(2, '0');
+    const hh = String(frameDate.getUTCHours()).padStart(2, '0');
+    const mi = String(frameDate.getUTCMinutes()).padStart(2, '0');
     
     const timeStr = `${yyyy}${mm}${dd}${hh}${mi}`;
     const url = `https://www.cwa.gov.tw/Data/radar/CV1_3600_${timeStr}.png`;
