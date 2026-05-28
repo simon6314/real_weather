@@ -197,8 +197,8 @@ function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v1';
-  const countyTimeKey = 'cwa_weather_cache_time';
+  const countyCacheKey = 'cwa_weather_cache_v2';
+  const countyTimeKey = 'cwa_weather_cache_time_v2';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -226,7 +226,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v2_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -251,7 +251,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_', 'cwa_town_cache_time_');
+    const timeKey = key.replace('cwa_town_cache_v2_', 'cwa_town_cache_time_v2_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -457,8 +457,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v1';
-  const cacheTimeKey = 'cwa_weather_cache_time';
+  const cacheKey = 'cwa_weather_cache_v2';
+  const cacheTimeKey = 'cwa_weather_cache_time_v2';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2154,8 +2154,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_${countyName}`;
+  const cacheKey = `cwa_town_cache_v2_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v2_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2791,8 +2791,8 @@ function initSettings() {
     localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
-    localStorage.removeItem('cwa_weather_cache_v1');
-    localStorage.removeItem('cwa_weather_cache_time');
+    localStorage.removeItem('cwa_weather_cache_v2');
+    localStorage.removeItem('cwa_weather_cache_time_v2');
     
     closeModal();
     
