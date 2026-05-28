@@ -960,42 +960,37 @@ body {
   letter-spacing: 1px;
 }
 
-/* Dynamic radar DBZ color code map legend overlay */
+/* Dynamic radar DBZ color code map legend (Placed below the radar viewport) */
 .radar-legend-card {
-  position: absolute;
-  bottom: 24px;
-  right: 24px;
-  padding: 16px;
+  position: relative;
+  margin: 16px auto 8px auto;
+  padding: 8px 16px;
   border-radius: var(--radius-md);
   z-index: 5;
-  width: 280px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  background: rgba(8, 14, 25, 0.85);
-}
-
-@media (max-width: 580px) {
-  .radar-legend-card {
-    position: relative;
-    bottom: auto;
-    right: auto;
-    width: calc(100% - 32px);
-    margin: 16px auto;
-  }
+  width: 90%;
+  max-width: 440px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  background: rgba(8, 14, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .legend-title {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
   font-weight: 700;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   letter-spacing: 0.5px;
+  text-align: center;
 }
 
 .legend-bar {
-  height: 12px;
-  border-radius: 6px;
+  height: 8px;
+  border-radius: 4px;
   background: linear-gradient(to right, 
     #00E5FF 0%, 
     #00E676 15%, 
@@ -1010,19 +1005,19 @@ body {
 .legend-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 8px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
   font-family: monospace;
 }
 
 .legend-desc {
   display: flex;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 8px;
-  font-size: 9px;
+  padding-top: 4px;
+  font-size: 8px;
   font-weight: 500;
 }
 

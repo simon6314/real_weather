@@ -168,6 +168,10 @@ function initNavigation() {
   const switchTab = (tab) => {
     AppState.activeTab = tab;
     if (tab === 'weather') {
+      // Stop radar animation if playing
+      if (typeof toggleRadarPlay === 'function' && radarPlayInterval) {
+        toggleRadarPlay();
+      }
       weatherTabBtn.classList.add('active');
       radarTabBtn.classList.remove('active');
       weatherPane.classList.add('active');
@@ -1763,6 +1767,11 @@ function initRadarControls() {
     loadRadarImage(true);
   });
   
+  // Play/Pause past 1 hour animation
+  document.getElementById('btn-radar-play').addEventListener('click', () => {
+    toggleRadarPlay();
+  });
+  
   // Pan mouse drag listeners
   outer.addEventListener('mousedown', (e) => {
     if (AppState.radarZoom <= 1) return; // Only pan when zoomed
@@ -1787,6 +1796,11 @@ function applyRadarTransform() {
 }
 
 function loadRadarImage(force = false) {
+  // If we are calling this manually and animation is active, stop it
+  if (force && radarPlayInterval) {
+    toggleRadarPlay();
+  }
+
   const radarImg = document.getElementById('radar-img');
   const timestampEl = document.getElementById('radar-timestamp');
   const loader = document.getElementById('radar-loader');
@@ -1802,6 +1816,136 @@ function loadRadarImage(force = false) {
   const pad = (n) => String(n).padStart(2, '0');
   const lastTenMin = Math.floor(now.getMinutes() / 10) * 10;
   timestampEl.textContent = `最後更新時間：${now.getHours()}:${pad(lastTenMin)}`;
+}
+
+// State for radar animation play
+let radarPlayInterval = null;
+let radarHistoryFrames = [];
+let radarCurrentFrameIndex = 0;
+
+// Dynamic UTC calculator for CWA historical radar images
+function getRadarHistoryUrls() {
+  const urls = [];
+  const now = new Date();
+  
+  // Radar data is stored in UTC, convert local time to UTC ms
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  
+  // Since CWA images take about 8 minutes to generate, let's offset by 8 minutes to be safe
+  const latestUtcMs = utcMs - (8 * 60 * 1000);
+  
+  // We fetch the past 6 intervals (representing 1 hour, each 10 mins apart)
+  for (let i = 0; i < 6; i++) {
+    const frameMs = latestUtcMs - (i * 10 * 60 * 1000);
+    const frameDate = new Date(frameMs);
+    
+    // Round down to the nearest 10 minutes
+    const roundedMinutes = Math.floor(frameDate.getMinutes() / 10) * 10;
+    frameDate.setMinutes(roundedMinutes);
+    frameDate.setSeconds(0);
+    frameDate.setMilliseconds(0);
+    
+    // Format YYYYMMDDHHMM
+    const yyyy = frameDate.getFullYear();
+    const mm = String(frameDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(frameDate.getDate()).padStart(2, '0');
+    const hh = String(frameDate.getHours()).padStart(2, '0');
+    const mi = String(frameDate.getMinutes()).padStart(2, '0');
+    
+    const timeStr = `${yyyy}${mm}${dd}${hh}${mi}`;
+    const url = `https://www.cwa.gov.tw/Data/radar/CV1_3600_${timeStr}.png`;
+    urls.push({ url, label: `${hh}:${mi} (UTC)` });
+  }
+  
+  // Reverse so they play from oldest to newest!
+  return urls.reverse();
+}
+
+function toggleRadarPlay() {
+  const playBtn = document.getElementById('btn-radar-play');
+  const playIcon = document.getElementById('radar-play-icon');
+  const radarImg = document.getElementById('radar-img');
+  const timestampEl = document.getElementById('radar-timestamp');
+  
+  if (radarPlayInterval) {
+    // Stop Animation
+    clearInterval(radarPlayInterval);
+    radarPlayInterval = null;
+    playIcon.textContent = '▶️';
+    playBtn.title = '播放過去 1 小時動畫';
+    
+    // Restore latest real-time image
+    loadRadarImage(true);
+  } else {
+    // Start Animation
+    updateDataBadge('載入動畫中...', 'loading');
+    
+    // Generate history URLs
+    radarHistoryFrames = getRadarHistoryUrls();
+    radarCurrentFrameIndex = 0;
+    
+    if (radarHistoryFrames.length === 0) {
+      updateDataBadge('無法取得動畫圖資', 'error');
+      return;
+    }
+    
+    playIcon.textContent = '⏸️';
+    playBtn.title = '暫停播放';
+    
+    // Preload images to prevent flickering
+    let loadCount = 0;
+    
+    radarHistoryFrames.forEach((frame) => {
+      const img = new Image();
+      img.src = frame.url;
+      img.onload = () => {
+        loadCount++;
+        if (loadCount === radarHistoryFrames.length) {
+          updateDataBadge('即時氣象署資料', 'live');
+          startPlaybackLoop();
+        }
+      };
+      img.onerror = () => {
+        loadCount++;
+        if (loadCount === radarHistoryFrames.length) {
+          updateDataBadge('即時氣象署資料', 'live');
+          startPlaybackLoop();
+        }
+      };
+    });
+    
+    // Fallback trigger if loading takes too long
+    setTimeout(() => {
+      if (!radarPlayInterval) {
+        updateDataBadge('即時氣象署資料', 'live');
+        startPlaybackLoop();
+      }
+    }, 2500);
+  }
+}
+
+function startPlaybackLoop() {
+  if (radarPlayInterval) return;
+  
+  const radarImg = document.getElementById('radar-img');
+  const timestampEl = document.getElementById('radar-timestamp');
+  
+  const playFrame = () => {
+    const frame = radarHistoryFrames[radarCurrentFrameIndex];
+    radarImg.src = frame.url;
+    
+    // Display local time for user convenience (convert UTC frame label back to local +8)
+    const [hh, mi] = frame.label.split(' ')[0].split(':');
+    let localHour = (parseInt(hh) + 8) % 24;
+    const formattedLocalTime = `${String(localHour).padStart(2, '0')}:${mi}`;
+    
+    timestampEl.textContent = `播放中：${formattedLocalTime}`;
+    
+    radarCurrentFrameIndex = (radarCurrentFrameIndex + 1) % radarHistoryFrames.length;
+  };
+  
+  playFrame(); // Play first frame immediately
+  radarPlayInterval = setInterval(playFrame, 800); // 800ms per frame
 }
 
 // --------------------------------------------------------------------------

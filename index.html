@@ -200,6 +200,9 @@
             
             <div class="radar-controls">
               <span id="radar-timestamp" class="radar-time">正在取得最新圖資...</span>
+              <button id="btn-radar-play" class="ctrl-btn" title="播放過去 1 小時動畫">
+                <span id="radar-play-icon">▶️</span>
+              </button>
               <button id="btn-radar-zoom-in" class="ctrl-btn" title="放大">
                 <span>➕</span>
               </button>
@@ -232,28 +235,28 @@
                 <img id="radar-img" src="" alt="中央氣象署雷達回波圖" referrerpolicy="no-referrer">
               </div>
             </div>
-            
-            <!-- dBZ Color scale Legend -->
-            <div class="radar-legend-card glass-panel">
-              <span class="legend-title">回波強度 (dBZ) & 降雨參考</span>
-              <div class="legend-scale">
-                <div class="legend-bar"></div>
-                <div class="legend-labels">
-                  <span>-10</span>
-                  <span>0</span>
-                  <span>10</span>
-                  <span>20</span>
-                  <span>30</span>
-                  <span>40</span>
-                  <span>50</span>
-                  <span>65+</span>
-                </div>
+          </div>
+          
+          <!-- dBZ Color scale Legend (Placed below the radar viewport!) -->
+          <div class="radar-legend-card glass-panel">
+            <span class="legend-title">回波強度 (dBZ) & 降雨參考</span>
+            <div class="legend-scale">
+              <div class="legend-bar"></div>
+              <div class="legend-labels">
+                <span>-10</span>
+                <span>0</span>
+                <span>10</span>
+                <span>20</span>
+                <span>30</span>
+                <span>40</span>
+                <span>50</span>
+                <span>65+</span>
               </div>
-              <div class="legend-desc">
-                <span class="lvl-green">10~25: 局部細雨</span>
-                <span class="lvl-yellow">25~40: 降雨顯著</span>
-                <span class="lvl-red">40+: 暴雨強降水</span>
-              </div>
+            </div>
+            <div class="legend-desc">
+              <span class="lvl-green">10~25: 局部細雨</span>
+              <span class="lvl-yellow">25~40: 降雨顯著</span>
+              <span class="lvl-red">40+: 暴雨強降水</span>
             </div>
           </div>
           
