@@ -197,8 +197,8 @@ function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v3';
-  const countyTimeKey = 'cwa_weather_cache_time_v3';
+  const countyCacheKey = 'cwa_weather_cache_v4';
+  const countyTimeKey = 'cwa_weather_cache_time_v4';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -226,7 +226,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v3_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v4_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -251,7 +251,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v3_', 'cwa_town_cache_time_v3_');
+    const timeKey = key.replace('cwa_town_cache_v4_', 'cwa_town_cache_time_v4_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -457,8 +457,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v3';
-  const cacheTimeKey = 'cwa_weather_cache_time_v3';
+  const cacheKey = 'cwa_weather_cache_v4';
+  const cacheTimeKey = 'cwa_weather_cache_time_v4';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -904,8 +904,9 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           rainProb = (popMatch && popMatch.elementValue && popMatch.elementValue[0]) ? parseInt(popMatch.elementValue[0].value) : 0;
         }
         
+        const twHour = getTaiwanHour(timeVal);
         hourlyList.push({
-          time: timeVal.getHours() + ':00',
+          time: twHour + ':00',
           displayTime: formatHourlyLabel(timeVal),
           temp: temp,
           humidity: humidity,
@@ -1029,8 +1030,21 @@ function normalizeCountyName(name) {
   return name.replace('台', '臺');
 }
 
+function getTaiwanHour(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      hour: 'numeric',
+      hour12: false
+    });
+    return parseInt(formatter.format(date));
+  } catch (e) {
+    return date.getHours();
+  }
+}
+
 function formatHourlyLabel(date) {
-  const hour = date.getHours();
+  const hour = getTaiwanHour(date);
   if (hour === 0) return '半夜';
   if (hour === 12) return '中午';
   return `${hour}:00`;
@@ -1639,6 +1653,18 @@ function drawHourlySvgChart(hourlyData) {
     // Coordinate circle point node
     svgCode += `<circle cx="${p.x}" cy="${p.y}" r="4" class="chart-point" />`;
     
+    // Render mini vector weather icon from SVG Defs sprite library at the bottom of the chart
+    let iconRef = '#svg-cloudy';
+    if (p.icon === 'sunny') iconRef = '#svg-sunny';
+    else if (p.icon === 'sunny-cloudy') iconRef = '#svg-cloudy';
+    else if (p.icon === 'cloudy') iconRef = '#svg-cloudy';
+    else if (p.icon === 'rainy') iconRef = '#svg-rainy';
+    else if (p.icon === 'thunderstorm') iconRef = '#svg-thunderstorm';
+    else if (p.icon === 'windy') iconRef = '#svg-windy';
+    else if (p.icon === 'night') iconRef = '#svg-night';
+    
+    svgCode += `<use href="${iconRef}" x="${p.x - 10}" y="${svgHeight - 46}" width="20" height="20" />`;
+    
     // Time label below bottom boundary
     svgCode += `<text x="${p.x}" y="${svgHeight - 10}" class="chart-label-time">${p.time}</text>`;
     
@@ -2154,8 +2180,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v3_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v3_${countyName}`;
+  const cacheKey = `cwa_town_cache_v4_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v4_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2808,8 +2834,8 @@ function initSettings() {
     localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
-    localStorage.removeItem('cwa_weather_cache_v3');
-    localStorage.removeItem('cwa_weather_cache_time_v3');
+    localStorage.removeItem('cwa_weather_cache_v4');
+    localStorage.removeItem('cwa_weather_cache_time_v4');
     
     closeModal();
     
