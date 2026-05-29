@@ -1162,10 +1162,10 @@ function getChartIconSvg(iconName, x, y, size = 20) {
     innerPaths = `
       <circle cx="32" cy="32" r="10" fill="url(#grad-sun)" />
       <g stroke="url(#grad-sun-rays)" stroke-width="2.8" stroke-linecap="round" class="anim-sun-rays">
-        <line x1="32" y1="12" x2="32" y2="4" />
-        <line x1="32" y1="52" x2="32" y2="60" />
-        <line x1="12" y1="32" x2="4" y2="32" />
-        <line x1="52" y1="32" x2="60" y2="32" />
+        <line x1="32" y1="12" x2="32.01" y2="4" />
+        <line x1="32" y1="52" x2="32.01" y2="60" />
+        <line x1="12" y1="32" x2="4" y2="32.01" />
+        <line x1="52" y1="32" x2="60" y2="32.01" />
         <line x1="49.32" y1="22.00" x2="56.25" y2="18.00" />
         <line x1="42.00" y1="14.68" x2="46.00" y2="7.75" />
         <line x1="22.00" y1="14.68" x2="18.00" y2="7.75" />
