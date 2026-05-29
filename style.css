@@ -1623,7 +1623,7 @@ body {
    -------------------------------------------------------------------------- */
 /* Sunny Animation */
 .anim-sun-rays {
-  transform-origin: center center;
+  transform-origin: 32px 32px;
   animation: rotate-sun 12s linear infinite;
 }
 
