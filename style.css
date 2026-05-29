@@ -2043,3 +2043,525 @@ body {
     font-weight: 600;
   }
 }
+
+/* --------------------------------------------------------------------------
+   13. Typhoon Tracker Tab Styling & Leaflet Dark Theme Overrides
+   -------------------------------------------------------------------------- */
+.typhoon-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 24px;
+  min-height: calc(100vh - 220px);
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .typhoon-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.typhoon-map-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.map-viewport-wrapper {
+  position: relative;
+  flex-grow: 1;
+  width: 100%;
+  min-height: 520px;
+  background: #020408;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+#typhoon-map {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  z-index: 1;
+}
+
+/* Cyberpunk Glass styling for select dropdown */
+.typhoon-select-dropdown {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--glass-border);
+  color: #FFF;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-family: var(--font-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.typhoon-select-dropdown:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+.typhoon-select-dropdown option {
+  background: #0d1423;
+  color: #FFF;
+}
+
+/* Leaflet Dark-theme Cyberpunk Overrides */
+.leaflet-container {
+  background: #020408 !important;
+  font-family: var(--font-primary) !important;
+}
+
+/* Attributions */
+.leaflet-control-attribution {
+  background: rgba(8, 14, 25, 0.8) !important;
+  color: var(--text-muted) !important;
+  border-top-left-radius: 8px;
+  border-left: 1px solid var(--glass-border) !important;
+  border-top: 1px solid var(--glass-border) !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-accent) !important;
+}
+
+/* Zoom controls */
+.leaflet-bar {
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  border-radius: var(--radius-sm) !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background: rgba(13, 20, 35, 0.9) !important;
+  color: #FFF !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  transition: var(--transition-smooth);
+}
+
+.leaflet-bar a:hover {
+  background: var(--color-accent) !important;
+  color: #FFF !important;
+  box-shadow: 0 0 10px var(--color-accent-glow) !important;
+}
+
+/* Popups styling */
+.leaflet-popup-content-wrapper {
+  background: rgba(13, 22, 41, 0.95) !important;
+  border: 1px solid var(--glass-border-hover) !important;
+  color: var(--text-primary) !important;
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+  padding: 2px !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(13, 22, 41, 0.95) !important;
+  border-left: 1px solid var(--glass-border-hover) !important;
+  border-bottom: 1px solid var(--glass-border-hover) !important;
+}
+
+.leaflet-popup-content {
+  font-family: var(--font-primary) !important;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  margin: 14px 18px !important;
+}
+
+.leaflet-popup-content h4 {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: #FFF;
+}
+
+.popup-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.popup-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.popup-lbl {
+  color: var(--text-secondary);
+}
+
+.popup-val {
+  font-weight: 700;
+  color: #FFF;
+}
+
+/* Right Side: Sidebar panels */
+.typhoon-side-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.typhoon-side-panel h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Typhoon Stats Card */
+.typhoon-stats-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.01);
+}
+
+.typhoon-hero-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+#typhoon-name-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFF;
+  letter-spacing: 0.5px;
+}
+
+.typhoon-badge-type {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #FF5252;
+  background: rgba(255, 82, 82, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-top: 4px;
+  border: 1px solid rgba(255, 82, 82, 0.2);
+}
+
+.typhoon-pressure-display {
+  display: flex;
+  align-items: baseline;
+  color: #FFF;
+}
+
+#typhoon-pressure {
+  font-size: 32px;
+  font-weight: 300;
+  font-family: 'Outfit', sans-serif;
+  line-height: 1;
+}
+
+.pressure-unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+.typhoon-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.typhoon-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFF;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Divergence Analysis Card */
+.analysis-section {
+  padding: 20px;
+  margin-bottom: 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.analysis-header h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFF;
+}
+
+.divergence-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.badge-high-agreement {
+  background: rgba(76, 175, 80, 0.12);
+  color: #81C784;
+  border: 1px solid rgba(76, 175, 80, 0.25);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.15);
+}
+
+.badge-moderate {
+  background: rgba(255, 152, 0, 0.12);
+  color: #FFB74D;
+  border: 1px solid rgba(255, 152, 0, 0.25);
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.15);
+}
+
+.badge-severe {
+  background: rgba(244, 67, 54, 0.12);
+  color: #E57373;
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.15);
+}
+
+#typhoon-analysis-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* Agency checklist controls card */
+.agency-checklist-card {
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.agency-checklist-card h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFF;
+  margin-bottom: 12px;
+}
+
+.agency-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 580px) {
+  .agency-check-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agency-checkbox-label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  gap: 8px;
+  user-select: none;
+}
+
+.agency-checkbox-label input[type="checkbox"] {
+  display: none;
+}
+
+.chk-custom {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  transition: var(--transition-smooth);
+}
+
+/* Dynamic color ticks for agencies */
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.cwa-indicator { border-color: #FFC107; background: rgba(255, 193, 7, 0.15); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.jma-indicator { border-color: #FF5252; background: rgba(255, 82, 82, 0.15); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.kma-indicator { border-color: #2196F3; background: rgba(33, 150, 243, 0.15); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.jtwc-indicator { border-color: #4CAF50; background: rgba(76, 175, 80, 0.15); }
+
+.chk-custom::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  transition: var(--transition-bounce);
+}
+
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom::after {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.cwa-indicator::after { background: #FFC107; box-shadow: 0 0 6px rgba(255, 193, 7, 0.6); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.jma-indicator::after { background: #FF5252; box-shadow: 0 0 6px rgba(255, 82, 82, 0.6); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.kma-indicator::after { background: #2196F3; box-shadow: 0 0 6px rgba(33, 150, 243, 0.6); }
+.agency-checkbox-label input[type="checkbox"]:checked + .chk-custom.jtwc-indicator::after { background: #4CAF50; box-shadow: 0 0 6px rgba(76, 175, 80, 0.6); }
+
+/* Custom Leaflet Pulsing Center Dot Animation */
+.leaflet-typhoon-pulse-icon {
+  background: none;
+  border: none;
+}
+
+.leaflet-typhoon-pulse-icon .pulse-ring {
+  border: 2.5px solid var(--color-accent);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  animation: pulse-marker 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.leaflet-typhoon-pulse-icon .pulse-center {
+  width: 8px;
+  height: 8px;
+  background: #FFF;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 50%;
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+@keyframes pulse-marker {
+  0% { transform: scale(0.3); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* 🌀 Windy & NCDR Integrations */
+.map-engine-toggle-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  margin-left: auto;
+  margin-right: 16px;
+}
+
+.map-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-primary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-toggle-btn:hover {
+  color: #FFF;
+}
+
+.map-toggle-btn.active {
+  background: var(--color-accent);
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 0 6px var(--color-accent-glow);
+}
+
+.external-links-card {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.external-links-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFF;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.external-btn-group {
+  display: flex;
+  gap: 12px;
+}
+
+.external-link-btn {
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 10px 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.external-link-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  color: #FFF;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .map-engine-toggle-group {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  .external-btn-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+

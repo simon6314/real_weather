@@ -11,6 +11,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
   
+  <!-- Leaflet.js Mapping Library (Free, Keyless, Premium Dark Theme Overlay) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
   <!-- CSS Styling -->
   <link rel="stylesheet" href="style.css?v=8">
 </head>
@@ -50,6 +54,9 @@
           </button>
           <button id="btn-tab-radar" class="tab-btn" data-tab="radar">
             <span class="tab-text">雷達回波</span>
+          </button>
+          <button id="btn-tab-typhoon" class="tab-btn" data-tab="typhoon">
+            <span class="tab-text">颱風動態</span>
           </button>
         </nav>
         
@@ -257,6 +264,159 @@
               <span class="lvl-green">10~25: 局部細雨</span>
               <span class="lvl-yellow">25~40: 降雨顯著</span>
               <span class="lvl-red">40+: 暴雨強降水</span>
+            </div>
+          </div>
+          
+        </div>
+      </section>
+
+      <!-- TAB 3: TYPHOON TRACKER -->
+      <section id="tab-content-typhoon" class="tab-pane">
+        <div class="typhoon-grid">
+          
+          <!-- LEFT COLUMN: Leaflet Cyberpunk Map -->
+          <div class="typhoon-map-container glass-panel">
+            <div class="panel-header">
+              <div class="location-badge">
+                <svg class="badge-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <span>西北太平洋颱風即時路徑圖</span>
+              </div>
+              
+              <!-- Map Engine Toggle Group -->
+              <div class="map-engine-toggle-group">
+                <button id="btn-map-leaflet" class="map-toggle-btn active" title="天巡者 賽博朋克霓虹路徑地圖">
+                  🗺️ 霓虹路徑
+                </button>
+                <button id="btn-map-windy" class="map-toggle-btn" title="Windy 全球即時風場雷達地圖">
+                  🌀 Windy 風場
+                </button>
+              </div>
+
+              <div class="data-source-badge">
+                <span class="pulse-dot" id="typhoon-pulse-dot"></span>
+                <span id="typhoon-status-text">載入中...</span>
+              </div>
+            </div>
+            
+            <div class="map-viewport-wrapper">
+              <!-- Map Loader Scan Overlay -->
+              <div class="radar-loading-overlay" id="typhoon-map-loader">
+                <div class="radar-scanner"></div>
+                <div class="loading-spinner"></div>
+                <span class="loading-text">地圖衛星雷達信號接收中...</span>
+              </div>
+              
+              <!-- Actual Leaflet Map element -->
+              <div id="typhoon-map"></div>
+
+              <!-- Windy Map Embed iframe (Hidden by default) -->
+              <div id="windy-map-container" style="display: none; width: 100%; height: 100%; position: relative;">
+                <iframe id="windy-iframe" src="" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+              </div>
+            </div>
+          </div>
+          
+          <!-- RIGHT COLUMN: Typhoon Info & Pathway Analysis Panel -->
+          <div class="typhoon-side-panel glass-panel">
+            <div class="panel-header">
+              <h2>颱風動態與路徑分析</h2>
+              <!-- Selector Dropdown -->
+              <div class="search-wrapper" style="width: auto;">
+                <select id="typhoon-selector" class="typhoon-select-dropdown">
+                  <!-- Dynamic options will be injected here -->
+                  <option value="simulate">天巡一號 (模擬演示)</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="panel-body">
+              <!-- Dynamic Typhoon Stats Card -->
+              <div class="typhoon-stats-card">
+                <div class="typhoon-hero-info">
+                  <div>
+                    <h3 id="typhoon-name-title">天巡一號 (ANTIGRAVITY)</h3>
+                    <span id="typhoon-class-badge" class="typhoon-badge-type">強烈颱風 (Category 5)</span>
+                  </div>
+                  <div class="typhoon-pressure-display">
+                    <span id="typhoon-pressure">915</span><span class="pressure-unit">hPa</span>
+                  </div>
+                </div>
+                
+                <div class="typhoon-details-grid">
+                  <div class="typhoon-detail-item">
+                    <span class="detail-label">近中心最大風速</span>
+                    <span class="detail-value" id="typhoon-max-wind">55 m/s</span>
+                  </div>
+                  <div class="typhoon-detail-item">
+                    <span class="detail-label">瞬間最大陣風</span>
+                    <span class="detail-value" id="typhoon-gust-wind">68 m/s</span>
+                  </div>
+                  <div class="typhoon-detail-item">
+                    <span class="detail-label">七級風暴風半徑</span>
+                    <span class="detail-value" id="typhoon-storm-radius">280 km</span>
+                  </div>
+                  <div class="typhoon-detail-item">
+                    <span class="detail-label">十級風暴風半徑</span>
+                    <span class="detail-value" id="typhoon-storm-radius-10">100 km</span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Divergence Analysis Section -->
+              <div class="analysis-section glass-panel">
+                <div class="analysis-header">
+                  <h4>路徑分歧度分析</h4>
+                  <span id="divergence-status-badge" class="divergence-badge badge-high-agreement">高度一致</span>
+                </div>
+                <div class="analysis-content">
+                  <p id="typhoon-analysis-text">
+                    根據最新氣象數據計算，各國氣象機構（台灣 CWA、日本 JMA、韓國 KMA、美國 JTWC）的 5 天預測路徑分歧度極低。路徑完全收斂，高度預示該颱風將會朝臺灣東部海域逼近，對宜花東地區將造成直接且顯著的風雨衝擊，防颱準備工作刻不容緩。
+                  </p>
+                </div>
+              </div>
+              
+              <!-- Agency Track Checkboxes -->
+              <div class="agency-checklist-card glass-panel">
+                <h4>顯示機構路徑軌跡</h4>
+                <div class="agency-check-grid">
+                  <label class="agency-checkbox-label">
+                    <input type="checkbox" id="chk-agency-cwa" checked>
+                    <span class="chk-custom cwa-indicator"></span>
+                    臺灣 CWA (金黃)
+                  </label>
+                  <label class="agency-checkbox-label">
+                    <input type="checkbox" id="chk-agency-jma" checked>
+                    <span class="chk-custom jma-indicator"></span>
+                    日本 JMA (鮮紅)
+                  </label>
+                  <label class="agency-checkbox-label">
+                    <input type="checkbox" id="chk-agency-kma" checked>
+                    <span class="chk-custom kma-indicator"></span>
+                    韓國 KMA (靛藍)
+                  </label>
+                  <label class="agency-checkbox-label">
+                    <input type="checkbox" id="chk-agency-jtwc" checked>
+                    <span class="chk-custom jtwc-indicator"></span>
+                    美國 JTWC (嫩綠)
+                  </label>
+                </div>
+              </div>
+
+              <!-- NCDR & Windy External Jump Links -->
+              <div class="external-links-card glass-panel" style="margin-top: 16px;">
+                <h4>🌐 官方災防跨國觀測對照</h4>
+                <div class="external-btn-group">
+                  <a href="https://watch.ncdr.nat.gov.tw/watch_typhoon" target="_blank" class="external-link-btn" title="開新分頁前往 國家災害防救科技中心 各國颱風路徑比較">
+                    🇹🇼 NCDR 各國路徑比對 🔗
+                  </a>
+                  <a href="https://www.windy.com/-Hurricane-tracker/hurricanes?typhoon" target="_blank" class="external-link-btn" title="開新分頁前往 Windy 颱風全球追蹤器">
+                    🌀 Windy 颱風追蹤器 🔗
+                  </a>
+                </div>
+              </div>
+              
             </div>
           </div>
           

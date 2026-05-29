@@ -162,31 +162,46 @@ function initClock() {
 function initNavigation() {
   const weatherTabBtn = document.getElementById('btn-tab-weather');
   const radarTabBtn = document.getElementById('btn-tab-radar');
+  const typhoonTabBtn = document.getElementById('btn-tab-typhoon');
   const weatherPane = document.getElementById('tab-content-weather');
   const radarPane = document.getElementById('tab-content-radar');
+  const typhoonPane = document.getElementById('tab-content-typhoon');
   
   const switchTab = (tab) => {
     AppState.activeTab = tab;
+    
+    // Stop radar animation if switching away from radar
+    if (tab !== 'radar' && typeof toggleRadarPlay === 'function' && radarPlayInterval) {
+      toggleRadarPlay();
+    }
+    
+    // Reset active class on all tabs
+    weatherTabBtn.classList.remove('active');
+    radarTabBtn.classList.remove('active');
+    if (typhoonTabBtn) typhoonTabBtn.classList.remove('active');
+    
+    // Reset active class on all panes
+    weatherPane.classList.remove('active');
+    radarPane.classList.remove('active');
+    if (typhoonPane) typhoonPane.classList.remove('active');
+    
     if (tab === 'weather') {
-      // Stop radar animation if playing
-      if (typeof toggleRadarPlay === 'function' && radarPlayInterval) {
-        toggleRadarPlay();
-      }
       weatherTabBtn.classList.add('active');
-      radarTabBtn.classList.remove('active');
       weatherPane.classList.add('active');
-      radarPane.classList.remove('active');
-    } else {
-      weatherTabBtn.classList.remove('active');
+    } else if (tab === 'radar') {
       radarTabBtn.classList.add('active');
-      weatherPane.classList.remove('active');
       radarPane.classList.add('active');
       loadRadarImage();
+    } else if (tab === 'typhoon') {
+      if (typhoonTabBtn) typhoonTabBtn.classList.add('active');
+      if (typhoonPane) typhoonPane.classList.add('active');
+      initTyphoonTracker();
     }
   };
   
   weatherTabBtn.addEventListener('click', () => switchTab('weather'));
   radarTabBtn.addEventListener('click', () => switchTab('radar'));
+  if (typhoonTabBtn) typhoonTabBtn.addEventListener('click', () => switchTab('typhoon'));
 }
 
 // --------------------------------------------------------------------------
@@ -3175,3 +3190,696 @@ window.retryDrawerLoad = function(id) {
     renderAddedRegionsList();
   });
 };
+
+// --------------------------------------------------------------------------
+// 14. Typhoon Tracker Feature Logic (Leaflet.js + CWA O-A0041-001)
+// --------------------------------------------------------------------------
+AppState.typhoonMap = null;
+AppState.typhoonMapLayers = [];
+AppState.typhoonList = [];
+AppState.selectedTyphoonId = null;
+
+// Initialize the Typhoon Tracker tab dashboard
+function initTyphoonTracker() {
+  if (typeof L === 'undefined') {
+    console.error('Leaflet library is missing or failed to load.');
+    const mapContainer = document.getElementById('typhoon-map');
+    if (mapContainer) {
+      mapContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); gap: 12px; padding: 20px;">
+          <span style="font-size: 36px;">🗺️</span>
+          <p style="font-weight: 600;">Leaflet.js 地圖庫未正確載入</p>
+          <p style="font-size: 12px; color: var(--text-muted);">請檢查網路連線或稍後再試。</p>
+        </div>
+      `;
+    }
+    const statusText = document.getElementById('typhoon-status-text');
+    if (statusText) statusText.textContent = '地圖載入失敗';
+    return;
+  }
+
+  // Prevent Leaflet error "Map container is already initialized"
+  if (AppState.typhoonMap !== null) {
+    // Force Leaflet to recalculate container size in case tab switching corrupted dimensions
+    setTimeout(() => { AppState.typhoonMap.invalidateSize(); }, 200);
+    return; 
+  }
+
+  console.log('Initializing Leaflet.js Cyberpunk map...');
+  
+  // Initialize map centered at Taiwan waters with zoom level 5.5
+  AppState.typhoonMap = L.map('typhoon-map', {
+    zoomControl: true,
+    minZoom: 3,
+    maxZoom: 12
+  }).setView([22.5, 123.5], 5.5);
+
+  // Load CartoDB Dark Matter tile layer for gorgeous cyberpunk visual excellence
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
+  }).addTo(AppState.typhoonMap);
+
+  // Selector dropdown listener
+  const selector = document.getElementById('typhoon-selector');
+  if (selector) {
+    selector.addEventListener('change', (e) => {
+      onTyphoonSelected(e.target.value);
+    });
+  }
+
+  // Map Engine Toggle Buttons Listeners
+  const btnLeaflet = document.getElementById('btn-map-leaflet');
+  const btnWindy = document.getElementById('btn-map-windy');
+  const leafletMapContainer = document.getElementById('typhoon-map');
+  const windyMapContainer = document.getElementById('windy-map-container');
+  const windyIframe = document.getElementById('windy-iframe');
+
+  if (btnLeaflet && btnWindy && leafletMapContainer && windyMapContainer && windyIframe) {
+    btnLeaflet.addEventListener('click', () => {
+      btnLeaflet.classList.add('active');
+      btnWindy.classList.remove('active');
+      leafletMapContainer.style.display = 'block';
+      windyMapContainer.style.display = 'none';
+      // Force Leaflet to recalculate container size when switching back
+      if (AppState.typhoonMap) {
+        setTimeout(() => { AppState.typhoonMap.invalidateSize(); }, 50);
+      }
+    });
+
+    btnWindy.addEventListener('click', () => {
+      btnWindy.classList.add('active');
+      btnLeaflet.classList.remove('active');
+      leafletMapContainer.style.display = 'none';
+      windyMapContainer.style.display = 'block';
+      
+      // Load Windy Embed iframe if it hasn't been loaded yet
+      if (!windyIframe.src || windyIframe.src === 'about:blank' || windyIframe.getAttribute('src') === '') {
+        console.log('Loading live Windy interactive wind map embed...');
+        // Official free Windy embed URL centered around Taiwan waters (lat: 22.5, lon: 123.5) with wind overlay and forecast pressure overlays
+        windyIframe.src = 'https://embed.windy.com/embed2.html?lat=22.5&lon=123.5&zoom=5&level=surface&overlay=wind&menu=&message=&marker=&calendar=now&pressure=true&type=map&location=coordinates&metricWind=kt&metricTemp=default&radarRange=-1';
+      }
+    });
+  }
+
+  // Load Typhoon Data
+  loadTyphoonDashboardData();
+}
+
+// Fetch live typhoon numeric forecast coordinates
+async function loadTyphoonDashboardData() {
+  const loader = document.getElementById('typhoon-map-loader');
+  const pulseDot = document.getElementById('typhoon-pulse-dot');
+  const statusText = document.getElementById('typhoon-status-text');
+
+  if (loader) {
+    loader.style.display = 'flex';
+    loader.style.opacity = '1';
+  }
+  if (statusText) statusText.textContent = '載入即時颱風資料...';
+
+  // Apply caching logic to prevent CWA rate-limiting (30 Minutes Cache)
+  const cacheKey = 'cwa_typhoon_cache_v2';
+  const cacheTimeKey = 'cwa_typhoon_cache_time_v2';
+  const cachedDataStr = localStorage.getItem(cacheKey);
+  const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+  const now = new Date().getTime();
+
+  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 1800000) {
+    try {
+      const parsedData = JSON.parse(cachedDataStr);
+      if (Array.isArray(parsedData) && parsedData.length > 0) {
+        console.log('Retrieved active typhoons from local storage cache.');
+        AppState.typhoonList = parsedData;
+        populateTyphoonSelector();
+        if (pulseDot) pulseDot.className = 'pulse-dot'; // Green pulse
+        if (statusText) statusText.textContent = '即時氣象署資料';
+        hideTyphoonLoader();
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed parsing typhoon cache.', e);
+    }
+  }
+
+  // Cache expired or missing, pull from CWA
+  console.log('Fetching live CWA typhoon numerical path data (W-C0034-005)...');
+  
+  let baseUrl = 'https://opendata.cwa.gov.tw';
+  let queryParams = '?format=JSON';
+  
+  if (CLOUDFLARE_PROXY_URL) {
+    baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl;
+    }
+    if (AppState.apiKey) {
+      queryParams += `&Authorization=${AppState.apiKey}`;
+    }
+  } else if (AppState.apiKey) {
+    queryParams += `&Authorization=${AppState.apiKey}`;
+  } else {
+    // No credentials, trigger simulation immediately
+    console.warn('No API key or Proxy available. Defaulting directly to Simulation.');
+    setupTyphoonSimulation();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/rest/datastore/W-C0034-005${queryParams}`);
+    if (!res.ok) throw new Error('W-C0034-005 API status: ' + res.status);
+    const data = await res.json();
+    
+    // Parse response
+    const parsedList = parseCwaTyphoonResponse(data);
+    
+    if (parsedList && parsedList.length > 0) {
+      AppState.typhoonList = parsedList;
+      localStorage.setItem(cacheKey, JSON.stringify(parsedList));
+      localStorage.setItem(cacheTimeKey, String(now));
+      
+      populateTyphoonSelector();
+      if (pulseDot) pulseDot.className = 'pulse-dot';
+      if (statusText) statusText.textContent = '即時氣象署資料';
+    } else {
+      // Empty data returned (no active typhoons currently)
+      console.log('No active typhoons returned by CWA API. Activating Simulation mode.');
+      setupTyphoonSimulation();
+    }
+  } catch (err) {
+    console.error('Failed to fetch W-C0034-005:', err);
+    setupTyphoonSimulation();
+  }
+  
+  hideTyphoonLoader();
+}
+
+function hideTyphoonLoader() {
+  const loader = document.getElementById('typhoon-map-loader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => { loader.style.display = 'none'; }, 400);
+  }
+}
+
+// Setup gorgeous Category 5 simulation path if offline or no active typhoons
+function setupTyphoonSimulation() {
+  const pulseDot = document.getElementById('typhoon-pulse-dot');
+  const statusText = document.getElementById('typhoon-status-text');
+
+  if (pulseDot) pulseDot.className = 'pulse-dot simulation-dot'; // Orange pulse
+  if (statusText) statusText.textContent = '模擬演示模式';
+
+  console.log('Generating high-fidelity simulated Super Typhoon Antigravity data...');
+  
+  // Construct real CWA track for "天巡一號 (Super Typhoon Antigravity)"
+  const simulateTyphoon = {
+    id: 'simulate',
+    nameZh: '天巡一號',
+    nameEn: 'ANTIGRAVITY',
+    maxWind: '55 m/s',
+    gustWind: '68 m/s',
+    pressure: 915,
+    stormRadius: '280 km',
+    stormRadius10: '100 km',
+    classZh: '強烈颱風 (Category 5)',
+    tracks: {
+      // CWA (Taiwan) - Direct Hit Landfall in Hualien
+      'CWA': [
+        { lat: 17.5, lon: 126.5, time: '過去 (現在)', windSpeed: 55, pressure: 915, radius: 280, isHistorical: true },
+        { lat: 18.8, lon: 125.2, time: '+12h', windSpeed: 55, pressure: 915, radius: 280 },
+        { lat: 20.1, lon: 123.8, time: '+24h', windSpeed: 53, pressure: 920, radius: 280 },
+        { lat: 21.3, lon: 122.5, time: '+48h', windSpeed: 51, pressure: 925, radius: 280 },
+        { lat: 22.8, lon: 121.2, time: '+72h (登陸)', windSpeed: 45, pressure: 940, radius: 250 },
+        { lat: 24.2, lon: 119.8, time: '+96h', windSpeed: 38, pressure: 960, radius: 200 },
+        { lat: 25.5, lon: 118.2, time: '+120h', windSpeed: 25, pressure: 980, radius: 150 }
+      ]
+    }
+  };
+
+  AppState.typhoonList = [simulateTyphoon];
+  populateTyphoonSelector();
+  hideTyphoonLoader();
+}
+
+// Populate the select dropdown selector
+function populateTyphoonSelector() {
+  const selector = document.getElementById('typhoon-selector');
+  if (!selector) return;
+
+  selector.innerHTML = '';
+  
+  AppState.typhoonList.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.nameZh} (${t.nameEn})`;
+    selector.appendChild(opt);
+  });
+
+  // Default to first item
+  if (AppState.typhoonList.length > 0) {
+    const defaultId = AppState.typhoonList[0].id;
+    selector.value = defaultId;
+    onTyphoonSelected(defaultId);
+  }
+}
+
+// Selector change handler
+function onTyphoonSelected(id) {
+  AppState.selectedTyphoonId = id;
+  const t = AppState.typhoonList.find(item => item.id === id);
+  if (!t) return;
+
+  // Render stats cards
+  document.getElementById('typhoon-name-title').textContent = `${t.nameZh} (${t.nameEn})`;
+  document.getElementById('typhoon-class-badge').textContent = t.classZh;
+  document.getElementById('typhoon-pressure').textContent = t.pressure;
+  document.getElementById('typhoon-max-wind').textContent = t.maxWind;
+  document.getElementById('typhoon-gust-wind').textContent = t.gustWind;
+  document.getElementById('typhoon-storm-radius').textContent = t.stormRadius;
+  document.getElementById('typhoon-storm-radius-10').textContent = t.stormRadius10;
+
+  // Perform standard deviation path divergence calculations and output badges
+  calculateAndRenderDivergence(t);
+
+  // Render paths on Leaflet
+  renderSelectedTyphoonTrack();
+}
+
+// Great-Circle Haversine distance calculator between coordinates (in km)
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Calculate pairwise spreads of agency paths at +24h, +48h, +72h, +96h, +120h
+function calculateAndRenderDivergence(typhoon) {
+  const badge = document.getElementById('divergence-status-badge');
+  const textEl = document.getElementById('typhoon-analysis-text');
+  
+  if (!badge || !textEl) return;
+
+  const tracks = typhoon.tracks;
+  const agencies = Object.keys(tracks);
+  
+  if (agencies.length <= 1) {
+    badge.textContent = '無法計算';
+    badge.className = 'divergence-badge badge-high-agreement';
+    textEl.textContent = '目前只有單一氣象機構的預報資料，無法進行路徑分歧度分析。';
+    return;
+  }
+
+  // Find intervals
+  let totalSpread = 0;
+  let intervalsCount = 0;
+  
+  // Check index 2 (+24h), index 3 (+48h), index 4 (+72h), index 5 (+96h), index 6 (+120h)
+  const targetIndices = [2, 3, 4, 5, 6];
+
+  targetIndices.forEach(idx => {
+    const points = [];
+    agencies.forEach(agency => {
+      const pt = tracks[agency]?.[idx];
+      if (pt) points.push(pt);
+    });
+
+    if (points.length >= 2) {
+      // Calculate pairwise distances
+      let sumDist = 0;
+      let pairs = 0;
+      for (let i = 0; i < points.length; i++) {
+        for (let j = i + 1; j < points.length; j++) {
+          sumDist += getHaversineDistance(points[i].lat, points[i].lon, points[j].lat, points[j].lon);
+          pairs++;
+        }
+      }
+      if (pairs > 0) {
+        totalSpread += (sumDist / pairs);
+        intervalsCount++;
+      }
+    }
+  });
+
+  const avgDivergence = intervalsCount > 0 ? (totalSpread / intervalsCount) : 0;
+  console.log(`Calculated Typhoon Path Divergence Spread: ${avgDivergence.toFixed(1)} km`);
+
+  // Classify divergence
+  badge.className = 'divergence-badge'; // Reset
+  
+  if (avgDivergence < 80) {
+    badge.textContent = '高度一致';
+    badge.classList.add('badge-high-agreement');
+    textEl.innerHTML = `
+      根據最新數值模擬計算，各國氣象機構（臺灣 CWA、日本 JMA、韓國 KMA、美國 JTWC）在 120 小時內的預測路徑<b>分歧度極低</b>（平均偏差約 ${avgDivergence.toFixed(0)} 公里）。<br><br>
+      路徑預報高度收斂，意味著颱風的路徑不確定性很小，對特定警戒區域（如臺灣${typhoon.id === 'simulate' ? '東部及北部地區' : '鄰近海域'}）造成直接衝擊的機率極高，請民眾務必提早完成防颱整備。
+    `;
+  } else if (avgDivergence <= 200) {
+    badge.textContent = '中度分歧';
+    badge.classList.add('badge-moderate');
+    textEl.innerHTML = `
+      各國氣象預報路徑呈現<b>中度分歧</b>（平均偏差約 ${avgDivergence.toFixed(0)} 公里）。<br><br>
+      主因是受到太平洋副熱帶高壓勢力強弱的導引氣流波動影響，目前預測路徑在「登陸穿心」與「偏轉北上」之間搖擺。未來 24 至 48 小時颱風行經鞍形場時的實際轉向角度將是關鍵觀察期，不確定性仍然存在。
+    `;
+  } else {
+    badge.textContent = '嚴重分歧';
+    badge.classList.add('badge-severe');
+    textEl.innerHTML = `
+      觀測資料顯示，各國對颱風未來 5 天預測路徑有著<b>嚴重分歧</b>（平均偏差高達 ${avgDivergence.toFixed(0)} 公里）。<br><br>
+      引導氣流極為微弱，颱風可能出現「滯留打轉」、「雙颱效應」或大角度「急轉彎」。目前路徑從登陸、擦過南端到大幅度拋物線北上均有預測，預測不確定性極大，請隨時密切注意最新氣象署特報。
+    `;
+  }
+}
+
+// Clean old layers and draw glowing polylines, storm circles, and pulsing nodes
+function renderSelectedTyphoonTrack() {
+  if (!AppState.typhoonMap || !AppState.selectedTyphoonId) return;
+
+  // Clear existing tracks and markers
+  AppState.typhoonMapLayers.forEach(layer => {
+    if (AppState.typhoonMap.hasLayer(layer)) {
+      AppState.typhoonMap.removeLayer(layer);
+    }
+  });
+  AppState.typhoonMapLayers = [];
+
+  const t = AppState.typhoonList.find(item => item.id === AppState.selectedTyphoonId);
+  if (!t) return;
+
+  const agencyStyles = {
+    'CWA': { color: '#FFC107', name: '臺灣 CWA', visible: true }
+  };
+
+  const allLatLngs = [];
+
+  Object.keys(t.tracks).forEach(agency => {
+    const style = agencyStyles[agency];
+    if (!style || !style.visible) return;
+
+    const points = t.tracks[agency];
+    if (!points || points.length === 0) return;
+
+    const latlngs = points.map(pt => [pt.lat, pt.lon]);
+    latlngs.forEach(ll => allLatLngs.push(ll));
+
+    // 1. Draw glowing polyline
+    const lineGlow = L.polyline(latlngs, {
+      color: style.color,
+      weight: 8,
+      opacity: 0.15,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(AppState.typhoonMap);
+    AppState.typhoonMapLayers.push(lineGlow);
+
+    const line = L.polyline(latlngs, {
+      color: style.color,
+      weight: 3.2,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(AppState.typhoonMap);
+    AppState.typhoonMapLayers.push(line);
+
+    // 2. Draw nodes, storm circles (7-class wind radius) & popups
+    points.forEach((pt, idx) => {
+      // Draw storm circle (7級風暴風半徑, in meters)
+      // Dynamic fill opacity based on maximum wind speed (higher wind speed = darker storm radius circle!)
+      const ws = pt.windSpeed || 30;
+      const fillOpacity = Math.min(0.24, 0.06 + (ws / 60) * 0.14);
+      
+      const stormCircle = L.circle([pt.lat, pt.lon], {
+        radius: pt.radius * 1000, // km to meters
+        color: style.color,
+        weight: 1,
+        opacity: 0.35,
+        fillColor: style.color,
+        fillOpacity: fillOpacity,
+        dashArray: idx === 0 ? null : '4, 4'
+      }).addTo(AppState.typhoonMap);
+      AppState.typhoonMapLayers.push(stormCircle);
+
+      // Create detailed popup content
+      const popupHtml = `
+        <div class="popup-container">
+          <h4>${t.nameZh} (${t.nameEn}) - ${style.name}</h4>
+          <span class="typhoon-badge-type" style="margin-top: 0; margin-bottom: 8px;">預測時段：${pt.time}</span>
+          <div class="popup-details-list">
+            <div class="popup-detail-row">
+              <span class="popup-lbl">座標位置</span>
+              <span class="popup-val">北緯 ${pt.lat.toFixed(1)}° / 東經 ${pt.lon.toFixed(1)}°</span>
+            </div>
+            <div class="popup-detail-row">
+              <span class="popup-lbl">中心氣壓</span>
+              <span class="popup-val">${pt.pressure} hPa</span>
+            </div>
+            <div class="popup-detail-row">
+              <span class="popup-lbl">最大風速</span>
+              <span class="popup-val">${pt.windSpeed} m/s</span>
+            </div>
+            <div class="popup-detail-row">
+              <span class="popup-lbl">7級風暴風半徑</span>
+              <span class="popup-val">${pt.radius} km</span>
+            </div>
+          </div>
+        </div>
+      `;
+      stormCircle.bindPopup(popupHtml);
+
+      // 3. Draw dot markers
+      if (idx === 0) {
+        // Pulser center marker for current/first coordinate
+        const pulseIcon = L.divIcon({
+          className: 'leaflet-typhoon-pulse-icon',
+          html: `<div class="pulse-ring" style="border-color: ${style.color}"></div><div class="pulse-center" style="border-color: ${style.color}"></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [0, 0]
+        });
+        
+        const pulser = L.marker([pt.lat, pt.lon], { icon: pulseIcon }).addTo(AppState.typhoonMap);
+        pulser.bindPopup(popupHtml);
+        AppState.typhoonMapLayers.push(pulser);
+      } else {
+        // Standard forecast coordinate node
+        const dot = L.circleMarker([pt.lat, pt.lon], {
+          radius: 4,
+          color: '#000',
+          weight: 1.5,
+          fillColor: style.color,
+          fillOpacity: 1,
+          opacity: 0.9
+        }).addTo(AppState.typhoonMap);
+        dot.bindPopup(popupHtml);
+        AppState.typhoonMapLayers.push(dot);
+      }
+    });
+  });
+
+  // Auto zoom map to fit all tracks dynamically
+  if (allLatLngs.length > 0) {
+    const bounds = L.latLngBounds(allLatLngs);
+    AppState.typhoonMap.fitBounds(bounds, { padding: [40, 40] });
+  }
+}
+
+// Dynamic response parser for CWA Numerical Forecast API response
+function parseCwaTyphoonResponse(data) {
+  const parsed = [];
+  try {
+    const records = data.records;
+    if (!records) return parsed;
+    
+    // Support 1: W-C0034-005 structure (CWA active tracking and forecasts)
+    const tropicalCyclones = records.TropicalCyclones?.TropicalCyclone || records.tropicalCyclones?.tropicalCyclone;
+    if (tropicalCyclones) {
+      const cyArr = Array.isArray(tropicalCyclones) ? tropicalCyclones : [tropicalCyclones];
+      cyArr.forEach(cy => {
+        if (!cy) return;
+        
+        const nameZh = cy.CwaTyphoonName || cy.cwaTyphoonName || cy.typhoonName || cy.TyphoonName || '未命名颱風';
+        const nameEn = cy.TyphoonName || cy.englishTyphoonName || cy.EnglishTyphoonName || 'UNKNOWN';
+        const id = cy.CwaTyNo || cy.cwaTyNo || cy.typhoonNo || cy.TyphoonNo || String(Math.random());
+        
+        const item = {
+          id: id,
+          nameZh: nameZh,
+          nameEn: nameEn,
+          maxWind: '-- m/s',
+          gustWind: '-- m/s',
+          pressure: 990,
+          stormRadius: '-- km',
+          stormRadius10: '-- km',
+          classZh: '輕度颱風',
+          tracks: {}
+        };
+        
+        // Parse AnalysisData (Historical fixes) and ForecastData (Forecast points)
+        const analysisData = cy.AnalysisData || cy.analysisData;
+        const forecastData = cy.ForecastData || cy.forecastData;
+        
+        const fixes = analysisData?.Fix || analysisData?.fix || [];
+        const lastFix = fixes[fixes.length - 1];
+        const forecastFixes = forecastData?.Fix || forecastData?.fix || [];
+        
+        if (lastFix) {
+          const currentPoint = {
+            lat: parseFloat(lastFix.CoordinateLatitude || lastFix.coordinateLatitude || lastFix.latitude || lastFix.Latitude),
+            lon: parseFloat(lastFix.CoordinateLongitude || lastFix.coordinateLongitude || lastFix.longitude || lastFix.Longitude),
+            time: '過去 (現在)',
+            windSpeed: parseFloat(lastFix.MaxWindSpeed || lastFix.maxWindSpeed || 25),
+            pressure: parseFloat(lastFix.Pressure || lastFix.pressure || 975),
+            radius: parseFloat(lastFix.Circle15ms?.Radius || lastFix.circle15ms?.radius || lastFix.radiusOf7Velocity || 120),
+            isHistorical: true
+          };
+          
+          // Construct CWA Track
+          const cwaTrack = [currentPoint];
+          forecastFixes.forEach(pt => {
+            const lat = parseFloat(pt.CoordinateLatitude || pt.coordinateLatitude || pt.latitude || pt.Latitude);
+            const lon = parseFloat(pt.CoordinateLongitude || pt.coordinateLongitude || pt.longitude || pt.Longitude);
+            if (isNaN(lat) || isNaN(lon)) return;
+            
+            const fHour = pt.ForecastHour || pt.forecastHour || '24';
+            let timeLabel = `預測 +${fHour}h`;
+            const initTime = pt.InitialTime || pt.initialTime;
+            if (initTime) {
+              const initDate = new Date(initTime);
+              initDate.setHours(initDate.getHours() + parseInt(fHour));
+              const m = initDate.getMonth() + 1;
+              const d = initDate.getDate();
+              const h = String(initDate.getHours()).padStart(2, '0');
+              const min = String(initDate.getMinutes()).padStart(2, '0');
+              timeLabel = `預測 +${fHour}h (${m}/${d} ${h}:${min})`;
+            }
+            
+            cwaTrack.push({
+              lat: lat,
+              lon: lon,
+              time: timeLabel,
+              windSpeed: parseFloat(pt.MaxWindSpeed || pt.maxWindSpeed || 25),
+              pressure: parseFloat(pt.Pressure || pt.pressure || 970),
+              radius: parseFloat(pt.Circle15ms?.Radius || pt.circle15ms?.radius || pt.radiusOf7Velocity || 120)
+            });
+          });
+          
+          item.tracks['CWA'] = cwaTrack;
+          
+          // Integrate specifications into stats cards
+          item.pressure = currentPoint.pressure;
+          item.maxWind = `${currentPoint.windSpeed} m/s`;
+          item.gustWind = `${Math.round(currentPoint.windSpeed * 1.25)} m/s`;
+          item.stormRadius = `${currentPoint.radius} km`;
+          item.stormRadius10 = `${Math.round(currentPoint.radius * 0.35)} km`;
+          
+          const ws = currentPoint.windSpeed;
+          if (ws >= 51) item.classZh = '強烈颱風 (Category 4-5)';
+          else if (ws >= 32.7) item.classZh = '中度颱風 (Category 2-3)';
+          else item.classZh = '輕度颱風 (Category 1)';
+          
+          parsed.push(item);
+        }
+      });
+      
+      if (parsed.length > 0) return parsed;
+    }
+    
+    // Support 2: Fallback to original O-A0041-001 parser
+    const cyclones = records.tropicalCyclones?.tropicalCyclone || records.tropicalCyclone || records.TropicalCyclones?.TropicalCyclone || [];
+    const cyArr = Array.isArray(cyclones) ? cyclones : [cyclones];
+    
+    cyArr.forEach(cy => {
+      if (!cy) return;
+      
+      const nameZh = cy.typhoonName || cy.TyphoonName || '未命名颱風';
+      const nameEn = cy.englishTyphoonName || cy.EnglishTyphoonName || 'UNKNOWN';
+      const id = cy.typhoonNo || cy.TyphoonNo || String(Math.random());
+      
+      const item = {
+        id: id,
+        nameZh: nameZh,
+        nameEn: nameEn,
+        maxWind: '-- m/s',
+        gustWind: '-- m/s',
+        pressure: 990,
+        stormRadius: '-- km',
+        stormRadius10: '-- km',
+        classZh: '輕度颱風',
+        tracks: {}
+      };
+      
+      const forecastGroups = cy.analysisAndForecasts?.analysisAndForecast || cy.analysisAndForecast || cy.AnalysisAndForecasts?.AnalysisAndForecast || [];
+      const fgArr = Array.isArray(forecastGroups) ? forecastGroups : [forecastGroups];
+      
+      fgArr.forEach(fg => {
+        const agency = fg.forecastAgency || fg.ForecastAgency || 'CWA';
+        const points = fg.forecastPoints?.forecastPoint || fg.forecastPoint || fg.ForecastPoints?.ForecastPoint || [];
+        const ptArr = Array.isArray(points) ? points : [points];
+        
+        const trackPoints = [];
+        ptArr.forEach(pt => {
+          const lat = parseFloat(pt.latitude || pt.Latitude);
+          const lon = parseFloat(pt.longitude || pt.Longitude);
+          if (isNaN(lat) || isNaN(lon)) return;
+          
+          const timeRaw = pt.forecastTime || pt.ForecastTime || '';
+          let timeLabel = timeRaw;
+          if (timeRaw && timeRaw.includes('T')) {
+            const dateObj = new Date(timeRaw);
+            const hour = dateObj.getHours();
+            const min = dateObj.getMinutes();
+            timeLabel = `預測 +${hour}h (${dateObj.getMonth()+1}/${dateObj.getDate()} ${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')})`;
+          }
+          
+          const wind = parseFloat(pt.maxWindSpeed || pt.MaxWindSpeed || 25);
+          const pres = parseFloat(pt.centralPressure || pt.CentralPressure || 970);
+          const radius = parseFloat(pt.radiusOf7Velocity || pt.RadiusOf7Velocity || 120);
+          
+          trackPoints.push({
+            lat: lat,
+            lon: lon,
+            time: timeLabel,
+            windSpeed: wind,
+            pressure: pres,
+            radius: radius
+          });
+        });
+        
+        if (trackPoints.length > 0) {
+          item.tracks[agency] = trackPoints;
+        }
+      });
+      
+      const cwaTrack = item.tracks['CWA'] || Object.values(item.tracks)[0];
+      if (cwaTrack && cwaTrack.length > 0) {
+        const first = cwaTrack[0];
+        item.pressure = first.pressure;
+        item.maxWind = `${first.windSpeed} m/s`;
+        item.gustWind = `${Math.round(first.windSpeed * 1.25)} m/s`;
+        item.stormRadius = `${first.radius} km`;
+        item.stormRadius10 = `${Math.round(first.radius * 0.35)} km`;
+        
+        const ws = first.windSpeed;
+        if (ws >= 51) item.classZh = '強烈颱風 (Category 4-5)';
+        else if (ws >= 32.7) item.classZh = '中度颱風 (Category 2-3)';
+        else item.classZh = '輕度颱風 (Category 1)';
+      }
+      
+      if (Object.keys(item.tracks).length > 0) {
+        parsed.push(item);
+      }
+    });
+  } catch (e) {
+    console.error('Failed parsing typhoon dataset response:', e);
+  }
+  return parsed;
+}
+
+// Bind to window to allow DOM elements or event listeners to access
+window.initTyphoonTracker = initTyphoonTracker;
+
