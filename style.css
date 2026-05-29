@@ -1168,7 +1168,7 @@ body {
 
 .svg-chart-wrapper {
   min-width: 650px;
-  height: 180px;
+  height: 220px;
   position: relative;
 }
 
@@ -1207,7 +1207,7 @@ body {
 }
 
 .chart-label-temp {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   fill: #FFF;
   text-anchor: middle;
@@ -1215,14 +1215,14 @@ body {
 }
 
 .chart-label-time {
-  font-size: 10px;
+  font-size: 13px;
   fill: var(--text-secondary);
   text-anchor: middle;
 }
 
 .chart-label-rain {
-  font-size: 9px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   fill: #7EA5F0;
   text-anchor: middle;
 }
@@ -2000,23 +2000,23 @@ body {
   }
   
   .weekly-item {
-    grid-template-columns: 50px 30px 40px 1fr 65px;
+    grid-template-columns: 60px 32px 42px 1fr 70px;
     padding: 8px 10px;
     gap: 6px;
     border-radius: var(--radius-sm);
   }
   
   .weekly-day {
-    font-size: 13px;
+    font-size: 14px;
   }
   
   .weekly-pop {
-    font-size: 9px;
+    font-size: 11px;
   }
   
   .weekly-icon-wrapper svg {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
   }
   
   .weekly-range-bar-track {
@@ -2030,7 +2030,7 @@ body {
   }
   
   .weekly-temp-labels {
-    font-size: 12px;
+    font-size: 13px;
     gap: 4px;
   }
   

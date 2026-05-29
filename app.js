@@ -1786,11 +1786,11 @@ function drawHourlySvgChart(hourlyData) {
   const data = hourlyData.slice(0, 12);
   const size = data.length;
   
-  // Chart dimensions
+  // Chart dimensions (adjusted for larger mobile typography and animations)
   const svgWidth = 680;
-  const svgHeight = 160;
+  const svgHeight = 200;
   const paddingX = 40;
-  const paddingY = 30;
+  const paddingY = 40;
   
   // Find min/max temp to map y coordinates
   const temps = data.map(d => d.temp);
@@ -1891,23 +1891,23 @@ function drawHourlySvgChart(hourlyData) {
   
   svgCode += `<path d="${pathD}" class="chart-line" filter="url(#glow-shadow)" />`;
   
-  // Render labels and interaction nodes
+  // Render labels and interaction nodes (enhanced sizes for mobile readability)
   points.forEach(p => {
     // Temperature above coordinate node
-    svgCode += `<text x="${p.x}" y="${p.y - 12}" class="chart-label-temp">${Number(p.temp).toFixed(1)}°</text>`;
+    svgCode += `<text x="${p.x}" y="${p.y - 15}" class="chart-label-temp">${Number(p.temp).toFixed(1)}°</text>`;
     
-    // Coordinate circle point node
-    svgCode += `<circle cx="${p.x}" cy="${p.y}" r="4" class="chart-point" />`;
+    // Coordinate circle point node (enlarged)
+    svgCode += `<circle cx="${p.x}" cy="${p.y}" r="5" class="chart-point" />`;
     
-    // Render inlined vector weather icon with animations!
-    svgCode += getChartIconSvg(p.icon, p.x, svgHeight - 36, 20);
+    // Render inlined vector weather icon with animations! (Scaled up to 36px for stunning animation views)
+    svgCode += getChartIconSvg(p.icon, p.x, svgHeight - 56, 36);
     
     // Time label below bottom boundary
-    svgCode += `<text x="${p.x}" y="${svgHeight - 10}" class="chart-label-time">${p.time}</text>`;
+    svgCode += `<text x="${p.x}" y="${svgHeight - 12}" class="chart-label-time">${p.time}</text>`;
     
     // Rain Pop label if greater than 0%
     if (p.rainProb > 0) {
-      svgCode += `<text x="${p.x}" y="${svgHeight - 24}" class="chart-label-rain">${p.rainProb}%</text>`;
+      svgCode += `<text x="${p.x}" y="${svgHeight - 32}" class="chart-label-rain">${p.rainProb}%</text>`;
     }
   });
   
@@ -1950,7 +1950,7 @@ function renderAppleWeeklyRangeBars(weeklyList) {
       <span class="weekly-day">${day.dayOfWeek}</span>
       <span class="weekly-pop">${day.rainProb > 0 ? day.rainProb + '%' : ''}</span>
       <div class="weekly-icon-wrapper">
-        ${getAnimatedSvgCode(day.icon, 32, 32)}
+        ${getAnimatedSvgCode(day.icon, 40, 40)}
       </div>
       <div class="weekly-range-bar-container">
         <div class="weekly-range-bar-track">
@@ -3398,8 +3398,8 @@ function setupTyphoonSimulation() {
     id: 'simulate',
     nameZh: '天巡一號',
     nameEn: 'ANTIGRAVITY',
-    maxWind: '55 m/s',
-    gustWind: '68 m/s',
+    maxWind: '55 m/s (16級風)',
+    gustWind: '68 m/s (17級風)',
     pressure: 915,
     stormRadius: '280 km',
     stormRadius10: '100 km',
@@ -3446,6 +3446,66 @@ function populateTyphoonSelector() {
 }
 
 // Selector change handler
+// Selector change handler
+// Beaufort Wind Scale Converter (蒲福風級轉換器)
+function getBeaufortScale(ws) {
+  if (ws < 0.3) return 0;
+  if (ws < 1.6) return 1;
+  if (ws < 3.4) return 2;
+  if (ws < 5.5) return 3;
+  if (ws < 8.0) return 4;
+  if (ws < 10.8) return 5;
+  if (ws < 13.9) return 6;
+  if (ws < 17.2) return 7;
+  if (ws < 20.8) return 8;
+  if (ws < 24.5) return 9;
+  if (ws < 28.5) return 10;
+  if (ws < 32.7) return 11;
+  if (ws < 37.0) return 12;
+  if (ws < 41.5) return 13;
+  if (ws < 46.2) return 14;
+  if (ws < 51.0) return 15;
+  if (ws < 56.1) return 16;
+  return 17;
+}
+
+// Render dynamic 5-day CWA forecast table rows
+function renderForecastTable(typhoon) {
+  const tbody = document.getElementById('typhoon-forecast-tbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  const cwaTrack = typhoon.tracks['CWA'];
+  if (!cwaTrack || cwaTrack.length <= 1) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">暫無未來預估數據</td></tr>';
+    return;
+  }
+  
+  // Loop through future forecast points (from index 1 onwards)
+  for (let i = 1; i < cwaTrack.length; i++) {
+    const pt = cwaTrack[i];
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+    tr.style.transition = 'background 0.2s';
+    
+    // Highlight rows slightly on hover
+    tr.addEventListener('mouseenter', () => { tr.style.background = 'rgba(255,255,255,0.02)'; });
+    tr.addEventListener('mouseleave', () => { tr.style.background = 'transparent'; });
+    
+    const timeDisplay = pt.time.replace('預測 ', '');
+    const ws = pt.windSpeed || 25;
+    
+    tr.innerHTML = `
+      <td style="padding: 10px 4px; font-weight: 600; color: #FFF;">${timeDisplay}</td>
+      <td style="padding: 10px 4px;">北緯 ${pt.lat.toFixed(1)}°<br>東經 ${pt.lon.toFixed(1)}°</td>
+      <td style="padding: 10px 4px; color: var(--color-accent); font-weight: 500;">${pt.pressure} hPa</td>
+      <td style="padding: 10px 4px; font-weight: 500; color: #FFF;">${ws} m/s<br><span style="color: var(--text-muted); font-size: 10px;">(${getBeaufortScale(ws)}級風)</span></td>
+      <td style="padding: 10px 4px;">${pt.radius} km</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
 function onTyphoonSelected(id) {
   AppState.selectedTyphoonId = id;
   const t = AppState.typhoonList.find(item => item.id === id);
@@ -3460,102 +3520,14 @@ function onTyphoonSelected(id) {
   document.getElementById('typhoon-storm-radius').textContent = t.stormRadius;
   document.getElementById('typhoon-storm-radius-10').textContent = t.stormRadius10;
 
-  // Perform standard deviation path divergence calculations and output badges
-  calculateAndRenderDivergence(t);
+  // Render dynamic 5-day CWA forecast table
+  renderForecastTable(t);
 
   // Render paths on Leaflet
   renderSelectedTyphoonTrack();
 }
 
-// Great-Circle Haversine distance calculator between coordinates (in km)
-function getHaversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth radius
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
-// Calculate pairwise spreads of agency paths at +24h, +48h, +72h, +96h, +120h
-function calculateAndRenderDivergence(typhoon) {
-  const badge = document.getElementById('divergence-status-badge');
-  const textEl = document.getElementById('typhoon-analysis-text');
-  
-  if (!badge || !textEl) return;
-
-  const tracks = typhoon.tracks;
-  const agencies = Object.keys(tracks);
-  
-  if (agencies.length <= 1) {
-    badge.textContent = '無法計算';
-    badge.className = 'divergence-badge badge-high-agreement';
-    textEl.textContent = '目前只有單一氣象機構的預報資料，無法進行路徑分歧度分析。';
-    return;
-  }
-
-  // Find intervals
-  let totalSpread = 0;
-  let intervalsCount = 0;
-  
-  // Check index 2 (+24h), index 3 (+48h), index 4 (+72h), index 5 (+96h), index 6 (+120h)
-  const targetIndices = [2, 3, 4, 5, 6];
-
-  targetIndices.forEach(idx => {
-    const points = [];
-    agencies.forEach(agency => {
-      const pt = tracks[agency]?.[idx];
-      if (pt) points.push(pt);
-    });
-
-    if (points.length >= 2) {
-      // Calculate pairwise distances
-      let sumDist = 0;
-      let pairs = 0;
-      for (let i = 0; i < points.length; i++) {
-        for (let j = i + 1; j < points.length; j++) {
-          sumDist += getHaversineDistance(points[i].lat, points[i].lon, points[j].lat, points[j].lon);
-          pairs++;
-        }
-      }
-      if (pairs > 0) {
-        totalSpread += (sumDist / pairs);
-        intervalsCount++;
-      }
-    }
-  });
-
-  const avgDivergence = intervalsCount > 0 ? (totalSpread / intervalsCount) : 0;
-  console.log(`Calculated Typhoon Path Divergence Spread: ${avgDivergence.toFixed(1)} km`);
-
-  // Classify divergence
-  badge.className = 'divergence-badge'; // Reset
-  
-  if (avgDivergence < 80) {
-    badge.textContent = '高度一致';
-    badge.classList.add('badge-high-agreement');
-    textEl.innerHTML = `
-      根據最新數值模擬計算，各國氣象機構（臺灣 CWA、日本 JMA、韓國 KMA、美國 JTWC）在 120 小時內的預測路徑<b>分歧度極低</b>（平均偏差約 ${avgDivergence.toFixed(0)} 公里）。<br><br>
-      路徑預報高度收斂，意味著颱風的路徑不確定性很小，對特定警戒區域（如臺灣${typhoon.id === 'simulate' ? '東部及北部地區' : '鄰近海域'}）造成直接衝擊的機率極高，請民眾務必提早完成防颱整備。
-    `;
-  } else if (avgDivergence <= 200) {
-    badge.textContent = '中度分歧';
-    badge.classList.add('badge-moderate');
-    textEl.innerHTML = `
-      各國氣象預報路徑呈現<b>中度分歧</b>（平均偏差約 ${avgDivergence.toFixed(0)} 公里）。<br><br>
-      主因是受到太平洋副熱帶高壓勢力強弱的導引氣流波動影響，目前預測路徑在「登陸穿心」與「偏轉北上」之間搖擺。未來 24 至 48 小時颱風行經鞍形場時的實際轉向角度將是關鍵觀察期，不確定性仍然存在。
-    `;
-  } else {
-    badge.textContent = '嚴重分歧';
-    badge.classList.add('badge-severe');
-    textEl.innerHTML = `
-      觀測資料顯示，各國對颱風未來 5 天預測路徑有著<b>嚴重分歧</b>（平均偏差高達 ${avgDivergence.toFixed(0)} 公里）。<br><br>
-      引導氣流極為微弱，颱風可能出現「滯留打轉」、「雙颱效應」或大角度「急轉彎」。目前路徑從登陸、擦過南端到大幅度拋物線北上均有預測，預測不確定性極大，請隨時密切注意最新氣象署特報。
-    `;
-  }
-}
+// Multi-agency route divergence calculations were removed to keep the focus solely on the CWA official track.
 
 // Clean old layers and draw glowing polylines, storm circles, and pulsing nodes
 function renderSelectedTyphoonTrack() {
@@ -3641,7 +3613,7 @@ function renderSelectedTyphoonTrack() {
             </div>
             <div class="popup-detail-row">
               <span class="popup-lbl">最大風速</span>
-              <span class="popup-val">${pt.windSpeed} m/s</span>
+              <span class="popup-val">${pt.windSpeed} m/s (${getBeaufortScale(pt.windSpeed)}級風)</span>
             </div>
             <div class="popup-detail-row">
               <span class="popup-lbl">7級風暴風半徑</span>
@@ -3772,8 +3744,10 @@ function parseCwaTyphoonResponse(data) {
           
           // Integrate specifications into stats cards
           item.pressure = currentPoint.pressure;
-          item.maxWind = `${currentPoint.windSpeed} m/s`;
-          item.gustWind = `${Math.round(currentPoint.windSpeed * 1.25)} m/s`;
+          const wsNum = currentPoint.windSpeed;
+          const gustNum = Math.round(wsNum * 1.25);
+          item.maxWind = `${wsNum} m/s (${getBeaufortScale(wsNum)}級風)`;
+          item.gustWind = `${gustNum} m/s (${getBeaufortScale(gustNum)}級風)`;
           item.stormRadius = `${currentPoint.radius} km`;
           item.stormRadius10 = `${Math.round(currentPoint.radius * 0.35)} km`;
           
@@ -3859,8 +3833,10 @@ function parseCwaTyphoonResponse(data) {
       if (cwaTrack && cwaTrack.length > 0) {
         const first = cwaTrack[0];
         item.pressure = first.pressure;
-        item.maxWind = `${first.windSpeed} m/s`;
-        item.gustWind = `${Math.round(first.windSpeed * 1.25)} m/s`;
+        const wsNum = first.windSpeed;
+        const gustNum = Math.round(wsNum * 1.25);
+        item.maxWind = `${wsNum} m/s (${getBeaufortScale(wsNum)}級風)`;
+        item.gustWind = `${gustNum} m/s (${getBeaufortScale(gustNum)}級風)`;
         item.stormRadius = `${first.radius} km`;
         item.stormRadius10 = `${Math.round(first.radius * 0.35)} km`;
         

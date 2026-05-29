@@ -364,43 +364,30 @@
                 </div>
               </div>
               
-              <!-- Divergence Analysis Section -->
-              <div class="analysis-section glass-panel">
-                <div class="analysis-header">
-                  <h4>路徑分歧度分析</h4>
-                  <span id="divergence-status-badge" class="divergence-badge badge-high-agreement">高度一致</span>
+              <!-- 5-Day Forecast Data Table Card -->
+              <div class="forecast-table-card glass-panel" style="margin-top: 16px;">
+                <div class="panel-header" style="padding-bottom: 8px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between;">
+                  <h4 style="font-size: 14px; font-weight: 600; color: #FFF; display: flex; align-items: center; gap: 6px; margin: 0;">📅 未來 5 天官方預報點數值</h4>
+                  <span class="divergence-badge badge-high-agreement" style="font-size: 10px; padding: 2px 8px; border-radius: 4px;">官方預估</span>
                 </div>
-                <div class="analysis-content">
-                  <p id="typhoon-analysis-text">
-                    根據最新氣象數據計算，各國氣象機構（台灣 CWA、日本 JMA、韓國 KMA、美國 JTWC）的 5 天預測路徑分歧度極低。路徑完全收斂，高度預示該颱風將會朝臺灣東部海域逼近，對宜花東地區將造成直接且顯著的風雨衝擊，防颱準備工作刻不容緩。
-                  </p>
-                </div>
-              </div>
-              
-              <!-- Agency Track Checkboxes -->
-              <div class="agency-checklist-card glass-panel">
-                <h4>顯示機構路徑軌跡</h4>
-                <div class="agency-check-grid">
-                  <label class="agency-checkbox-label">
-                    <input type="checkbox" id="chk-agency-cwa" checked>
-                    <span class="chk-custom cwa-indicator"></span>
-                    臺灣 CWA (金黃)
-                  </label>
-                  <label class="agency-checkbox-label">
-                    <input type="checkbox" id="chk-agency-jma" checked>
-                    <span class="chk-custom jma-indicator"></span>
-                    日本 JMA (鮮紅)
-                  </label>
-                  <label class="agency-checkbox-label">
-                    <input type="checkbox" id="chk-agency-kma" checked>
-                    <span class="chk-custom kma-indicator"></span>
-                    韓國 KMA (靛藍)
-                  </label>
-                  <label class="agency-checkbox-label">
-                    <input type="checkbox" id="chk-agency-jtwc" checked>
-                    <span class="chk-custom jtwc-indicator"></span>
-                    美國 JTWC (嫩綠)
-                  </label>
+                <div class="forecast-table-wrapper" style="margin-top: 12px; overflow-x: auto; max-height: 250px;">
+                  <table class="forecast-data-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; color: var(--text-secondary);">
+                    <thead>
+                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); font-weight: 600;">
+                        <th style="padding: 8px 4px;">預測時段</th>
+                        <th style="padding: 8px 4px;">經緯度</th>
+                        <th style="padding: 8px 4px;">氣壓</th>
+                        <th style="padding: 8px 4px;">最大風速</th>
+                        <th style="padding: 8px 4px;">7級風半徑</th>
+                      </tr>
+                    </thead>
+                    <tbody id="typhoon-forecast-tbody">
+                      <!-- Dynamic rows will be injected by JS -->
+                      <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">載入數據中...</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
