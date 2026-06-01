@@ -211,9 +211,29 @@ function initNavigation() {
 function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
+  // Clean up legacy caches from prior versions (V7, V8, V2) to reclaim space and force immediate updates!
+  const legacyKeys = [
+    'cwa_weather_cache_v8', 'cwa_weather_cache_time_v8',
+    'cwa_weather_cache_v7', 'cwa_weather_cache_time_v7',
+    'cwa_typhoon_cache_v2', 'cwa_typhoon_cache_time_v2',
+    'cwa_typhoon_cache', 'cwa_typhoon_cache_time'
+  ];
+  legacyKeys.forEach(k => localStorage.removeItem(k));
+  
+  // Wipe legacy township caches
+  const legacyTownshipKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('cwa_town_cache_v8_') || key.startsWith('cwa_town_cache_time_v8_') ||
+                key.startsWith('cwa_town_cache_v7_') || key.startsWith('cwa_town_cache_time_v7_'))) {
+      legacyTownshipKeys.push(key);
+    }
+  }
+  legacyTownshipKeys.forEach(k => localStorage.removeItem(k));
+  
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v8';
-  const countyTimeKey = 'cwa_weather_cache_time_v8';
+  const countyCacheKey = 'cwa_weather_cache_v9';
+  const countyTimeKey = 'cwa_weather_cache_time_v9';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -241,7 +261,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v8_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v9_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -266,7 +286,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v8_', 'cwa_town_cache_time_v8_');
+    const timeKey = key.replace('cwa_town_cache_v9_', 'cwa_town_cache_time_v9_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -490,6 +510,38 @@ function isNightTime(identifier, date) {
   return timeMs < sunrise.getTime() || timeMs >= sunset.getTime();
 }
 
+// Helper to determine if we should bypass local storage caching (e.g. for development or force refresh)
+function shouldBypassCache() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.has('nocache') || urlParams.has('refresh') || urlParams.has('dev');
+}
+
+// Clear all CWA weather caches, township caches, and typhoon caches from localStorage
+function clearAllWeatherCaches() {
+  console.log('Clearing all weather, township, and typhoon caches from localStorage...');
+  localStorage.removeItem('cwa_weather_cache_v9');
+  localStorage.removeItem('cwa_weather_cache_time_v9');
+  localStorage.removeItem('cwa_typhoon_cache_v3');
+  localStorage.removeItem('cwa_typhoon_cache_time_v3');
+  
+  // Wipe all versions of township and main weather caches to be safe
+  localStorage.removeItem('cwa_weather_cache_v8');
+  localStorage.removeItem('cwa_weather_cache_time_v8');
+  localStorage.removeItem('cwa_weather_cache_v7');
+  localStorage.removeItem('cwa_weather_cache_time_v7');
+  localStorage.removeItem('cwa_typhoon_cache_v2');
+  localStorage.removeItem('cwa_typhoon_cache_time_v2');
+  
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('cwa_town_cache_') || key.includes('cwa_town_cache_time_'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+}
+
 // --------------------------------------------------------------------------
 // 5. CWA API Fetching & LocalStorage Caching Client
 // --------------------------------------------------------------------------
@@ -550,14 +602,14 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v8';
-  const cacheTimeKey = 'cwa_weather_cache_time_v8';
+  const cacheKey = 'cwa_weather_cache_v9';
+  const cacheTimeKey = 'cwa_weather_cache_time_v9';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
   // Use Cache if younger than 10 Minutes (600,000 ms) and fully valid to ensure fresh observations
-  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
+  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
     try {
       const parsedData = JSON.parse(cachedDataStr);
       // Validate county cache integrity
@@ -2520,13 +2572,13 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v8_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v8_${countyName}`;
+  const cacheKey = `cwa_town_cache_v9_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v9_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
-  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
+  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
     try {
       const parsedTowns = JSON.parse(cachedDataStr);
       
@@ -3240,8 +3292,7 @@ function initSettings() {
     localStorage.setItem('cwa_data_mode', 'live');
     
     // Wipe cache to force fresh pull with new settings
-    localStorage.removeItem('cwa_weather_cache_v7');
-    localStorage.removeItem('cwa_weather_cache_time_v7');
+    clearAllWeatherCaches();
     
     closeModal();
     
@@ -3254,7 +3305,8 @@ function initSettings() {
     apiKeyInput.value = '';
     AppState.apiKey = '';
     localStorage.removeItem('cwa_api_key');
-    alert('金鑰已清除，請在「設定」中重新輸入以獲取即時資料。');
+    clearAllWeatherCaches();
+    alert('金鑰與所有本地天氣快取已清除，請在「設定」中重新輸入以獲取即時資料。');
   });
 }
 
@@ -3415,21 +3467,26 @@ async function loadTyphoonDashboardData() {
   if (statusText) statusText.textContent = '載入即時颱風資料...';
 
   // Apply caching logic to prevent CWA rate-limiting (30 Minutes Cache)
-  const cacheKey = 'cwa_typhoon_cache_v2';
-  const cacheTimeKey = 'cwa_typhoon_cache_time_v2';
+  const cacheKey = 'cwa_typhoon_cache_v3';
+  const cacheTimeKey = 'cwa_typhoon_cache_time_v3';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
 
-  if (cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 1800000) {
+  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 1800000) {
     try {
       const parsedData = JSON.parse(cachedDataStr);
       if (Array.isArray(parsedData) && parsedData.length > 0) {
         console.log('Retrieved active typhoons from local storage cache.');
         AppState.typhoonList = parsedData;
         populateTyphoonSelector();
-        if (pulseDot) pulseDot.className = 'pulse-dot'; // Green pulse
-        if (statusText) statusText.textContent = '即時氣象署資料';
+        const hasRealTyphoon = parsedData.some(t => t.id !== 'simulate');
+        if (pulseDot) {
+          pulseDot.className = hasRealTyphoon ? 'pulse-dot' : 'pulse-dot simulation-dot';
+        }
+        if (statusText) {
+          statusText.textContent = hasRealTyphoon ? '即時氣象署資料' : '現在西太平洋未有颱風生成';
+        }
         hideTyphoonLoader();
         return;
       }
@@ -3470,6 +3527,10 @@ async function loadTyphoonDashboardData() {
     const parsedList = parseCwaTyphoonResponse(data);
     
     if (parsedList && parsedList.length > 0) {
+      // Append simulated typhoon as a demo option at the end of active typhoons
+      const simulateTyphoon = getSimulatedTyphoonData();
+      parsedList.push(simulateTyphoon);
+      
       AppState.typhoonList = parsedList;
       localStorage.setItem(cacheKey, JSON.stringify(parsedList));
       localStorage.setItem(cacheTimeKey, String(now));
@@ -3498,18 +3559,9 @@ function hideTyphoonLoader() {
   }
 }
 
-// Setup gorgeous Category 5 simulation path if offline or no active typhoons
-function setupTyphoonSimulation() {
-  const pulseDot = document.getElementById('typhoon-pulse-dot');
-  const statusText = document.getElementById('typhoon-status-text');
-
-  if (pulseDot) pulseDot.className = 'pulse-dot simulation-dot'; // Orange pulse
-  if (statusText) statusText.textContent = '模擬演示模式';
-
-  console.log('Generating high-fidelity simulated Super Typhoon Antigravity data...');
-  
-  // Construct real CWA track for "天巡一號 (Super Typhoon Antigravity)"
-  const simulateTyphoon = {
+// Helper to return static mock data for Super Typhoon Antigravity
+function getSimulatedTyphoonData() {
+  return {
     id: 'simulate',
     nameZh: '天巡一號',
     nameEn: 'ANTIGRAVITY',
@@ -3532,6 +3584,19 @@ function setupTyphoonSimulation() {
       ]
     }
   };
+}
+
+// Setup gorgeous Category 5 simulation path if offline or no active typhoons
+function setupTyphoonSimulation() {
+  const pulseDot = document.getElementById('typhoon-pulse-dot');
+  const statusText = document.getElementById('typhoon-status-text');
+
+  if (pulseDot) pulseDot.className = 'pulse-dot simulation-dot'; // Orange pulse
+  if (statusText) statusText.textContent = '現在西太平洋未有颱風生成';
+
+  console.log('Generating high-fidelity simulated Super Typhoon Antigravity data...');
+  
+  const simulateTyphoon = getSimulatedTyphoonData();
 
   AppState.typhoonList = [simulateTyphoon];
   populateTyphoonSelector();
@@ -3548,7 +3613,11 @@ function populateTyphoonSelector() {
   AppState.typhoonList.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.id;
-    opt.textContent = `${t.nameZh} (${t.nameEn})`;
+    if (t.id === 'simulate') {
+      opt.textContent = `${t.nameZh} (${t.nameEn}) (模擬)`;
+    } else {
+      opt.textContent = `${t.nameZh} (${t.nameEn})`;
+    }
     selector.appendChild(opt);
   });
 
