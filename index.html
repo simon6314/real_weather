@@ -16,7 +16,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -174,7 +174,9 @@
           <!-- RIGHT COLUMN: Custom Regions (自選地區) -->
           <div class="side-panel glass-panel">
             <div class="panel-header">
-              <h2>自選觀測地區</h2>
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px;">
+                <h2>自選觀測地區</h2>
+              </div>
               <div class="search-wrapper">
                 <input type="text" id="search-input" placeholder="搜尋並新增臺灣縣市..." autocomplete="off">
                 <button id="btn-search-clear" class="search-clear-btn" style="display: none;">&times;</button>
@@ -326,7 +328,6 @@
               <div class="search-wrapper" style="width: auto;">
                 <select id="typhoon-selector" class="typhoon-select-dropdown">
                   <!-- Dynamic options will be injected here -->
-                  <option value="simulate">天巡一號 (模擬演示)</option>
                 </select>
               </div>
             </div>
@@ -442,6 +443,8 @@
     </div>
     
     <div class="drawer-body">
+      <!-- Active Alerts Container -->
+      <div id="drawer-alerts-container"></div>
       
       <!-- Section A: 72H Trend Forecast -->
       <div class="drawer-section glass-panel">
@@ -621,6 +624,6 @@
   </svg>
 
   <!-- JavaScript Application -->
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

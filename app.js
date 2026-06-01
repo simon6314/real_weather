@@ -97,6 +97,7 @@ const AppState = {
   apiKey: localStorage.getItem('cwa_api_key') || DEFAULT_API_KEY,
   dataMode: 'live', // Enforce live CWA only
   isSimulationActive: false,
+  activeAlerts: [], // Store live or simulated weather alerts
   
   currentLocationCounty: '臺北市中正區', // Default fallback
   currentWeather: {},            // Cached current weather for main display
@@ -127,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initRadarControls();
   initDetailsDrawer();
   
+
   // Make main location panel clickable to open detailed forecast
   const mainPanel = document.querySelector('.main-panel');
   if (mainPanel) {
@@ -211,20 +213,26 @@ function initNavigation() {
 function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
-  // Clean up legacy caches from prior versions (V7, V8, V2) to reclaim space and force immediate updates!
+  // Clean up legacy caches from prior versions (V11, V10, V9, V8, V7, V2) to reclaim space and force immediate updates!
   const legacyKeys = [
+    'cwa_weather_cache_v11', 'cwa_weather_cache_time_v11',
+    'cwa_weather_cache_v10', 'cwa_weather_cache_time_v10',
+    'cwa_weather_cache_v9', 'cwa_weather_cache_time_v9',
     'cwa_weather_cache_v8', 'cwa_weather_cache_time_v8',
     'cwa_weather_cache_v7', 'cwa_weather_cache_time_v7',
     'cwa_typhoon_cache_v2', 'cwa_typhoon_cache_time_v2',
-    'cwa_typhoon_cache', 'cwa_typhoon_cache_time'
+    'cwa_typhoon_cache', 'cwa_typhoon_cache_time',
+    'cwa_alerts_cache_v12', 'cwa_alerts_cache_time_v12'
   ];
   legacyKeys.forEach(k => localStorage.removeItem(k));
   
-  // Wipe legacy township caches
+  // Wipe legacy township caches (including V10, V9, V8, V7)
   const legacyTownshipKeys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && (key.startsWith('cwa_town_cache_v8_') || key.startsWith('cwa_town_cache_time_v8_') ||
+    if (key && (key.startsWith('cwa_town_cache_v10_') || key.startsWith('cwa_town_cache_time_v10_') ||
+                key.startsWith('cwa_town_cache_v9_') || key.startsWith('cwa_town_cache_time_v9_') ||
+                key.startsWith('cwa_town_cache_v8_') || key.startsWith('cwa_town_cache_time_v8_') ||
                 key.startsWith('cwa_town_cache_v7_') || key.startsWith('cwa_town_cache_time_v7_'))) {
       legacyTownshipKeys.push(key);
     }
@@ -232,8 +240,8 @@ function validateAndCleanAllCaches() {
   legacyTownshipKeys.forEach(k => localStorage.removeItem(k));
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v9';
-  const countyTimeKey = 'cwa_weather_cache_time_v9';
+  const countyCacheKey = 'cwa_weather_cache_v12';
+  const countyTimeKey = 'cwa_weather_cache_time_v12';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -261,7 +269,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v9_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v11_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -286,7 +294,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v9_', 'cwa_town_cache_time_v9_');
+    const timeKey = key.replace('cwa_town_cache_v11_', 'cwa_town_cache_time_v11_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -519,12 +527,18 @@ function shouldBypassCache() {
 // Clear all CWA weather caches, township caches, and typhoon caches from localStorage
 function clearAllWeatherCaches() {
   console.log('Clearing all weather, township, and typhoon caches from localStorage...');
-  localStorage.removeItem('cwa_weather_cache_v9');
-  localStorage.removeItem('cwa_weather_cache_time_v9');
+  localStorage.removeItem('cwa_weather_cache_v12');
+  localStorage.removeItem('cwa_weather_cache_time_v12');
   localStorage.removeItem('cwa_typhoon_cache_v3');
   localStorage.removeItem('cwa_typhoon_cache_time_v3');
   
   // Wipe all versions of township and main weather caches to be safe
+  localStorage.removeItem('cwa_weather_cache_v11');
+  localStorage.removeItem('cwa_weather_cache_time_v11');
+  localStorage.removeItem('cwa_weather_cache_v10');
+  localStorage.removeItem('cwa_weather_cache_time_v10');
+  localStorage.removeItem('cwa_weather_cache_v9');
+  localStorage.removeItem('cwa_weather_cache_time_v9');
   localStorage.removeItem('cwa_weather_cache_v8');
   localStorage.removeItem('cwa_weather_cache_time_v8');
   localStorage.removeItem('cwa_weather_cache_v7');
@@ -540,6 +554,219 @@ function clearAllWeatherCaches() {
     }
   }
   keysToRemove.forEach(key => localStorage.removeItem(key));
+  
+  // Clear alerts cache
+  localStorage.removeItem('cwa_alerts_cache_v13');
+  localStorage.removeItem('cwa_alerts_cache_time_v13');
+  localStorage.removeItem('cwa_alerts_cache_v12');
+  localStorage.removeItem('cwa_alerts_cache_time_v12');
+  localStorage.removeItem('cwa_alerts_cache_v2');
+  localStorage.removeItem('cwa_alerts_cache_time_v2');
+  localStorage.removeItem('cwa_alerts_cache');
+  localStorage.removeItem('cwa_alerts_cache_time');
+}
+
+// Fetch active weather alerts from CWA (W-C0033-002) with 10 minutes cache
+async function fetchActiveAlerts() {
+  if (AppState.isSimulationActive) return;
+  
+  const cacheKey = 'cwa_alerts_cache_v13';
+  const cacheTimeKey = 'cwa_alerts_cache_time_v13';
+  const cachedDataStr = localStorage.getItem(cacheKey);
+  const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+  const now = new Date().getTime();
+  
+  // Use cached alerts if younger than 10 minutes (600,000 ms) and not bypassing cache
+  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
+    try {
+      AppState.activeAlerts = JSON.parse(cachedDataStr);
+      console.log('Retrieved active weather alerts from cache:', AppState.activeAlerts);
+      return;
+    } catch (e) {
+      console.warn('Failed parsing alerts cache. Refreshing CWA API.', e);
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheTimeKey);
+    }
+  }
+  
+  console.log('Fetching fresh active weather alerts...');
+  
+  let baseUrl = 'https://opendata.cwa.gov.tw';
+  let queryParams = '?format=JSON';
+  
+  if (CLOUDFLARE_PROXY_URL) {
+    baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'https://' + baseUrl;
+    }
+    if (AppState.apiKey) {
+      queryParams += `&Authorization=${AppState.apiKey}`;
+    }
+  } else if (AppState.apiKey) {
+    queryParams += `&Authorization=${AppState.apiKey}`;
+  } else {
+    AppState.activeAlerts = [];
+    return;
+  }
+  
+  const parsedAlerts = [];
+  
+  // 1. Fetch Standard Weather Alerts (W-C0033-002)
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-002${queryParams}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success === 'true' && data.records && data.records.record) {
+        const records = Array.isArray(data.records.record) ? data.records.record : [data.records.record];
+        const grouped = {};
+        
+        for (const r of records) {
+          if (!r.contentText) continue;
+          
+          const title = `${r.phenomena || ''}${r.significance || '特報'}`;
+          const key = `${title}_${r.contentText}_${r.startTime}_${r.endTime}`;
+          
+          if (!grouped[key]) {
+            grouped[key] = {
+              title: title || '天氣警特報',
+              phenomena: r.phenomena || '',
+              significance: r.significance || '特報',
+              contentText: r.contentText || '',
+              startTime: r.startTime || '',
+              endTime: r.endTime || '',
+              affectedAreas: []
+            };
+          }
+          
+          if (r.locationName) {
+            grouped[key].affectedAreas.push(r.locationName.trim());
+          }
+        }
+        
+        for (const key of Object.keys(grouped)) {
+          parsedAlerts.push(grouped[key]);
+        }
+      }
+    } else {
+      console.warn('CWA Alerts API returned status ' + res.status);
+    }
+  } catch (err) {
+    console.error('Failed to fetch standard weather alerts (W-C0033-002):', err);
+  }
+  
+  // 2. Fetch High Temperature Information (W-C0033-005)
+  try {
+    const resHeat = await fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-005${queryParams}`);
+    if (resHeat.ok) {
+      const heatData = await resHeat.json();
+      if (heatData && heatData.success === 'true' && heatData.records && heatData.records.info) {
+        const infos = Array.isArray(heatData.records.info) ? heatData.records.info : [heatData.records.info];
+        for (const inf of infos) {
+          // Check expiration
+          const expiresMs = inf.expires ? new Date(inf.expires).getTime() : Infinity;
+          if (!isNaN(expiresMs) && now > expiresMs) {
+            continue; // Skip expired warnings
+          }
+          
+          // Reconstruct description contentText
+          let contentText = '';
+          if (inf.description) {
+            if (typeof inf.description === 'string') {
+              contentText = inf.description;
+            } else if (Array.isArray(inf.description.section)) {
+              contentText = inf.description.section.map(s => s.value || '').join('\n');
+            } else if (inf.description.value) {
+              contentText = inf.description.value;
+            } else if (typeof inf.description === 'object') {
+              contentText = JSON.stringify(inf.description);
+            }
+          }
+          if (!contentText) {
+            contentText = inf.headline || '';
+          }
+          
+          // Parse affectedAreas
+          const affectedAreas = [];
+          if (inf.area) {
+            const areas = Array.isArray(inf.area) ? inf.area : [inf.area];
+            for (const a of areas) {
+              if (a.areaDesc) {
+                affectedAreas.push(a.areaDesc.trim());
+              }
+            }
+          }
+          
+          // Build event title and phenomena
+          const phenomena = inf.event || '高溫';
+          const title = inf.eventName || inf.headline || `${phenomena}資訊`;
+          
+          parsedAlerts.push({
+            title: title,
+            phenomena: phenomena,
+            significance: '特報',
+            contentText: contentText,
+            startTime: inf.onset || inf.effective || '',
+            endTime: inf.expires || '',
+            affectedAreas: affectedAreas
+          });
+        }
+      }
+    } else {
+      console.warn('CWA High Temp API returned status ' + resHeat.status);
+    }
+  } catch (errHeat) {
+    console.error('Failed to fetch high temperature alerts (W-C0033-005):', errHeat);
+  }
+  
+  AppState.activeAlerts = parsedAlerts;
+  localStorage.setItem(cacheKey, JSON.stringify(parsedAlerts));
+  localStorage.setItem(cacheTimeKey, now.toString());
+  console.log('Fetched and cached alerts successfully:', parsedAlerts);
+}
+
+// Convert ISO time string to localized MM/DD HH:mm format
+function formatAlertTime(timeStr) {
+  if (!timeStr) return '無期限';
+  try {
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${month}/${day} ${hours}:${minutes}`;
+  } catch (e) {
+    return timeStr;
+  }
+}
+
+// Generate an intelligent array of geographical keywords for weather alert filtering
+function getCountyKeywords(county) {
+  if (!county) return [];
+  const base = county.replace('台', '臺'); // Normalise to Traditional
+  const alt = county.replace('臺', '台');
+  const short1 = base.replace('市', '').replace('縣', '');
+  const short2 = alt.replace('市', '').replace('縣', '');
+  
+  const keywords = [base, alt, short1, short2];
+  
+  if (base.includes('臺北') || base.includes('新北') || base.includes('基隆')) {
+    keywords.push('大臺北', '大台北', '北臺灣', '北台灣', '北部');
+  }
+  if (base.includes('桃園') || base.includes('新竹') || base.includes('苗栗')) {
+    keywords.push('竹苗', '北臺灣', '北台灣', '北部');
+  }
+  if (base.includes('臺中') || base.includes('彰化') || base.includes('南投') || base.includes('雲林')) {
+    keywords.push('中臺灣', '中台灣', '中部');
+  }
+  if (base.includes('嘉義') || base.includes('臺南') || base.includes('高雄') || base.includes('屏東')) {
+    keywords.push('南臺灣', '南台灣', '南部');
+  }
+  if (base.includes('宜蘭') || base.includes('花蓮') || base.includes('臺東') || base.includes('台東')) {
+    keywords.push('東臺灣', '東台灣', '東部');
+  }
+  
+  return Array.from(new Set(keywords));
 }
 
 // --------------------------------------------------------------------------
@@ -550,6 +777,9 @@ async function loadWeatherDashboard() {
   
   try {
     const dataSuccess = await fetchAllWeatherData();
+    
+    // Fetch active weather warnings/alerts
+    await fetchActiveAlerts();
     
     // Also load township data if current location is a township
     const parsed = parseIdentifier(AppState.currentLocationCounty);
@@ -602,8 +832,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v9';
-  const cacheTimeKey = 'cwa_weather_cache_time_v9';
+  const cacheKey = 'cwa_weather_cache_v12';
+  const cacheTimeKey = 'cwa_weather_cache_time_v12';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -687,21 +917,36 @@ async function fetchAllWeatherData() {
     if (!res7d.ok) throw new Error('CWA 7d API returned status ' + res7d.status);
     const data7d = await res7d.json();
     
-    // 4. Fetch real-time automatic weather station observations (O-A0003-001)
-    let observationData = null;
+    // 4. Fetch real-time weather observations from both manned (O-A0001-001) and automatic (O-A0003-001) stations
+    let mergedStations = [];
+    
+    // Fetch primary manned stations (O-A0001-001)
     try {
-      console.log('Fetching CWA real-time weather observations (O-A0003-001)...');
-      const resObs = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`);
-      if (resObs.ok) {
-        observationData = await resObs.json();
+      console.log('Fetching CWA real-time manned weather observations (O-A0001-001)...');
+      const resObs1 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0001-001${queryParams}`);
+      if (resObs1.ok) {
+        const obsData1 = await resObs1.json();
+        const stations1 = obsData1.records?.Station || obsData1.records?.station || [];
+        mergedStations = mergedStations.concat(stations1);
       }
-    } catch (obsErr) {
-      console.warn('Failed to fetch real-time observations, falling back to forecast values.', obsErr);
+    } catch (obsErr1) {
+      console.warn('Failed to fetch O-A0001-001 manned observations:', obsErr1);
     }
     
-    if (observationData && observationData.records) {
-      AppState.observations = observationData.records.Station || observationData.records.station || [];
+    // Fetch automatic weather stations (O-A0003-001)
+    try {
+      console.log('Fetching CWA real-time automatic weather observations (O-A0003-001)...');
+      const resObs3 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`);
+      if (resObs3.ok) {
+        const obsData3 = await resObs3.json();
+        const stations3 = obsData3.records?.Station || obsData3.records?.station || [];
+        mergedStations = mergedStations.concat(stations3);
+      }
+    } catch (obsErr3) {
+      console.warn('Failed to fetch O-A0003-001 automatic observations:', obsErr3);
     }
+    
+    AppState.observations = mergedStations;
     
     // Parse and integrate the three datasets
     const parsedData = integrateCwaDatasets(data36h, data72h, data7d);
@@ -770,20 +1015,92 @@ function findObservation(countyName, townName = '') {
   const normCounty = countyName.replace('台', '臺');
   const normTown = townName ? townName.replace('台', '臺') : '';
   
-  // 1. Try to find exact township station match
+  // 1. Try to find exact or fuzzy township station match
   if (normTown) {
-    const match = AppState.observations.find(obs => {
+    const cleanTown = normTown.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+    
+    // Step A: Prefer a station whose name matches the town name exactly (e.g. station "旗山" for "旗山區")
+    let match = AppState.observations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const tempVal = getObsElementValue(obs, 'AirTemperature');
+      const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+      
+      const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+      const sNameClean = sName.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+      const sNameMatches = sName === normTown || sNameClean === cleanTown;
+      
+      return obsCounty === normCounty && sNameMatches && hasTemp;
+    });
+    if (match) return match;
+    
+    // Step B: Fallback to any automatic weather station in the township
+    match = AppState.observations.find(obs => {
       const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
       const obsTown = (obs.GeoInfo?.TownName || obs.geoInfo?.townName || '').replace('台', '臺');
       const tempVal = getObsElementValue(obs, 'AirTemperature');
       const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
-      return obsCounty === normCounty && obsTown === normTown && hasTemp;
+      
+      const matchesTown = obsTown === normTown || 
+                          (obsTown.length > 0 && normTown.length > 0 && 
+                           (obsTown.includes(normTown) || normTown.includes(obsTown)));
+                           
+      return obsCounty === normCounty && matchesTown && hasTemp;
     });
     if (match) return match;
+    
+    // Crucial fix: If we are looking for a specific township and there is no exact local AWS station,
+    // return null so it stays with the CWA township-level forecast data
+    return null;
   }
   
-  // 2. Fallback: Find the first station in the county with a valid temperature
-  const countyMatch = AppState.observations.find(obs => {
+  // 2. County-level overview match:
+  // Step A: Prefer a station whose name matches the county name exactly (e.g. "臺中" station for "臺中市")
+  const cleanCounty = normCounty.replace('市', '').replace('縣', '');
+  let countyMatch = AppState.observations.find(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    const tempVal = getObsElementValue(obs, 'AirTemperature');
+    const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+    
+    const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+    const sNameClean = sName.replace('市', '').replace('縣', '');
+    const isPrimaryStation = sName === normCounty || sName === cleanCounty || sNameClean === cleanCounty;
+    
+    return obsCounty === normCounty && isPrimaryStation && hasTemp;
+  });
+  if (countyMatch) return countyMatch;
+  
+  // Step B: Fallback to a station located in the county's capital township (e.g. "板橋" for "新北市")
+  const capitalTown = COUNTY_CAPITALS[normCounty] || '';
+  if (capitalTown) {
+    const cleanCapital = capitalTown.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+    countyMatch = AppState.observations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const tempVal = getObsElementValue(obs, 'AirTemperature');
+      const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+      
+      const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+      const sNameClean = sName.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+      
+      return obsCounty === normCounty && (sName === capitalTown || sNameClean === cleanCapital) && hasTemp;
+    });
+    if (countyMatch) return countyMatch;
+  }
+  
+  // Step C: Fallback to any low-altitude station in the county (avoid stations containing "山" in name)
+  countyMatch = AppState.observations.find(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    const tempVal = getObsElementValue(obs, 'AirTemperature');
+    const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
+    
+    const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+    const isMountain = sName.includes('山') && !sName.includes('山區') && sName !== '中山';
+    
+    return obsCounty === normCounty && !isMountain && hasTemp;
+  });
+  if (countyMatch) return countyMatch;
+  
+  // Step D: Ultimate fallback to any station in the county
+  countyMatch = AppState.observations.find(obs => {
     const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
     const tempVal = getObsElementValue(obs, 'AirTemperature');
     const hasTemp = tempVal !== undefined && tempVal !== null && parseFloat(tempVal) !== -99 && tempVal !== -99 && tempVal !== '-99';
@@ -1611,6 +1928,38 @@ function triggerSimulationMode(reasonMsg) {
   }
   
   AppState.allCountiesWeatherData = simulated;
+  
+  // Inject highly visual simulated weather alerts for demonstration
+  AppState.activeAlerts = [
+    {
+      title: "大雨特報",
+      phenomena: "大雨",
+      significance: "特報",
+      contentText: "對流雲系發展旺盛，易有短延時強降雨，今（１）日新北市、臺北市、基隆市及桃園市地區有局部大雨或豪雨發生的機率，請注意雷擊及強陣風，山區請慎防坍方、落石及溪水暴漲。",
+      startTime: now.toISOString(),
+      endTime: new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString(),
+      affectedAreas: ["新北市", "臺北市", "基隆市", "桃園市"]
+    },
+    {
+      title: "陸上強風特報",
+      phenomena: "強風",
+      significance: "特報",
+      contentText: "東北風明顯偏強，今（１）日晚起臺中市、彰化縣、雲林縣、嘉義縣、臺南市沿海空曠地區及澎湖縣、金門縣、馬祖地區將有９至１０級強陣風，基隆北海岸、東半部地區及新北市、桃園市、新竹市、新竹縣、苗栗縣沿海空曠地區亦有較強陣風，鄰近海域並有較大風浪，請特別注意。",
+      startTime: now.toISOString(),
+      endTime: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      affectedAreas: ["臺中市", "彰化縣", "雲林縣", "嘉義縣", "臺南市", "澎湖縣", "金門縣", "連江縣", "基隆市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣"]
+    },
+    {
+      title: "高溫資訊",
+      phenomena: "高溫",
+      significance: "特報",
+      contentText: "天氣晴朗炎熱，今（１）日中午前後高雄市地區為黃色燈號，請注意防曬、多補充水分、減少戶外劇烈運動，高溫可能引發熱傷害，請特別注意。",
+      startTime: now.toISOString(),
+      endTime: new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString(),
+      affectedAreas: ["高雄市"]
+    }
+  ];
+  
   AppState.isSimulationActive = true;
   updateDataBadge('模擬演示模式', 'simulation');
 }
@@ -1650,7 +1999,29 @@ function renderMainLocationWeather() {
   
   const cur = countyData.current;
   document.getElementById('current-temp').textContent = Number(cur.temp).toFixed(1);
-  document.getElementById('current-weather-desc').textContent = cur.desc;
+  
+  // Render active warning badges if any exist for the current county (or any of its townships)
+  const parsedActive = parseIdentifier(activeCountyName);
+  const activeCountyOnly = parsedActive.county;
+  const normHeroCounty = activeCountyOnly.replace(/台/g, '臺');
+  
+  const activeAlertsForHero = (AppState.activeAlerts || []).filter(a => 
+    a.affectedAreas && a.affectedAreas.some(area => {
+      const normArea = area.replace(/台/g, '臺');
+      return normArea === normHeroCounty || normArea.includes(normHeroCounty);
+    })
+  );
+  
+  const descEl = document.getElementById('current-weather-desc');
+  if (activeAlertsForHero.length > 0) {
+    const badgeHtml = activeAlertsForHero.map(a => 
+      `<span class="card-alert-badge animate-pulse-neon">⚠️ ${a.title}</span>`
+    ).join(' ');
+    descEl.innerHTML = `${cur.desc} ${badgeHtml}`;
+  } else {
+    descEl.textContent = cur.desc;
+  }
+  
   document.getElementById('current-temp-range').textContent = `最高 ${Number(cur.tempMax).toFixed(1)}° | 最低 ${Number(cur.tempMin).toFixed(1)}°`;
   
   document.getElementById('current-apparent-temp').textContent = `${Number(cur.apparentTemp).toFixed(1)}°C`;
@@ -1897,11 +2268,38 @@ function renderAddedRegionsList() {
     }
     
     const cur = data.current;
+    
+    // Check for active alerts in the custom region's parent county or specific township
+    const activeAlertsForRegion = (AppState.activeAlerts || []).filter(a => {
+      if (!a.affectedAreas) return false;
+      const normCounty = parsed.county.replace(/台/g, '臺');
+      const normTown = parsed.town ? parsed.town.replace(/台/g, '臺') : '';
+      
+      return a.affectedAreas.some(area => {
+        const normArea = area.replace(/台/g, '臺');
+        if (normArea === normCounty) return true;
+        if (parsed.type === 'town' && normTown && normArea.includes(normCounty) && normArea.includes(normTown)) {
+          return true;
+        }
+        if (parsed.type === 'county' && normArea.includes(normCounty)) {
+          return true;
+        }
+        return false;
+      });
+    });
+    let regionAlertBadgeHtml = '';
+    if (activeAlertsForRegion.length > 0) {
+      regionAlertBadgeHtml = activeAlertsForRegion.map(a => {
+        const displayTitle = a.title.replace('特報', '').replace('警報', '');
+        return `<span class="card-alert-badge-mini animate-pulse-neon">⚠️ ${displayTitle}</span>`;
+      }).join(' ');
+    }
+    
     card.className = 'region-card glass-panel';
     card.innerHTML = `
       <div class="region-card-left">
         <span class="region-card-name">${nameLabel}</span>
-        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}%</span>
+        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}% ${regionAlertBadgeHtml}</span>
       </div>
       <div class="region-card-right">
         <div class="region-card-temp">${Number(cur.temp).toFixed(1)}°</div>
@@ -2195,6 +2593,10 @@ function openDrawerForecast(identifier) {
   // Set headers
   document.getElementById('drawer-region-title').textContent = title;
   
+  // Clear any residual alert boxes
+  const alertsContainer = document.getElementById('drawer-alerts-container');
+  if (alertsContainer) alertsContainer.innerHTML = '';
+  
   const overlay = document.getElementById('details-drawer-overlay');
   const drawer = document.getElementById('details-drawer');
   
@@ -2227,6 +2629,77 @@ function openDrawerForecast(identifier) {
   
   document.getElementById('drawer-current-desc').textContent = `${data.current.desc} • 現在溫度 ${Number(data.current.temp).toFixed(1)}°C`;
   document.getElementById('drawer-hero-icon').innerHTML = getAnimatedSvgCode(data.current.icon, 64, 64);
+  
+  // Build and render localized warning summaries if warnings are active for this county
+  const countyName = parsed.county;
+  const normCounty = countyName.replace(/台/g, '臺');
+  const normTown = parsed.town ? parsed.town.replace(/台/g, '臺') : '';
+  
+  const countyAlerts = (AppState.activeAlerts || []).filter(alert => {
+    if (!alert.affectedAreas) return false;
+    return alert.affectedAreas.some(area => {
+      const normArea = area.replace(/台/g, '臺');
+      if (normArea === normCounty) return true;
+      if (parsed.type === 'town' && normTown && normArea.includes(normCounty) && normArea.includes(normTown)) {
+        return true;
+      }
+      if (parsed.type === 'county' && normArea.includes(normCounty)) {
+        return true;
+      }
+      return false;
+    });
+  });
+  
+  if (countyAlerts.length > 0 && alertsContainer) {
+    countyAlerts.forEach(alert => {
+      const keywords = getCountyKeywords(countyName);
+      
+      // Split sentences by Chinese punctuation
+      const sentences = alert.contentText.split(/[。！]/).filter(s => s.trim().length > 0);
+      let relevantSentences = sentences.filter(s => keywords.some(k => s.includes(k)));
+      
+      // Highlight logic helper
+      const highlightText = (text) => {
+        let res = text;
+        keywords.forEach(k => {
+          const regex = new RegExp(k, 'g');
+          res = res.replace(regex, `<span class="alert-highlight">${k}</span>`);
+        });
+        return res;
+      };
+      
+      let summaryHtml = '';
+      if (relevantSentences.length > 0) {
+        summaryHtml = relevantSentences.map(s => `<li>${highlightText(s)}。</li>`).join('');
+      } else {
+        // Fallback to first two sentences if no keywords matched
+        summaryHtml = sentences.slice(0, 2).map(s => `<li>${highlightText(s)}。</li>`).join('');
+      }
+      
+      const fullTextHighlighted = highlightText(alert.contentText);
+      
+      const alertBox = document.createElement('div');
+      alertBox.className = 'drawer-alert-box glass-panel';
+      alertBox.innerHTML = `
+        <div class="drawer-alert-header">
+          <div class="drawer-alert-title">
+            <span class="alert-icon">⚠️</span>
+            <h4>${alert.title}</h4>
+          </div>
+          <span class="drawer-alert-time">${formatAlertTime(alert.startTime)} ～ ${formatAlertTime(alert.endTime)}</span>
+        </div>
+        <div class="drawer-alert-body">
+          <div class="alert-summary-section">
+            <span class="alert-section-badge">🎯 ${countyName} 專屬影響摘要</span>
+            <ul class="alert-summary-list">
+              ${summaryHtml}
+            </ul>
+          </div>
+        </div>
+      `;
+      alertsContainer.appendChild(alertBox);
+    });
+  }
   
   // Render SVG hourly chart
   drawHourlySvgChart(data.hourly);
@@ -2572,8 +3045,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v9_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v9_${countyName}`;
+  const cacheKey = `cwa_town_cache_v11_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v11_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -2741,24 +3214,24 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
     
     const elements = loc.WeatherElement || loc.weatherElement || [];
     const tempEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'T' || name.includes('溫度');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'T' || name === '溫度';
     });
     const rhEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'RH' || name.includes('濕度');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'RH' || name === '相對濕度';
     });
     const wsEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'WS' || name.includes('風速');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'WS' || name === '風速';
     });
     const wxEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'WX' || name.includes('天氣現象');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'WX' || name === '天氣現象';
     });
     const popEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'POP6H' || name === 'POP12H' || name.includes('降雨機率');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'POP6H' || name === 'POP12H' || name === '3小時降雨機率' || name === '降雨機率';
     });
     
     const hourlyList = [];
@@ -2938,20 +3411,20 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
     
     const elements = loc.WeatherElement || loc.weatherElement || [];
     const minTEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'MINT' || name.includes('最低溫度');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'MINT' || name === '最低溫度';
     });
     const maxTEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'MAXT' || name.includes('最高溫度');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'MAXT' || name === '最高溫度';
     });
     const wxEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'WX' || name.includes('天氣現象');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'WX' || name === '天氣現象';
     });
     const popEl = elements.find(el => {
-      const name = (el.ElementName || el.elementName || '').toUpperCase();
-      return name === 'POP12H' || name === 'POP6H' || name.includes('降雨機率');
+      const name = el.ElementName || el.elementName || '';
+      return name === 'POP12H' || name === 'POP6H' || name === '12小時降雨機率' || name === '降雨機率';
     });
     
     const weeklyList = [];
@@ -3455,6 +3928,7 @@ function initTyphoonTracker() {
 }
 
 // Fetch live typhoon numeric forecast coordinates
+// Fetch live typhoon numeric forecast coordinates
 async function loadTyphoonDashboardData() {
   const loader = document.getElementById('typhoon-map-loader');
   const pulseDot = document.getElementById('typhoon-pulse-dot');
@@ -3476,19 +3950,19 @@ async function loadTyphoonDashboardData() {
   if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 1800000) {
     try {
       const parsedData = JSON.parse(cachedDataStr);
-      if (Array.isArray(parsedData) && parsedData.length > 0) {
-        console.log('Retrieved active typhoons from local storage cache.');
-        AppState.typhoonList = parsedData;
-        populateTyphoonSelector();
-        const hasRealTyphoon = parsedData.some(t => t.id !== 'simulate');
-        if (pulseDot) {
-          pulseDot.className = hasRealTyphoon ? 'pulse-dot' : 'pulse-dot simulation-dot';
+      if (Array.isArray(parsedData)) {
+        if (parsedData.length > 0) {
+          console.log('Retrieved active typhoons from local storage cache.');
+          AppState.typhoonList = parsedData;
+          populateTyphoonSelector();
+          if (pulseDot) pulseDot.className = 'pulse-dot';
+          if (statusText) statusText.textContent = '即時氣象署資料';
+          hideTyphoonLoader();
+          return;
+        } else {
+          setupEmptyTyphoonState();
+          return;
         }
-        if (statusText) {
-          statusText.textContent = hasRealTyphoon ? '即時氣象署資料' : '現在西太平洋未有颱風生成';
-        }
-        hideTyphoonLoader();
-        return;
       }
     } catch (e) {
       console.warn('Failed parsing typhoon cache.', e);
@@ -3512,9 +3986,9 @@ async function loadTyphoonDashboardData() {
   } else if (AppState.apiKey) {
     queryParams += `&Authorization=${AppState.apiKey}`;
   } else {
-    // No credentials, trigger simulation immediately
-    console.warn('No API key or Proxy available. Defaulting directly to Simulation.');
-    setupTyphoonSimulation();
+    // No credentials, trigger empty state
+    console.warn('No API key or Proxy available.');
+    setupEmptyTyphoonState();
     return;
   }
 
@@ -3527,10 +4001,6 @@ async function loadTyphoonDashboardData() {
     const parsedList = parseCwaTyphoonResponse(data);
     
     if (parsedList && parsedList.length > 0) {
-      // Append simulated typhoon as a demo option at the end of active typhoons
-      const simulateTyphoon = getSimulatedTyphoonData();
-      parsedList.push(simulateTyphoon);
-      
       AppState.typhoonList = parsedList;
       localStorage.setItem(cacheKey, JSON.stringify(parsedList));
       localStorage.setItem(cacheTimeKey, String(now));
@@ -3540,12 +4010,14 @@ async function loadTyphoonDashboardData() {
       if (statusText) statusText.textContent = '即時氣象署資料';
     } else {
       // Empty data returned (no active typhoons currently)
-      console.log('No active typhoons returned by CWA API. Activating Simulation mode.');
-      setupTyphoonSimulation();
+      console.log('No active typhoons returned by CWA API.');
+      localStorage.setItem(cacheKey, JSON.stringify([]));
+      localStorage.setItem(cacheTimeKey, String(now));
+      setupEmptyTyphoonState();
     }
   } catch (err) {
     console.error('Failed to fetch W-C0034-005:', err);
-    setupTyphoonSimulation();
+    setupEmptyTyphoonState();
   }
   
   hideTyphoonLoader();
@@ -3559,47 +4031,52 @@ function hideTyphoonLoader() {
   }
 }
 
-// Helper to return static mock data for Super Typhoon Antigravity
-function getSimulatedTyphoonData() {
-  return {
-    id: 'simulate',
-    nameZh: '天巡一號',
-    nameEn: 'ANTIGRAVITY',
-    maxWind: '55 m/s (16級風)',
-    gustWind: '68 m/s (17級風)',
-    pressure: 915,
-    stormRadius: '280 km',
-    stormRadius10: '100 km',
-    classZh: '強烈颱風 (Category 5)',
-    tracks: {
-      // CWA (Taiwan) - Direct Hit Landfall in Hualien
-      'CWA': [
-        { lat: 17.5, lon: 126.5, time: '過去 (現在)', windSpeed: 55, pressure: 915, radius: 280, isHistorical: true },
-        { lat: 18.8, lon: 125.2, time: '+12h', windSpeed: 55, pressure: 915, radius: 280 },
-        { lat: 20.1, lon: 123.8, time: '+24h', windSpeed: 53, pressure: 920, radius: 280 },
-        { lat: 21.3, lon: 122.5, time: '+48h', windSpeed: 51, pressure: 925, radius: 280 },
-        { lat: 22.8, lon: 121.2, time: '+72h (登陸)', windSpeed: 45, pressure: 940, radius: 250 },
-        { lat: 24.2, lon: 119.8, time: '+96h', windSpeed: 38, pressure: 960, radius: 200 },
-        { lat: 25.5, lon: 118.2, time: '+120h', windSpeed: 25, pressure: 980, radius: 150 }
-      ]
-    }
-  };
-}
-
-// Setup gorgeous Category 5 simulation path if offline or no active typhoons
-function setupTyphoonSimulation() {
+// Set up clean empty state when there are no active typhoons (Simulation removed)
+function setupEmptyTyphoonState() {
   const pulseDot = document.getElementById('typhoon-pulse-dot');
   const statusText = document.getElementById('typhoon-status-text');
 
-  if (pulseDot) pulseDot.className = 'pulse-dot simulation-dot'; // Orange pulse
-  if (statusText) statusText.textContent = '現在西太平洋未有颱風生成';
+  if (pulseDot) pulseDot.className = 'pulse-dot'; // Standard green pulse
+  if (statusText) statusText.textContent = '現在西太平洋無颱風';
 
-  console.log('Generating high-fidelity simulated Super Typhoon Antigravity data...');
+  AppState.typhoonList = [];
   
-  const simulateTyphoon = getSimulatedTyphoonData();
+  const selector = document.getElementById('typhoon-selector');
+  if (selector) {
+    selector.innerHTML = '<option value="">目前無活躍颱風</option>';
+  }
+  
+  const nameTitle = document.getElementById('typhoon-name-title');
+  const classBadge = document.getElementById('typhoon-class-badge');
+  const pressureEl = document.getElementById('typhoon-pressure');
+  const maxWindEl = document.getElementById('typhoon-max-wind');
+  const gustWindEl = document.getElementById('typhoon-gust-wind');
+  const radiusEl = document.getElementById('typhoon-storm-radius');
+  const radius10El = document.getElementById('typhoon-storm-radius-10');
 
-  AppState.typhoonList = [simulateTyphoon];
-  populateTyphoonSelector();
+  if (nameTitle) nameTitle.textContent = "目前無活躍颱風";
+  if (classBadge) classBadge.textContent = "目前西太平洋無活躍的颱風威脅";
+  if (pressureEl) pressureEl.textContent = "--";
+  if (maxWindEl) maxWindEl.textContent = "-- m/s";
+  if (gustWindEl) gustWindEl.textContent = "-- m/s";
+  if (radiusEl) radiusEl.textContent = "-- km";
+  if (radius10El) radius10El.textContent = "-- km";
+
+  const tbody = document.getElementById('typhoon-forecast-tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">目前無活躍的颱風資料</td></tr>';
+  }
+
+  // Clear map layers
+  if (AppState.typhoonMap && AppState.typhoonMapLayers) {
+    AppState.typhoonMapLayers.forEach(layer => {
+      if (AppState.typhoonMap.hasLayer(layer)) {
+        AppState.typhoonMap.removeLayer(layer);
+      }
+    });
+    AppState.typhoonMapLayers = [];
+  }
+
   hideTyphoonLoader();
 }
 
@@ -3613,11 +4090,7 @@ function populateTyphoonSelector() {
   AppState.typhoonList.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.id;
-    if (t.id === 'simulate') {
-      opt.textContent = `${t.nameZh} (${t.nameEn}) (模擬)`;
-    } else {
-      opt.textContent = `${t.nameZh} (${t.nameEn})`;
-    }
+    opt.textContent = `${t.nameZh} (${t.nameEn})`;
     selector.appendChild(opt);
   });
 
