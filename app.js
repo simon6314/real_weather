@@ -412,6 +412,84 @@ async function reverseGeocodeTownship(lat, lon) {
   return null;
 }
 
+// ── Sunrise/Sunset Astronomical Calculation Engine ──────────────────────────
+// Computes high-fidelity client-side sunrise and sunset times based on 
+// latitude, longitude, and day of the year.
+function getSunriseSunset(latitude, longitude, date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date.getTime() - start.getTime() + (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  
+  // Declination of the sun (degrees)
+  const declination = 23.45 * Math.sin((2 * Math.PI * (284 + dayOfYear)) / 365);
+  
+  // Hour Angle (H)
+  const latRad = (latitude * Math.PI) / 180;
+  const decRad = (declination * Math.PI) / 180;
+  const cosH = (Math.sin((-0.83 * Math.PI) / 180) - Math.sin(latRad) * Math.sin(decRad)) / (Math.cos(latRad) * Math.cos(decRad));
+  
+  let H = 0;
+  if (cosH < -1) {
+    H = Math.PI; // Polar day
+  } else if (cosH > 1) {
+    H = 0; // Polar night
+  } else {
+    H = Math.acos(cosH);
+  }
+  
+  const H_hours = (H * 180) / Math.PI / 15;
+  
+  // Equation of Time (EqT) in minutes
+  const b = (2 * Math.PI * (dayOfYear - 81)) / 365;
+  const EqT = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+  
+  // Solar Noon in local Taiwan time (Taiwan Standard Time is UTC+8, longitude 120 E)
+  const solarNoonLocal = 12 + (120 - longitude) / 15 - EqT / 60;
+  
+  const sunriseLocalHours = solarNoonLocal - H_hours;
+  const sunsetLocalHours = solarNoonLocal + H_hours;
+  
+  const sunriseDate = new Date(date);
+  sunriseDate.setHours(Math.floor(sunriseLocalHours), Math.floor((sunriseLocalHours % 1) * 60), Math.floor(((sunriseLocalHours % 1) * 60 % 1) * 60), 0);
+  
+  const sunsetDate = new Date(date);
+  sunsetDate.setHours(Math.floor(sunsetLocalHours), Math.floor((sunsetLocalHours % 1) * 60), Math.floor(((sunsetLocalHours % 1) * 60 % 1) * 60), 0);
+  
+  return {
+    sunrise: sunriseDate,
+    sunset: sunsetDate,
+    sunriseStr: `${String(sunriseDate.getHours()).padStart(2, '0')}:${String(sunriseDate.getMinutes()).padStart(2, '0')}`,
+    sunsetStr: `${String(sunsetDate.getHours()).padStart(2, '0')}:${String(sunsetDate.getMinutes()).padStart(2, '0')}`
+  };
+}
+
+// Get coordinates for any region identifier (county or township)
+function getCoordinates(identifier) {
+  const parsed = parseIdentifier(identifier);
+  const county = TAIWAN_COUNTIES.find(c => c.name === parsed.county);
+  if (county) {
+    return { lat: county.lat, lon: county.lon };
+  }
+  return { lat: 25.0329, lon: 121.5654 }; // Default to Taipei City
+}
+
+// Determine if a given date is night time for a specific region
+function isNightTime(identifier, date) {
+  const coords = getCoordinates(identifier);
+  const sunTimes = getSunriseSunset(coords.lat, coords.lon, date);
+  const timeMs = date.getTime();
+  
+  // Check against sunrise and sunset times
+  const sunrise = new Date(date);
+  sunrise.setHours(sunTimes.sunrise.getHours(), sunTimes.sunrise.getMinutes(), sunTimes.sunrise.getSeconds(), 0);
+  
+  const sunset = new Date(date);
+  sunset.setHours(sunTimes.sunset.getHours(), sunTimes.sunset.getMinutes(), sunTimes.sunset.getSeconds(), 0);
+  
+  return timeMs < sunrise.getTime() || timeMs >= sunset.getTime();
+}
+
 // --------------------------------------------------------------------------
 // 5. CWA API Fetching & LocalStorage Caching Client
 // --------------------------------------------------------------------------
@@ -786,8 +864,12 @@ function applyObservationToCurrent(current, countyName, townName = '') {
   const obsWeatherVal = getObsElementValue(obs, 'Weather');
   const obsWeather = obsWeatherVal ? String(obsWeatherVal).trim() : '';
   if (obsWeather && obsWeather !== '-99' && obsWeather.length > 0) {
-    const obsIcon = mapObsWeatherToIcon(obsWeather);
+    let obsIcon = mapObsWeatherToIcon(obsWeather);
     if (obsIcon) {
+      const isNight = isNightTime(countyName + townName, new Date());
+      if (isNight && obsIcon === 'sunny') {
+        obsIcon = 'night';
+      }
       current.icon = obsIcon;
       current.desc = obsWeather; // Actual observed text
       current._fromObservation = true;
@@ -827,12 +909,17 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       const minT = minTEl?.time?.[0]?.parameter?.parameterName || '--';
       const maxT = maxTEl?.time?.[0]?.parameter?.parameterName || '--';
       
+      let icon = mapWxToIcon(wx.parameterValue || '2');
+      if (isNightTime(cName, new Date()) && icon === 'sunny') {
+        icon = 'night';
+      }
+      
       merged[cName].current = {
         temp: Math.round((parseInt(minT) + parseInt(maxT)) / 2) || 26,
         tempMin: parseInt(minT) || 23,
         tempMax: parseInt(maxT) || 29,
         desc: wx.parameterName || '多雲',
-        icon: mapWxToIcon(wx.parameterValue || '2'),
+        icon: icon,
         rainProb: parseInt(pop) || 0,
         humidity: 75,       // Default fallback
         windGrade: 2,       // Default fallback
@@ -967,6 +1054,10 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         
         const twHour = getTaiwanHour(timeVal);
+        let icon = mapWxToIcon(wxValue);
+        if (isNightTime(cName, timeVal) && icon === 'sunny') {
+          icon = 'night';
+        }
         hourlyList.push({
           time: twHour + ':00',
           displayTime: formatHourlyLabel(timeVal),
@@ -974,7 +1065,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           humidity: humidity,
           windGrade: wind,
           desc: wx,
-          icon: mapWxToIcon(wxValue),
+          icon: icon,
           rainProb: isNaN(rainProb) ? 0 : rainProb
         });
       }
@@ -1364,6 +1455,12 @@ function triggerSimulationMode(reasonMsg) {
       conditionText = '晴朗舒適';
     }
     
+    if (isNightTime(cName, now)) {
+      if (activeIcon === 'sunny' || activeIcon === 'sunny-cloudy') {
+        activeIcon = 'night';
+      }
+    }
+    
     // Create Simulated County Profile
     simulated[cName] = {
       name: cName,
@@ -1403,7 +1500,7 @@ function triggerSimulationMode(reasonMsg) {
         hIcon = 'thunderstorm';
         hDesc = '雷陣雨';
         hRain = Math.max(hRain, 80);
-      } else if (forecastHour >= 22 || forecastHour <= 5) {
+      } else if (isNightTime(cName, forecastDate)) {
         if (activeIcon === 'sunny') hIcon = 'night';
         else if (activeIcon === 'sunny-cloudy') hIcon = 'night'; // Starry night with clouds
       }
@@ -1670,7 +1767,7 @@ function applyDynamicBackdropTheme(iconType) {
       drop.style.animationDelay = `${Math.random() * 2}s`;
       particlesContainer.appendChild(drop);
     }
-  } else if (iconType === 'night' || (iconType === 'sunny' && new Date().getHours() >= 18)) {
+  } else if (iconType === 'night' || (iconType === 'sunny' && isNightTime(AppState.currentLocationCounty, new Date()))) {
     // Starry Stars
     const starCount = 35;
     for (let i = 0; i < starCount; i++) {
@@ -2743,6 +2840,10 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       }
       
       const twHour = getTaiwanHour(timeVal);
+      let icon = mapWxToIcon(wxValue);
+      if (isNightTime(fullId, timeVal) && icon === 'sunny') {
+        icon = 'night';
+      }
       hourlyList.push({
         time: twHour + ':00',
         displayTime: formatHourlyLabel(timeVal),
@@ -2750,7 +2851,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         humidity: humidity,
         windGrade: wind,
         desc: wx,
-        icon: mapWxToIcon(wxValue),
+        icon: icon,
         rainProb: isNaN(rainProb) ? 0 : rainProb
       });
     }
@@ -2926,6 +3027,13 @@ function simulateRegionWeather(id) {
   const minT = parseFloat((baseTemp - 3 + (Math.random() * 0.4 - 0.2)).toFixed(1));
   const maxT = parseFloat((baseTemp + 3 + (Math.random() * 0.4 - 0.2)).toFixed(1));
   
+  let activeIcon = rainProbBase > 40 ? 'rainy' : 'sunny-cloudy';
+  if (isNightTime(id, now)) {
+    if (activeIcon === 'sunny' || activeIcon === 'sunny-cloudy') {
+      activeIcon = 'night';
+    }
+  }
+
   const simulated = {
     name: parsed.type === 'town' ? parsed.town : parsed.county,
     parentCounty: parsed.type === 'town' ? parsed.county : '',
@@ -2935,7 +3043,7 @@ function simulateRegionWeather(id) {
       tempMin: minT,
       tempMax: maxT,
       desc: rainProbBase > 40 ? '多雲短暫雨' : '晴時多雲',
-      icon: rainProbBase > 40 ? 'rainy' : 'sunny-cloudy',
+      icon: activeIcon,
       rainProb: rainProbBase,
       humidity: baseHumidity,
       windGrade: 2,
@@ -2951,6 +3059,13 @@ function simulateRegionWeather(id) {
     forecastDate.setHours(currentHour + h * 3);
     const offset = Math.sin((forecastHour - 9) * Math.PI / 12) * 4;
     
+    let hIcon = rainProbBase > 40 ? 'rainy' : 'sunny-cloudy';
+    if (isNightTime(id, forecastDate)) {
+      if (hIcon === 'sunny' || hIcon === 'sunny-cloudy') {
+        hIcon = 'night';
+      }
+    }
+    
     simulated.hourly.push({
       time: `${forecastHour}:00`,
       displayTime: formatHourlyLabel(forecastDate),
@@ -2958,7 +3073,7 @@ function simulateRegionWeather(id) {
       humidity: baseHumidity,
       windGrade: 2,
       desc: rainProbBase > 40 ? '短暫雨' : '多雲',
-      icon: rainProbBase > 40 ? 'rainy' : 'sunny-cloudy',
+      icon: hIcon,
       rainProb: rainProbBase
     });
   }
