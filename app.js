@@ -853,16 +853,23 @@ async function fetchAllWeatherData() {
       
       if (isCacheValid) {
         console.log('Retrieved valid weather data from local storage cache.');
-        AppState.allCountiesWeatherData = parsedData;
+        // Preserve any loaded township data in AppState.allCountiesWeatherData
+        const existingTownships = {};
+        for (const [key, val] of Object.entries(AppState.allCountiesWeatherData)) {
+          if (val && val.isTownship) {
+            existingTownships[key] = val;
+          }
+        }
+        AppState.allCountiesWeatherData = Object.assign({}, parsedData, existingTownships);
+        
         if (parsedData._observations) {
           AppState.observations = parsedData._observations;
-          // Re-apply real-time observation desc/icon overrides even from cached data
-          // (the cached forecast desc may not match actual sky conditions)
-          for (const countyName of Object.keys(parsedData)) {
-            if (countyName.startsWith('_')) continue;
-            const countyData = parsedData[countyName];
-            if (countyData && countyData.current) {
-              applyObservationToCurrent(countyData.current, countyName);
+          // Re-apply real-time observation desc/icon overrides to all loaded counties and townships
+          for (const [id, data] of Object.entries(AppState.allCountiesWeatherData)) {
+            if (id.startsWith('_')) continue;
+            if (data && data.current) {
+              const parsedId = parseIdentifier(id);
+              applyObservationToCurrent(data.current, parsedId.county, parsedId.town);
             }
           }
         }
@@ -953,7 +960,25 @@ async function fetchAllWeatherData() {
     
     if (Object.keys(parsedData).length > 0) {
       parsedData._observations = AppState.observations;
-      AppState.allCountiesWeatherData = parsedData;
+      
+      // Preserve any loaded township data in AppState.allCountiesWeatherData
+      const existingTownships = {};
+      for (const [key, val] of Object.entries(AppState.allCountiesWeatherData)) {
+        if (val && val.isTownship) {
+          existingTownships[key] = val;
+        }
+      }
+      AppState.allCountiesWeatherData = Object.assign({}, parsedData, existingTownships);
+      
+      // Re-apply real-time observations to all loaded counties and townships to ensure they are 100% fresh!
+      for (const [id, data] of Object.entries(AppState.allCountiesWeatherData)) {
+        if (id.startsWith('_')) continue;
+        if (data && data.current) {
+          const parsedId = parseIdentifier(id);
+          applyObservationToCurrent(data.current, parsedId.county, parsedId.town);
+        }
+      }
+      
       localStorage.setItem(cacheKey, JSON.stringify(parsedData));
       localStorage.setItem(cacheTimeKey, String(now));
       return true;
@@ -3066,6 +3091,12 @@ async function fetchCwaTownshipData(countyName) {
       
       if (isCacheValid) {
         console.log(`Successfully loaded valid township weather cache for ${countyName}`);
+        // Re-apply real-time observation overrides even from cached township data
+        for (const [fullId, townData] of Object.entries(parsedTowns)) {
+          if (townData && townData.current) {
+            applyObservationToCurrent(townData.current, countyName, townData.name);
+          }
+        }
         Object.assign(AppState.allCountiesWeatherData, parsedTowns);
         return true;
       } else {
