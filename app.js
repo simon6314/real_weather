@@ -925,7 +925,8 @@ async function fetchAllWeatherData() {
     const data7d = await res7d.json();
     
     // 4. Fetch real-time weather observations from both manned (O-A0001-001) and automatic (O-A0003-001) stations
-    let mergedStations = [];
+    let stations1 = [];
+    let stations3 = [];
     
     // Fetch primary manned stations (O-A0001-001)
     try {
@@ -933,8 +934,7 @@ async function fetchAllWeatherData() {
       const resObs1 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0001-001${queryParams}`);
       if (resObs1.ok) {
         const obsData1 = await resObs1.json();
-        const stations1 = obsData1.records?.Station || obsData1.records?.station || [];
-        mergedStations = mergedStations.concat(stations1);
+        stations1 = obsData1.records?.Station || obsData1.records?.station || [];
       }
     } catch (obsErr1) {
       console.warn('Failed to fetch O-A0001-001 manned observations:', obsErr1);
@@ -946,14 +946,29 @@ async function fetchAllWeatherData() {
       const resObs3 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`);
       if (resObs3.ok) {
         const obsData3 = await resObs3.json();
-        const stations3 = obsData3.records?.Station || obsData3.records?.station || [];
-        mergedStations = mergedStations.concat(stations3);
+        stations3 = obsData3.records?.Station || obsData3.records?.station || [];
       }
     } catch (obsErr3) {
       console.warn('Failed to fetch O-A0003-001 automatic observations:', obsErr3);
     }
     
-    AppState.observations = mergedStations;
+    // Merge and deduplicate stations by StationId/stationId. 
+    // Manned stations (O-A0001-001) typically update hourly, while automatic stations (O-A0003-001) update every 10 minutes.
+    // By processing manned stations first and overriding them with automatic ones of the same ID, 
+    // we ensure the 10-minute real-time observations always take precedence over the hourly manned ones!
+    const stationMap = {};
+    
+    stations1.forEach(s => {
+      const sId = s.StationId || s.stationId;
+      if (sId) stationMap[sId] = s;
+    });
+    
+    stations3.forEach(s => {
+      const sId = s.StationId || s.stationId;
+      if (sId) stationMap[sId] = s;
+    });
+    
+    AppState.observations = Object.values(stationMap);
     
     // Parse and integrate the three datasets
     const parsedData = integrateCwaDatasets(data36h, data72h, data7d);
