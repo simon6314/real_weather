@@ -592,7 +592,7 @@ async function fetchActiveAlerts() {
   console.log('Fetching fresh active weather alerts...');
   
   let baseUrl = 'https://opendata.cwa.gov.tw';
-  let queryParams = '?format=JSON';
+  let queryParams = `?format=JSON&_t=${Date.now()}`;
   
   if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
@@ -884,7 +884,7 @@ async function fetchAllWeatherData() {
   
   // Construct URLs dynamically: Route through Cloudflare proxy if configured to bypass browser CORS blocks, otherwise direct CWA connection
   let baseUrl = 'https://opendata.cwa.gov.tw';
-  let queryParams = '?format=JSON';
+  let queryParams = `?format=JSON&_t=${Date.now()}`;
   
   if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, ''); // Remove trailing slash
@@ -3082,7 +3082,7 @@ async function fetchCwaTownshipData(countyName) {
   
   console.log(`Fetching township data for ${countyName} from CWA API...`);
   let baseUrl = 'https://opendata.cwa.gov.tw';
-  let queryParams = '?format=JSON';
+  let queryParams = `?format=JSON&_t=${Date.now()}`;
   
   if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
@@ -3973,7 +3973,7 @@ async function loadTyphoonDashboardData() {
   console.log('Fetching live CWA typhoon numerical path data (W-C0034-005)...');
   
   let baseUrl = 'https://opendata.cwa.gov.tw';
-  let queryParams = '?format=JSON';
+  let queryParams = `?format=JSON&_t=${Date.now()}`;
   
   if (CLOUDFLARE_PROXY_URL) {
     baseUrl = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
