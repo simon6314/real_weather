@@ -111,7 +111,8 @@ const AppState = {
   radarPan: { x: 0, y: 0 },
   isDraggingRadar: false,
   dragStart: { x: 0, y: 0 },
-  drawerMap: null                // Leaflet map instance inside details drawer
+  drawerMap: null,                // Leaflet map instance inside details drawer
+  strongWindCapTowns: []          // CAP parsed townships under active wind warning
 };
 
 // Ensure API Key is initialized in local storage if not present
@@ -225,7 +226,12 @@ function validateAndCleanAllCaches() {
     'cwa_typhoon_cache_v2', 'cwa_typhoon_cache_time_v2',
     'cwa_typhoon_cache', 'cwa_typhoon_cache_time',
     'cwa_alerts_cache_v13', 'cwa_alerts_cache_time_v13',
-    'cwa_alerts_cache_v12', 'cwa_alerts_cache_time_v12'
+    'cwa_alerts_cache_v12', 'cwa_alerts_cache_time_v12',
+    'cwa_weather_cache_v12', 'cwa_weather_cache_time_v12',
+    'cwa_alerts_cache_v14', 'cwa_alerts_cache_time_v14',
+    'cwa_typhoon_cache_v3', 'cwa_typhoon_cache_time_v3',
+    'cwa_rainfall_cache_v1', 'cwa_rainfall_cache_time_v1',
+    'cwa_cap_wind_cache_v1', 'cwa_cap_wind_cache_time_v1'
   ];
   legacyKeys.forEach(k => localStorage.removeItem(k));
   
@@ -243,8 +249,8 @@ function validateAndCleanAllCaches() {
   legacyTownshipKeys.forEach(k => localStorage.removeItem(k));
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v12';
-  const countyTimeKey = 'cwa_weather_cache_time_v12';
+  const countyCacheKey = 'cwa_weather_cache_v13';
+  const countyTimeKey = 'cwa_weather_cache_time_v13';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -272,7 +278,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v11_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v12_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -297,7 +303,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v11_', 'cwa_town_cache_time_v11_');
+    const timeKey = key.replace('cwa_town_cache_v12_', 'cwa_town_cache_time_v12_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -530,14 +536,20 @@ function shouldBypassCache() {
 // Clear all CWA weather caches, township caches, and typhoon caches from localStorage
 function clearAllWeatherCaches() {
   console.log('Clearing all weather, township, and typhoon caches from localStorage...');
-  localStorage.removeItem('cwa_weather_cache_v12');
-  localStorage.removeItem('cwa_weather_cache_time_v12');
-  localStorage.removeItem('cwa_typhoon_cache_v3');
-  localStorage.removeItem('cwa_typhoon_cache_time_v3');
-  localStorage.removeItem('cwa_rainfall_cache_v1');
-  localStorage.removeItem('cwa_rainfall_cache_time_v1');
+  localStorage.removeItem('cwa_weather_cache_v13');
+  localStorage.removeItem('cwa_weather_cache_time_v13');
+  localStorage.removeItem('cwa_typhoon_cache_v4');
+  localStorage.removeItem('cwa_typhoon_cache_time_v4');
+  localStorage.removeItem('cwa_rainfall_cache_v2');
+  localStorage.removeItem('cwa_rainfall_cache_time_v2');
+  localStorage.removeItem('cwa_cap_wind_cache_v2');
+  localStorage.removeItem('cwa_cap_wind_cache_time_v2');
+  localStorage.removeItem('cwa_cap_wind_cache_v1');
+  localStorage.removeItem('cwa_cap_wind_cache_time_v1');
   
   // Wipe all versions of township and main weather caches to be safe
+  localStorage.removeItem('cwa_weather_cache_v12');
+  localStorage.removeItem('cwa_weather_cache_time_v12');
   localStorage.removeItem('cwa_weather_cache_v11');
   localStorage.removeItem('cwa_weather_cache_time_v11');
   localStorage.removeItem('cwa_weather_cache_v10');
@@ -548,6 +560,8 @@ function clearAllWeatherCaches() {
   localStorage.removeItem('cwa_weather_cache_time_v8');
   localStorage.removeItem('cwa_weather_cache_v7');
   localStorage.removeItem('cwa_weather_cache_time_v7');
+  localStorage.removeItem('cwa_typhoon_cache_v3');
+  localStorage.removeItem('cwa_typhoon_cache_time_v3');
   localStorage.removeItem('cwa_typhoon_cache_v2');
   localStorage.removeItem('cwa_typhoon_cache_time_v2');
   
@@ -561,6 +575,8 @@ function clearAllWeatherCaches() {
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
   // Clear alerts cache
+  localStorage.removeItem('cwa_alerts_cache_v15');
+  localStorage.removeItem('cwa_alerts_cache_time_v15');
   localStorage.removeItem('cwa_alerts_cache_v14');
   localStorage.removeItem('cwa_alerts_cache_time_v14');
   localStorage.removeItem('cwa_alerts_cache_v13');
@@ -577,10 +593,15 @@ function clearAllWeatherCaches() {
 async function fetchActiveAlerts() {
   if (AppState.isSimulationActive) return;
   
-  const cacheKey = 'cwa_alerts_cache_v14';
-  const cacheTimeKey = 'cwa_alerts_cache_time_v14';
+  const cacheKey = 'cwa_alerts_cache_v15';
+  const cacheTimeKey = 'cwa_alerts_cache_time_v15';
+  const capCacheKey = 'cwa_cap_wind_cache_v2';
+  const capCacheTimeKey = 'cwa_cap_wind_cache_time_v2';
+  
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+  const cachedCapStr = localStorage.getItem(capCacheKey);
+  const cachedCapTimeStr = localStorage.getItem(capCacheTimeKey);
   const now = new Date().getTime();
   
   // Use cached alerts if younger than 10 minutes (600,000 ms) and not bypassing cache
@@ -588,11 +609,20 @@ async function fetchActiveAlerts() {
     try {
       AppState.activeAlerts = JSON.parse(cachedDataStr);
       console.log('Retrieved active weather alerts from cache:', AppState.activeAlerts);
+      
+      if (cachedCapStr) {
+        AppState.strongWindCapTowns = JSON.parse(cachedCapStr);
+        console.log('Retrieved CAP strong wind townships from cache:', AppState.strongWindCapTowns);
+      } else {
+        AppState.strongWindCapTowns = [];
+      }
       return;
     } catch (e) {
       console.warn('Failed parsing alerts cache. Refreshing CWA API.', e);
       localStorage.removeItem(cacheKey);
       localStorage.removeItem(cacheTimeKey);
+      localStorage.removeItem(capCacheKey);
+      localStorage.removeItem(capCacheTimeKey);
     }
   }
   
@@ -805,6 +835,71 @@ async function fetchActiveAlerts() {
   localStorage.setItem(cacheKey, JSON.stringify(finalAlerts));
   localStorage.setItem(cacheTimeKey, now.toString());
   console.log('Fetched, deduplicated, and cached alerts successfully:', finalAlerts);
+  
+  // 3. Fetch CAP Strong Wind Warning (W-C0033-006)
+  try {
+    let capUrl = '';
+    if (CLOUDFLARE_PROXY_URL) {
+      let proxyBase = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
+      if (!proxyBase.startsWith('http://') && !proxyBase.startsWith('https://')) {
+        proxyBase = 'https://' + proxyBase;
+      }
+      capUrl = `${proxyBase}/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
+      if (AppState.apiKey) {
+        capUrl += `&Authorization=${AppState.apiKey}`;
+      }
+    } else {
+      capUrl = `https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
+      if (AppState.apiKey) {
+        capUrl += `&Authorization=${AppState.apiKey}`;
+      }
+    }
+    
+    console.log('Fetching CWA CAP strong wind alert (W-C0033-006)...');
+    const resCap = await fetch(capUrl);
+    if (resCap.ok) {
+      const xmlText = await resCap.text();
+      if (xmlText && xmlText.includes('<alert')) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        
+        // Check if message type is Cancel
+        const msgTypeEl = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'msgType')[0] : xmlDoc.getElementsByTagName('msgType')[0];
+        const isCancel = msgTypeEl && msgTypeEl.textContent.trim() === 'Cancel';
+        
+        if (!isCancel) {
+          const areaDescs = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'areaDesc') : xmlDoc.getElementsByTagName('areaDesc');
+          const towns = [];
+          for (let i = 0; i < areaDescs.length; i++) {
+            const tName = areaDescs[i].textContent.trim();
+            if (tName) {
+              towns.push(tName.replace(/台/g, '臺'));
+            }
+          }
+          AppState.strongWindCapTowns = towns;
+          localStorage.setItem(capCacheKey, JSON.stringify(towns));
+          localStorage.setItem(capCacheTimeKey, now.toString());
+          console.log('Successfully loaded CAP strong wind townships:', towns);
+        } else {
+          AppState.strongWindCapTowns = [];
+          localStorage.setItem(capCacheKey, JSON.stringify([]));
+          localStorage.setItem(capCacheTimeKey, now.toString());
+          console.log('CAP strong wind alert is canceled.');
+        }
+      } else {
+        AppState.strongWindCapTowns = [];
+        localStorage.setItem(capCacheKey, JSON.stringify([]));
+        localStorage.setItem(capCacheTimeKey, now.toString());
+        console.log('CAP strong wind alert response is empty or invalid.');
+      }
+    } else {
+      console.warn('CWA CAP API returned status ' + resCap.status);
+      AppState.strongWindCapTowns = null;
+    }
+  } catch (capErr) {
+    console.error('Failed to fetch/parse CAP strong wind warning:', capErr);
+    AppState.strongWindCapTowns = null;
+  }
 }
 
 // Convert ISO time string to localized MM/DD HH:mm format
@@ -875,45 +970,151 @@ function isTownInMountainArea(county, town) {
 }
 
 // Determine if a weather alert applies to the specified location (county/township)
-function isAlertMatch(alertArea, parsedLocation) {
+// List of coastal townships for each county in Taiwan for Level 2 strong wind fallback
+const TAIWAN_COASTAL_TOWNS = {
+  '基隆市': ['中正區', '中山區', '安樂區', '信義區', '仁愛區'],
+  '新北市': ['淡水區', '三芝區', '石門區', '金山區', '萬里區', '瑞芳區', '貢寮區', '八里區'],
+  '桃園市': ['大園區', '觀音區', '新屋區', '蘆竹區'],
+  '新竹縣': ['新豐鄉', '竹北市'],
+  '新竹市': ['香山區', '北區'],
+  '苗栗縣': ['竹南鎮', '後龍鎮', '通霄鎮', '苑裡鎮'],
+  '臺中市': ['大安區', '外埔區', '清水區', '梧棲區', '龍井區'],
+  '彰化縣': ['伸港鄉', '線西鄉', '鹿港鎮', '福興鄉', '芳苑鄉', '大城鄉'],
+  '雲林縣': ['麥寮鄉', '台西鄉', '四湖鄉', '口湖鄉'],
+  '嘉義縣': ['東石鄉', '布袋鎮'],
+  '臺南市': ['北門區', '將軍區', '七股區', '安南區', '安平區', '南區'],
+  '高雄市': ['茄萣區', '永安區', '彌陀區', '梓官區', '楠梓區', '左營區', '鼓山區', '旗津區', '前鎮區', '小港區', '林園區'],
+  '屏東縣': ['新園鄉', '東港鎮', '林邊鄉', '佳冬鄉', '枋寮鄉', '枋山鄉', '車城鄉', '恆春鎮', '滿州鄉', '琉球鄉'],
+  '宜蘭縣': ['頭城鎮', '壯圍鄉', '五結鄉', '蘇澳鎮', '南澳鄉'],
+  '花蓮縣': ['新城鄉', '花蓮市', '吉安鄉', '壽豐鄉', '豐濱鄉'],
+  '臺東縣': ['長濱鄉', '東河鄉', '成功鎮', '卑南鄉', '台東市', '太麻里鄉', '大武鄉', '達仁鄉', '綠島鄉', '蘭嶼鄉']
+};
+
+// Map of special meteorological warning regions to their constituent counties/towns
+const SPECIAL_REGIONS = {
+  '基隆北海岸': {
+    counties: ['基隆市', '新北市'],
+    towns: {
+      '基隆市': ['中正區', '中山區', '安樂區', '信義區', '仁愛區'],
+      '新北市': ['石門區', '三芝區', '金山區', '萬里區', '瑞芳區', '貢寮區']
+    }
+  },
+  '恆春半島': {
+    counties: ['屏東縣'],
+    towns: {
+      '屏東縣': ['恆春鎮', '車城鄉', '滿州鄉', '枋山鄉', '獅子鄉', '牡丹鄉']
+    }
+  },
+  '蘭嶼綠島': {
+    counties: ['臺東縣'],
+    towns: {
+      '臺東縣': ['蘭嶼鄉', '綠島鄉']
+    }
+  }
+};
+
+// Determine if a county-level strong wind warning in contentText is restricted to coastal areas
+function isCountyCoastalRestricted(countyName, contentText) {
+  if (!contentText) return false;
+  
+  const normText = contentText.replace(/台/g, '臺');
+  const normCounty = countyName.replace(/台/g, '臺').replace('市', '').replace('縣', ''); // e.g. "桃園"
+  
+  let index = normText.indexOf(normCounty);
+  if (index === -1) return false;
+  
+  let hasCoastalSpecifier = false;
+  while (index !== -1) {
+    const windowText = normText.substring(index, index + 25);
+    if (windowText.includes('沿海') || windowText.includes('空曠') || windowText.includes('海面')) {
+      hasCoastalSpecifier = true;
+      break;
+    }
+    index = normText.indexOf(normCounty, index + 1);
+  }
+  return hasCoastalSpecifier;
+}
+
+// Determine if a weather alert applies to the specified location (county/township)
+function isAlertMatch(alertArea, parsedLocation, alertObj = null) {
   if (!alertArea || !parsedLocation) return false;
   const normArea = alertArea.replace(/台/g, '臺');
   const normCounty = parsedLocation.county.replace(/台/g, '臺');
+  const normTown = parsedLocation.town ? parsedLocation.town.replace(/台/g, '臺') : '';
   
-  // If the alert is for a completely different county, no match
+  // 1. Handle Special Regions mapping first (e.g. 基隆北海岸, 恆春半島, 蘭嶼綠島)
+  if (SPECIAL_REGIONS[normArea]) {
+    const region = SPECIAL_REGIONS[normArea];
+    if (!region.counties.includes(normCounty)) {
+      return false;
+    }
+    if (parsedLocation.type === 'county') {
+      return true;
+    }
+    if (parsedLocation.type === 'town' && normTown) {
+      const allowedTowns = region.towns[normCounty];
+      return allowedTowns ? allowedTowns.includes(normTown) : true;
+    }
+  }
+
+  // 2. If it is a strong wind warning and we have official CAP parsed data
+  const isWindAlert = alertObj && (
+    (alertObj.phenomena && alertObj.phenomena.includes('強風')) ||
+    (alertObj.title && alertObj.title.includes('強風'))
+  );
+  
+  if (isWindAlert && Array.isArray(AppState.strongWindCapTowns) && AppState.strongWindCapTowns.length > 0) {
+    if (parsedLocation.type === 'town' && normTown) {
+      const fullTownKey = normCounty + normTown;
+      return AppState.strongWindCapTowns.includes(fullTownKey);
+    }
+    if (parsedLocation.type === 'county') {
+      return AppState.strongWindCapTowns.some(t => t.startsWith(normCounty));
+    }
+  }
+
+  // 3. If it's not a special region and no CAP matches, it must start with the county name
   if (!normArea.startsWith(normCounty)) {
     return false;
   }
   
-  // If it's a county-level view (no specific town is queried)
+  // 4. For county-level view (no specific town is queried)
   if (parsedLocation.type === 'county') {
     return true; 
   }
   
-  // If it's a town-level view (e.g. 竹北市)
-  if (parsedLocation.type === 'town' && parsedLocation.town) {
-    const normTown = parsedLocation.town.replace(/台/g, '臺');
+  // 5. For town-level view (e.g. 竹北市)
+  if (parsedLocation.type === 'town' && normTown) {
+    // A. Check if the warning is a strong wind warning (level 2 coastal fallback)
+    if (isWindAlert) {
+      if (normArea === normCounty || normArea === `${normCounty}平地` || normArea === `${normCounty}平地及山區` || normArea === `${normCounty}沿海` || normArea === `${normCounty}沿海地區`) {
+        const isCoastalOnly = isCountyCoastalRestricted(normCounty, alertObj.contentText);
+        if (isCoastalOnly) {
+          const coastalTowns = TAIWAN_COASTAL_TOWNS[normCounty];
+          if (coastalTowns) {
+            return coastalTowns.includes(normTown);
+          }
+        }
+      }
+    }
     
-    // If the warning specifies the town name directly
+    // B. Check standard mountain/plains or exact matching
     if (normArea.includes(normTown)) {
       return true;
     }
     
-    // If it's a general county warning (e.g., "新竹縣" or "新竹縣平地及山區" or "新竹縣平地")
     if (normArea === normCounty || normArea === `${normCounty}平地` || normArea === `${normCounty}平地及山區`) {
       const isMountain = isTownInMountainArea(normCounty, normTown);
       if (normArea.includes('平地') && isMountain) {
-        return false; // Plains warnings don't apply to mountain towns
+        return false;
       }
       return true; 
     }
     
-    // If it is a mountain-only warning (e.g., "新竹縣山區")
     if (normArea === `${normCounty}山區`) {
       return isTownInMountainArea(normCounty, normTown);
     }
     
-    // If it is a plains-only warning (e.g., "新竹縣平地")
     if (normArea === `${normCounty}平地`) {
       return !isTownInMountainArea(normCounty, normTown);
     }
@@ -1040,8 +1241,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v12';
-  const cacheTimeKey = 'cwa_weather_cache_time_v12';
+  const cacheKey = 'cwa_weather_cache_v13';
+  const cacheTimeKey = 'cwa_weather_cache_time_v13';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -1063,7 +1264,7 @@ async function fetchAllWeatherData() {
         console.log('Retrieved valid weather data from local storage cache.');
         
         // Load rainfall cache if weather cache is valid
-        const rainCacheKey = 'cwa_rainfall_cache_v1';
+        const rainCacheKey = 'cwa_rainfall_cache_v2';
         const cachedRainStr = localStorage.getItem(rainCacheKey);
         if (cachedRainStr) {
           try {
@@ -1200,8 +1401,8 @@ async function fetchAllWeatherData() {
         const rainStations = rainData.records?.Station || rainData.records?.station || [];
         if (rainStations.length > 0) {
           AppState.rainfallObservations = rainStations;
-          localStorage.setItem('cwa_rainfall_cache_v1', JSON.stringify(rainStations));
-          localStorage.setItem('cwa_rainfall_cache_time_v1', String(now));
+          localStorage.setItem('cwa_rainfall_cache_v2', JSON.stringify(rainStations));
+          localStorage.setItem('cwa_rainfall_cache_time_v2', String(now));
           console.log(`Fetched and cached ${rainStations.length} rainfall stations.`);
         }
       }
@@ -2334,6 +2535,24 @@ function triggerSimulationMode(reasonMsg) {
     }
   ];
   
+  // Set simulated strong wind CAP warning areas to match the mock warning
+  AppState.strongWindCapTowns = [
+    "新北市三芝區", "新北市石門區", "新北市淡水區",
+    "桃園市觀音區", "桃園市新屋區",
+    "新竹市北區", "新竹縣新豐鄉",
+    "苗栗縣通霄鎮", "苗栗縣後龍鎮",
+    "臺中市大甲區",
+    "彰化縣線西鄉", "彰化縣鹿港鎮", "彰化縣伸港鄉", "彰化縣芳苑鄉", "彰化縣大城鄉",
+    "雲林縣臺西鄉", "雲林縣麥寮鄉",
+    "嘉義縣東石鄉",
+    "臺南市北門區", "臺南市七股區", "臺南市將軍區", "臺南市安南區",
+    "高雄市梓官區", "高雄市永安區", "高雄市彌陀區", "高雄市林園區", "高雄市小港區", "高雄市茄萣區", "高雄市前鎮區", "高雄市旗津區",
+    "屏東縣獅子鄉", "屏東縣枋寮鄉", "屏東縣萬巒鄉", "屏東縣林邊鄉", "屏東縣琉球鄉", "屏東縣佳冬鄉", "屏東縣恆春鎮", "屏東縣滿州鄉", "屏東縣車城鄉", "屏東縣牡丹鄉",
+    "臺東縣綠島鄉", "臺東縣蘭嶼鄉", "臺東縣臺東市", "臺東縣東河鄉", "臺東縣成功鎮", "臺東縣長濱鄉", "臺東縣太麻里鄉",
+    "澎湖縣望安鄉", "澎湖縣湖西鄉", "澎湖縣白沙鄉", "澎湖縣七美鄉", "澎湖縣西嶼鄉", "澎湖縣馬公市",
+    "連江縣東引鄉", "連江縣北竿鄉", "連江縣莒光鄉", "連江縣南竿鄉"
+  ];
+  
   AppState.isSimulationActive = true;
   updateDataBadge('模擬演示模式', 'simulation');
 }
@@ -2380,7 +2599,7 @@ function renderMainLocationWeather() {
   const parsedActive = parseIdentifier(activeCountyName);
   const activeAlertsForHero = filterRedundantAlerts(
     (AppState.activeAlerts || []).filter(a => 
-      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive))
+      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive, a))
     )
   );
   
@@ -2650,7 +2869,7 @@ function renderAddedRegionsList() {
     // Check for active alerts in the custom region's parent county or specific township
     const activeAlertsForRegion = filterRedundantAlerts(
       (AppState.activeAlerts || []).filter(a => 
-        a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsed))
+        a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsed, a))
       )
     );
     let regionAlertBadgeHtml = '';
@@ -3014,7 +3233,7 @@ function openDrawerForecast(identifier) {
   
   const countyAlerts = filterRedundantAlerts(
     (AppState.activeAlerts || []).filter(alert => 
-      alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed))
+      alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed, alert))
     )
   );
   
@@ -3509,8 +3728,8 @@ async function fetchCwaTownshipData(countyName) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v11_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v11_${countyName}`;
+  const cacheKey = `cwa_town_cache_v12_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v12_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -4414,8 +4633,8 @@ async function loadTyphoonDashboardData() {
   if (statusText) statusText.textContent = '載入即時颱風資料...';
 
   // Apply caching logic to prevent CWA rate-limiting (30 Minutes Cache)
-  const cacheKey = 'cwa_typhoon_cache_v3';
-  const cacheTimeKey = 'cwa_typhoon_cache_time_v3';
+  const cacheKey = 'cwa_typhoon_cache_v4';
+  const cacheTimeKey = 'cwa_typhoon_cache_time_v4';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
