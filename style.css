@@ -2782,3 +2782,60 @@ body {
   100% { transform: rotate(-5deg); }
 }
 
+/* 🌧️ 實時雨量觀測樣式 */
+.rain-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.rain-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm, 8px);
+  padding: 12px 8px;
+  text-align: center;
+  transition: var(--transition-smooth);
+}
+
+.rain-stat-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.rain-lbl {
+  font-size: 11px;
+  color: var(--text-muted, #94A3B8);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.rain-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent);
+  font-family: 'Outfit', sans-serif;
+}
+
+@media (max-width: 480px) {
+  .rain-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .rain-stat-item {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 16px;
+  }
+  .rain-lbl {
+    margin-bottom: 0;
+  }
+}
+

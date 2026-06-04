@@ -104,6 +104,7 @@ const AppState = {
   addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '臺中市', '高雄市'],
   allCountiesWeatherData: {},    // Map of countyName -> parsed weather profile
   observations: [],              // Real-time automatic weather station observations
+  rainfallObservations: [],      // Real-time rain gauge observations
   
   activeTab: 'weather',          // 'weather' or 'radar'
   radarZoom: 1,
@@ -532,6 +533,8 @@ function clearAllWeatherCaches() {
   localStorage.removeItem('cwa_weather_cache_time_v12');
   localStorage.removeItem('cwa_typhoon_cache_v3');
   localStorage.removeItem('cwa_typhoon_cache_time_v3');
+  localStorage.removeItem('cwa_rainfall_cache_v1');
+  localStorage.removeItem('cwa_rainfall_cache_time_v1');
   
   // Wipe all versions of township and main weather caches to be safe
   localStorage.removeItem('cwa_weather_cache_v11');
@@ -932,6 +935,19 @@ async function fetchAllWeatherData() {
       
       if (isCacheValid) {
         console.log('Retrieved valid weather data from local storage cache.');
+        
+        // Load rainfall cache if weather cache is valid
+        const rainCacheKey = 'cwa_rainfall_cache_v1';
+        const cachedRainStr = localStorage.getItem(rainCacheKey);
+        if (cachedRainStr) {
+          try {
+            AppState.rainfallObservations = JSON.parse(cachedRainStr);
+            console.log('Retrieved valid rainfall data from local storage cache.');
+          } catch (e) {
+            console.warn('Failed parsing rainfall cache.', e);
+          }
+        }
+        
         // Preserve any loaded township data in AppState.allCountiesWeatherData
         const existingTownships = {};
         for (const [key, val] of Object.entries(AppState.allCountiesWeatherData)) {
@@ -1048,6 +1064,24 @@ async function fetchAllWeatherData() {
     });
     
     AppState.observations = Object.values(stationMap);
+
+    // Fetch real-time rainfall observations (O-A0002-001)
+    try {
+      console.log('Fetching CWA real-time rainfall observations (O-A0002-001)...');
+      const resRain = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0002-001${queryParams}`);
+      if (resRain.ok) {
+        const rainData = await resRain.json();
+        const rainStations = rainData.records?.Station || rainData.records?.station || [];
+        if (rainStations.length > 0) {
+          AppState.rainfallObservations = rainStations;
+          localStorage.setItem('cwa_rainfall_cache_v1', JSON.stringify(rainStations));
+          localStorage.setItem('cwa_rainfall_cache_time_v1', String(now));
+          console.log(`Fetched and cached ${rainStations.length} rainfall stations.`);
+        }
+      }
+    } catch (rainErr) {
+      console.warn('Failed to fetch O-A0002-001 rainfall observations:', rainErr);
+    }
     
     // Parse and integrate the three datasets
     const parsedData = integrateCwaDatasets(data36h, data72h, data7d);
@@ -1228,6 +1262,76 @@ function findObservation(countyName, townName = '') {
   return countyMatch;
 }
 
+// Helper to find a matching automatic rain gauge station observation
+function findRainObservation(countyName, townName = '', weatherStationId = null) {
+  if (!AppState.rainfallObservations || AppState.rainfallObservations.length === 0) return null;
+  
+  const normCounty = countyName.replace('台', '臺');
+  const normTown = townName ? townName.replace('台', '臺') : '';
+  
+  // 1. If we have a weather station ID, try to match by station ID first (since many AWS stations measure both)
+  if (weatherStationId) {
+    const match = AppState.rainfallObservations.find(obs => {
+      const rId = obs.StationId || obs.stationId;
+      return rId === weatherStationId;
+    });
+    if (match) return match;
+  }
+  
+  // 2. Try to match by town name exactly
+  if (normTown) {
+    const cleanTown = normTown.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+    
+    // Step A: Prefer station name matching town name
+    let match = AppState.rainfallObservations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+      const sNameClean = sName.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+      return obsCounty === normCounty && (sName === normTown || sNameClean === cleanTown);
+    });
+    if (match) return match;
+    
+    // Step B: Match by GeoInfo town name matching
+    match = AppState.rainfallObservations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const obsTown = (obs.GeoInfo?.TownName || obs.geoInfo?.townName || '').replace('台', '臺');
+      const matchesTown = obsTown === normTown || 
+                          (obsTown.length > 0 && normTown.length > 0 && 
+                           (obsTown.includes(normTown) || normTown.includes(obsTown)));
+      return obsCounty === normCounty && matchesTown;
+    });
+    if (match) return match;
+  }
+  
+  // 3. Fallback to County capital town rain station
+  const capitalTown = COUNTY_CAPITALS[normCounty] || '';
+  if (capitalTown) {
+    const cleanCapital = capitalTown.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+    let countyMatch = AppState.rainfallObservations.find(obs => {
+      const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+      const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+      const sNameClean = sName.replace('區', '').replace('鎮', '').replace('鄉', '').replace('市', '');
+      return obsCounty === normCounty && (sName === capitalTown || sNameClean === cleanCapital);
+    });
+    if (countyMatch) return countyMatch;
+  }
+  
+  // 4. Fallback to any rain station in the county (avoid mountain stations if possible)
+  let countyMatch = AppState.rainfallObservations.find(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    const sName = (obs.StationName || obs.stationName || '').replace('台', '臺');
+    const isMountain = sName.includes('山') && !sName.includes('山區') && sName !== '中山';
+    return obsCounty === normCounty && !isMountain;
+  });
+  if (countyMatch) return countyMatch;
+  
+  // 5. Ultimate fallback to any rain station in the county
+  return AppState.rainfallObservations.find(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    return obsCounty === normCounty;
+  });
+}
+
 // ── Apparent Temperature (體感溫度) Calculation ─────────────────────────────
 // Uses NOAA Heat Index when temp >= 27°C & RH >= 40%, Wind Chill when temp <= 10°C,
 // otherwise uses Steadman's simple regression.
@@ -1304,64 +1408,86 @@ function mapObsWeatherToIcon(obsWeather) {
 // Helper to apply real-time observation values to current weather state
 function applyObservationToCurrent(current, countyName, townName = '') {
   const obs = findObservation(countyName, townName);
-  if (!obs) return;
+  const weatherStationId = obs ? (obs.StationId || obs.stationId) : null;
+  const rainObs = findRainObservation(countyName, townName, weatherStationId);
   
-  // Collect all three values first so we can do a proper apparent temp calculation
-  let obsTemp = null, obsRh = null, obsWs = null;
-  
-  const tempVal = getObsElementValue(obs, 'AirTemperature');
-  const temp = parseFloat(tempVal);
-  if (!isNaN(temp) && temp > -50 && temp < 60 && tempVal !== -99 && tempVal !== '-99') {
-    current.temp = parseFloat(temp.toFixed(1));
-    obsTemp = temp;
-  }
-  
-  const rhVal = getObsElementValue(obs, 'RelativeHumidity');
-  const rh = parseFloat(rhVal);
-  if (!isNaN(rh) && rh >= 0 && rh <= 100 && rhVal !== -99 && rhVal !== '-99') {
-    current.humidity = Math.round(rh);
-    obsRh = rh;
-  }
-  
-  const wsVal = getObsElementValue(obs, 'WindSpeed'); // m/s from observation
-  const ws = parseFloat(wsVal);
-  if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
-    if (ws <= 1) current.windGrade = 0;
-    else if (ws <= 3) current.windGrade = 1;
-    else if (ws <= 5) current.windGrade = 2;
-    else if (ws <= 8) current.windGrade = 3;
-    else if (ws <= 11) current.windGrade = 4;
-    else current.windGrade = 5;
-    obsWs = ws;
-  }
-  
-  // ── Recalculate apparent temperature using real observed values ───────────
-  // Use actual observed T + RH + WS for the most accurate Heat Index / Wind Chill.
-  if (obsTemp !== null) {
-    const apparentT = calcApparentTemp(
-      obsTemp,
-      obsRh !== null ? obsRh : (current.humidity || 70),
-      obsWs !== null ? obsWs : windGradeToMs(current.windGrade || 2)
-    );
-    current.apparentTemp = apparentT;
-  }
-  
-  // ── Override desc & icon from real-time observed sky condition ────────────
-  // The observation station returns a human-readable Weather string (e.g. '晴', '多雲', '陰有雨').
-  // Use it to override the *forecast* description so the card shows actual sky conditions.
-  const obsWeatherVal = getObsElementValue(obs, 'Weather');
-  const obsWeather = obsWeatherVal ? String(obsWeatherVal).trim() : '';
-  if (obsWeather && obsWeather !== '-99' && obsWeather.length > 0) {
-    let obsIcon = mapObsWeatherToIcon(obsWeather);
-    if (obsIcon) {
-      const isNight = isNightTime(countyName + townName, new Date());
-      if (isNight && obsIcon === 'sunny') {
-        obsIcon = 'night';
-      }
-      current.icon = obsIcon;
-      current.desc = obsWeather; // Actual observed text
-      current._fromObservation = true;
+  if (obs) {
+    // Collect all three values first so we can do a proper apparent temp calculation
+    let obsTemp = null, obsRh = null, obsWs = null;
+    
+    const tempVal = getObsElementValue(obs, 'AirTemperature');
+    const temp = parseFloat(tempVal);
+    if (!isNaN(temp) && temp > -50 && temp < 60 && tempVal !== -99 && tempVal !== '-99') {
+      current.temp = parseFloat(temp.toFixed(1));
+      obsTemp = temp;
     }
+    
+    const rhVal = getObsElementValue(obs, 'RelativeHumidity');
+    const rh = parseFloat(rhVal);
+    if (!isNaN(rh) && rh >= 0 && rh <= 100 && rhVal !== -99 && rhVal !== '-99') {
+      current.humidity = Math.round(rh);
+      obsRh = rh;
+    }
+    
+    const wsVal = getObsElementValue(obs, 'WindSpeed'); // m/s from observation
+    const ws = parseFloat(wsVal);
+    if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
+      if (ws <= 1) current.windGrade = 0;
+      else if (ws <= 3) current.windGrade = 1;
+      else if (ws <= 5) current.windGrade = 2;
+      else if (ws <= 8) current.windGrade = 3;
+      else if (ws <= 11) current.windGrade = 4;
+      else current.windGrade = 5;
+      obsWs = ws;
+    }
+    
+    // ── Recalculate apparent temperature using real observed values ───────────
+    // Use actual observed T + RH + WS for the most accurate Heat Index / Wind Chill.
+    if (obsTemp !== null) {
+      const apparentT = calcApparentTemp(
+        obsTemp,
+        obsRh !== null ? obsRh : (current.humidity || 70),
+        obsWs !== null ? obsWs : windGradeToMs(current.windGrade || 2)
+      );
+      current.apparentTemp = apparentT;
+    }
+    
+    // ── Override desc & icon from real-time observed sky condition ────────────
+    // The observation station returns a human-readable Weather string (e.g. '晴', '多雲', '陰有雨').
+    // Use it to override the *forecast* description so the card shows actual sky conditions.
+    const obsWeatherVal = getObsElementValue(obs, 'Weather');
+    const obsWeather = obsWeatherVal ? String(obsWeatherVal).trim() : '';
+    if (obsWeather && obsWeather !== '-99' && obsWeather.length > 0) {
+      let obsIcon = mapObsWeatherToIcon(obsWeather);
+      if (obsIcon) {
+        const isNight = isNightTime(countyName + townName, new Date());
+        if (isNight && obsIcon === 'sunny') {
+          obsIcon = 'night';
+        }
+        current.icon = obsIcon;
+        current.desc = obsWeather; // Actual observed text
+        current._fromObservation = true;
+      }
+    }
+  }
+  
+  // Apply rain gauge observation if found
+  if (rainObs) {
+    const rfEl = rainObs.RainfallElement || rainObs.rainfallElement;
+    if (rfEl) {
+      const getVal = (item) => {
+        const val = item ? (item.Precipitation !== undefined ? item.Precipitation : (item.precipitation !== undefined ? item.precipitation : item.value)) : null;
+        const num = parseFloat(val);
+        return (!isNaN(num) && num >= 0) ? num : 0.0;
+      };
+      current.rain10Min = getVal(rfEl.Past10Min);
+      current.rain1Hr = getVal(rfEl.Past1hr);
+      current.rainDaily = getVal(rfEl.Now);
+    }
+  } else if (current.rain10Min === undefined) {
+    current.rain10Min = 0.0;
+    current.rain1Hr = 0.0;
+    current.rainDaily = 0.0;
   }
 }
 
@@ -1961,7 +2087,10 @@ function triggerSimulationMode(reasonMsg) {
         rainProb: finalRainProb,
         humidity: Math.min(100, Math.max(30, Math.round(baseHumidity - diurnalOffset * 3))),
         windGrade: Math.max(1, Math.min(7, Math.round(2 + Math.random() * 2 + (county.region === '離島' ? 2 : 0)))),
-        apparentTemp: apparentTemp
+        apparentTemp: apparentTemp,
+        rain10Min: activeIcon === 'thunderstorm' ? parseFloat((Math.random() * 2.0).toFixed(1)) : (activeIcon === 'rainy' ? parseFloat((Math.random() * 0.5).toFixed(1)) : 0.0),
+        rain1Hr: activeIcon === 'thunderstorm' ? parseFloat((5.0 + Math.random() * 5.0).toFixed(1)) : (activeIcon === 'rainy' ? parseFloat((1.0 + Math.random() * 2.0).toFixed(1)) : 0.0),
+        rainDaily: activeIcon === 'thunderstorm' ? parseFloat((15.0 + Math.random() * 20.0).toFixed(1)) : (activeIcon === 'rainy' ? parseFloat((3.0 + Math.random() * 5.0).toFixed(1)) : 0.0)
       },
       hourly: [],
       weekly: []
@@ -2103,6 +2232,8 @@ function renderMainLocationWeather() {
     document.getElementById('current-humidity').textContent = '--%';
     document.getElementById('current-wind-grade').textContent = '-- 級';
     document.getElementById('current-rain-prob').textContent = '--%';
+    document.getElementById('current-rain-recent').textContent = '-- / -- mm';
+    document.getElementById('current-rain-daily').textContent = '-- mm';
     
     const iconContainer = document.getElementById('hero-weather-icon');
     iconContainer.innerHTML = `
@@ -2147,6 +2278,12 @@ function renderMainLocationWeather() {
   document.getElementById('current-humidity').textContent = `${cur.humidity}%`;
   document.getElementById('current-wind-grade').textContent = `${cur.windGrade} 級`;
   document.getElementById('current-rain-prob').textContent = `${cur.rainProb}%`;
+  
+  const r10m = cur.rain10Min !== undefined ? Number(cur.rain10Min).toFixed(1) : '0.0';
+  const r1h = cur.rain1Hr !== undefined ? Number(cur.rain1Hr).toFixed(1) : '0.0';
+  const rDaily = cur.rainDaily !== undefined ? Number(cur.rainDaily).toFixed(1) : '0.0';
+  document.getElementById('current-rain-recent').textContent = `${r10m} / ${r1h} mm`;
+  document.getElementById('current-rain-daily').textContent = `${rDaily} mm`;
   
   // Render the dressed-person icon based on apparent temperature
   renderApparentTempPerson(cur.apparentTemp);
@@ -2414,11 +2551,16 @@ function renderAddedRegionsList() {
       }).join(' ');
     }
     
+    const r10m = cur.rain10Min !== undefined ? Number(cur.rain10Min).toFixed(1) : '0.0';
+    const r1h = cur.rain1Hr !== undefined ? Number(cur.rain1Hr).toFixed(1) : '0.0';
+    const rDaily = cur.rainDaily !== undefined ? Number(cur.rainDaily).toFixed(1) : '0.0';
+    const rainText = `🌧️ ${r10m}/${r1h}/${rDaily} mm`;
+    
     card.className = 'region-card glass-panel';
     card.innerHTML = `
       <div class="region-card-left">
         <span class="region-card-name">${nameLabel}</span>
-        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}% ${regionAlertBadgeHtml}</span>
+        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}% &bull; ${rainText} ${regionAlertBadgeHtml}</span>
       </div>
       <div class="region-card-right">
         <div class="region-card-temp">${Number(cur.temp).toFixed(1)}°</div>
@@ -2819,6 +2961,14 @@ function openDrawerForecast(identifier) {
       alertsContainer.appendChild(alertBox);
     });
   }
+  // Set rainfall values in drawer
+  const r10m = data.current.rain10Min !== undefined ? Number(data.current.rain10Min).toFixed(1) : '0.0';
+  const r1h = data.current.rain1Hr !== undefined ? Number(data.current.rain1Hr).toFixed(1) : '0.0';
+  const rDaily = data.current.rainDaily !== undefined ? Number(data.current.rainDaily).toFixed(1) : '0.0';
+  
+  document.getElementById('drawer-rain-10m').textContent = `${r10m} mm`;
+  document.getElementById('drawer-rain-1h').textContent = `${r1h} mm`;
+  document.getElementById('drawer-rain-daily').textContent = `${rDaily} mm`;
   
   // Render SVG hourly chart
   drawHourlySvgChart(data.hourly);
@@ -3722,7 +3872,10 @@ function simulateRegionWeather(id) {
       rainProb: rainProbBase,
       humidity: baseHumidity,
       windGrade: 2,
-      apparentTemp: curTemp
+      apparentTemp: curTemp,
+      rain10Min: activeIcon === 'rainy' ? parseFloat((Math.random() * 0.5).toFixed(1)) : 0.0,
+      rain1Hr: activeIcon === 'rainy' ? parseFloat((1.0 + Math.random() * 2.0).toFixed(1)) : 0.0,
+      rainDaily: activeIcon === 'rainy' ? parseFloat((3.0 + Math.random() * 5.0).toFixed(1)) : 0.0
     },
     hourly: [],
     weekly: []
@@ -4187,7 +4340,7 @@ function setupEmptyTyphoonState() {
   const statusText = document.getElementById('typhoon-status-text');
 
   if (pulseDot) pulseDot.className = 'pulse-dot'; // Standard green pulse
-  if (statusText) statusText.textContent = '現在西北太平洋無颱風';
+  if (statusText) statusText.textContent = '現在西太平洋無颱風';
 
   AppState.typhoonList = [];
   
@@ -4205,7 +4358,7 @@ function setupEmptyTyphoonState() {
   const radius10El = document.getElementById('typhoon-storm-radius-10');
 
   if (nameTitle) nameTitle.textContent = "目前無活躍颱風";
-  if (classBadge) classBadge.textContent = "目前西北太平洋無活躍的颱風威脅";
+  if (classBadge) classBadge.textContent = "目前西太平洋無活躍的颱風威脅";
   if (pressureEl) pressureEl.textContent = "--";
   if (maxWindEl) maxWindEl.textContent = "-- m/s";
   if (gustWindEl) gustWindEl.textContent = "-- m/s";
