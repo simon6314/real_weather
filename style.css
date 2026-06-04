@@ -1749,12 +1749,12 @@ body {
   }
   
   .brand-text h1 {
-    font-size: 18px;
+    font-size: 20px;
     letter-spacing: 0.5px;
   }
   
   .sub-brand {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 1px;
   }
   
@@ -1769,7 +1769,7 @@ body {
   
   .tab-btn {
     padding: 6px 12px;
-    font-size: 13px;
+    font-size: 14.5px;
     border-radius: 8px;
   }
   
@@ -1793,12 +1793,12 @@ body {
   }
   
   .location-badge {
-    font-size: 14px;
+    font-size: 15.5px;
   }
   
   .data-source-badge {
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: 12.5px;
   }
   
   /* Hero Temperature & Condition */
@@ -1809,21 +1809,21 @@ body {
   }
   
   .temp-display {
-    font-size: 60px;
+    font-size: 66px;
   }
   
   .temp-unit {
-    font-size: 20px;
+    font-size: 22px;
     margin-top: 6px;
   }
   
   .weather-condition-text {
-    font-size: 18px;
+    font-size: 20px;
     margin-top: 4px;
   }
   
   .temp-range {
-    font-size: 12px;
+    font-size: 13.5px;
     margin-top: 4px;
   }
   
@@ -1854,22 +1854,22 @@ body {
   }
   
   .stat-label {
-    font-size: 10px;
+    font-size: 11.5px;
     letter-spacing: 0.2px;
   }
   
   .stat-value {
-    font-size: 15px;
+    font-size: 16.5px;
     margin-top: 0;
   }
   
   /* Custom Regions Panel */
   .side-panel h2 {
-    font-size: 15px;
+    font-size: 16px;
   }
   
   .search-wrapper input {
-    font-size: 12px;
+    font-size: 13.5px;
     padding: 6px 12px;
   }
   
@@ -1883,15 +1883,15 @@ body {
   }
   
   .region-card-name {
-    font-size: 14px;
+    font-size: 15.5px;
   }
   
   .region-card-meta {
-    font-size: 11px;
+    font-size: 12.5px;
   }
   
   .region-card-temp {
-    font-size: 22px;
+    font-size: 24px;
   }
   
   .region-card-icon {
@@ -1957,11 +1957,11 @@ body {
   }
   
   #drawer-region-title {
-    font-size: 22px;
+    font-size: 24px;
   }
   
   #drawer-current-desc {
-    font-size: 13px;
+    font-size: 14px;
   }
   
   .drawer-weather-icon {
@@ -2009,11 +2009,11 @@ body {
   }
   
   .weekly-day {
-    font-size: 14px;
+    font-size: 15.5px;
   }
   
   .weekly-pop {
-    font-size: 11px;
+    font-size: 12px;
   }
   
   .weekly-icon-wrapper svg {
@@ -2032,7 +2032,7 @@ body {
   }
   
   .weekly-temp-labels {
-    font-size: 13px;
+    font-size: 14.5px;
     gap: 4px;
   }
   
@@ -2836,6 +2836,10 @@ body {
   }
   .rain-lbl {
     margin-bottom: 0;
+    font-size: 12.5px;
+  }
+  .rain-val {
+    font-size: 17.5px;
   }
 }
 
