@@ -222,6 +222,7 @@ function validateAndCleanAllCaches() {
     'cwa_weather_cache_v7', 'cwa_weather_cache_time_v7',
     'cwa_typhoon_cache_v2', 'cwa_typhoon_cache_time_v2',
     'cwa_typhoon_cache', 'cwa_typhoon_cache_time',
+    'cwa_alerts_cache_v13', 'cwa_alerts_cache_time_v13',
     'cwa_alerts_cache_v12', 'cwa_alerts_cache_time_v12'
   ];
   legacyKeys.forEach(k => localStorage.removeItem(k));
@@ -556,6 +557,8 @@ function clearAllWeatherCaches() {
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
   // Clear alerts cache
+  localStorage.removeItem('cwa_alerts_cache_v14');
+  localStorage.removeItem('cwa_alerts_cache_time_v14');
   localStorage.removeItem('cwa_alerts_cache_v13');
   localStorage.removeItem('cwa_alerts_cache_time_v13');
   localStorage.removeItem('cwa_alerts_cache_v12');
@@ -570,8 +573,8 @@ function clearAllWeatherCaches() {
 async function fetchActiveAlerts() {
   if (AppState.isSimulationActive) return;
   
-  const cacheKey = 'cwa_alerts_cache_v13';
-  const cacheTimeKey = 'cwa_alerts_cache_time_v13';
+  const cacheKey = 'cwa_alerts_cache_v14';
+  const cacheTimeKey = 'cwa_alerts_cache_time_v14';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -621,25 +624,65 @@ async function fetchActiveAlerts() {
         const grouped = {};
         
         for (const r of records) {
-          if (!r.contentText) continue;
+          const contentText = r.contents?.content?.contentText || r.contentText || '';
+          if (!contentText) continue;
           
-          const title = `${r.phenomena || ''}${r.significance || '特報'}`;
-          const key = `${title}_${r.contentText}_${r.startTime}_${r.endTime}`;
+          const startTime = r.datasetInfo?.validTime?.startTime || r.startTime || '';
+          const endTime = r.datasetInfo?.validTime?.endTime || r.endTime || '';
           
-          if (!grouped[key]) {
-            grouped[key] = {
-              title: title || '天氣警特報',
-              phenomena: r.phenomena || '',
-              significance: r.significance || '特報',
-              contentText: r.contentText || '',
-              startTime: r.startTime || '',
-              endTime: r.endTime || '',
-              affectedAreas: []
-            };
-          }
+          const hazards = r.hazardConditions?.hazards?.hazard;
+          const hazardArr = Array.isArray(hazards) ? hazards : (hazards ? [hazards] : []);
           
-          if (r.locationName) {
-            grouped[key].affectedAreas.push(r.locationName.trim());
+          if (hazardArr.length > 0) {
+            for (const h of hazardArr) {
+              const phenomena = h.info?.phenomena || r.phenomena || '';
+              const significance = h.info?.significance || r.significance || '特報';
+              const title = `${phenomena}${significance}`;
+              const key = `${title}_${contentText}_${startTime}_${endTime}`;
+              
+              if (!grouped[key]) {
+                grouped[key] = {
+                  title: title || '天氣警特報',
+                  phenomena: phenomena,
+                  significance: significance,
+                  contentText: contentText,
+                  startTime: startTime,
+                  endTime: endTime,
+                  affectedAreas: []
+                };
+              }
+              
+              const locations = h.info?.affectedAreas?.location;
+              const locationArr = Array.isArray(locations) ? locations : (locations ? [locations] : []);
+              locationArr.forEach(loc => {
+                const name = loc.locationName || '';
+                if (name && !grouped[key].affectedAreas.includes(name.trim())) {
+                  grouped[key].affectedAreas.push(name.trim());
+                }
+              });
+            }
+          } else {
+            // Fallback for flat structure
+            const phenomena = r.phenomena || '';
+            const significance = r.significance || '特報';
+            const title = `${phenomena}${significance}`;
+            const key = `${title}_${contentText}_${startTime}_${endTime}`;
+            
+            if (!grouped[key]) {
+              grouped[key] = {
+                title: title || '天氣警特報',
+                phenomena: phenomena,
+                significance: significance,
+                contentText: contentText,
+                startTime: startTime,
+                endTime: endTime,
+                affectedAreas: []
+              };
+            }
+            
+            if (r.locationName && !grouped[key].affectedAreas.includes(r.locationName.trim())) {
+              grouped[key].affectedAreas.push(r.locationName.trim());
+            }
           }
         }
         
@@ -718,10 +761,46 @@ async function fetchActiveAlerts() {
     console.error('Failed to fetch high temperature alerts (W-C0033-005):', errHeat);
   }
   
-  AppState.activeAlerts = parsedAlerts;
-  localStorage.setItem(cacheKey, JSON.stringify(parsedAlerts));
+  // Group and merge warnings with identical title and time windows to prevent duplicate alerts (e.g. Yellow and Orange heat warnings both showing on a county-level card)
+  const alertGroups = {};
+  parsedAlerts.forEach(alert => {
+    const key = `${alert.title}_${alert.startTime}_${alert.endTime}`;
+    if (!alertGroups[key]) {
+      alertGroups[key] = {
+        title: alert.title,
+        phenomena: alert.phenomena,
+        significance: alert.significance,
+        contentText: alert.contentText,
+        startTime: alert.startTime,
+        endTime: alert.endTime,
+        affectedAreas: [...alert.affectedAreas]
+      };
+    } else {
+      // Merge affected areas
+      alert.affectedAreas.forEach(area => {
+        if (!alertGroups[key].affectedAreas.includes(area)) {
+          alertGroups[key].affectedAreas.push(area);
+        }
+      });
+      // Resolve contentText descriptions (use the longer one if one nests the other, or concatenate)
+      if (alertGroups[key].contentText !== alert.contentText) {
+        if (alertGroups[key].contentText.includes(alert.contentText)) {
+          // Do nothing
+        } else if (alert.contentText.includes(alertGroups[key].contentText)) {
+          alertGroups[key].contentText = alert.contentText;
+        } else {
+          alertGroups[key].contentText += '\n' + alert.contentText;
+        }
+      }
+    }
+  });
+  
+  const finalAlerts = Object.values(alertGroups);
+  
+  AppState.activeAlerts = finalAlerts;
+  localStorage.setItem(cacheKey, JSON.stringify(finalAlerts));
   localStorage.setItem(cacheTimeKey, now.toString());
-  console.log('Fetched and cached alerts successfully:', parsedAlerts);
+  console.log('Fetched, deduplicated, and cached alerts successfully:', finalAlerts);
 }
 
 // Convert ISO time string to localized MM/DD HH:mm format
@@ -4403,6 +4482,10 @@ function parseCwaTyphoonResponse(data) {
         const forecastFixes = forecastData?.Fix || forecastData?.fix || [];
         
         if (lastFix) {
+          const currentPointTimeStr = lastFix.DateTime || lastFix.dateTime || lastFix.fixTime || lastFix.FixTime;
+          const currentPointTimeMs = currentPointTimeStr ? new Date(currentPointTimeStr).getTime() : 0;
+          let maxTimeMs = currentPointTimeMs;
+
           const currentPoint = {
             lat: parseFloat(lastFix.CoordinateLatitude || lastFix.coordinateLatitude || lastFix.latitude || lastFix.Latitude),
             lon: parseFloat(lastFix.CoordinateLongitude || lastFix.coordinateLongitude || lastFix.longitude || lastFix.Longitude),
@@ -4423,14 +4506,19 @@ function parseCwaTyphoonResponse(data) {
             const fHour = pt.ForecastHour || pt.forecastHour || '24';
             let timeLabel = `預測 +${fHour}h`;
             const initTime = pt.InitialTime || pt.initialTime;
+            let targetTimeMs = 0;
             if (initTime) {
               const initDate = new Date(initTime);
               initDate.setHours(initDate.getHours() + parseInt(fHour));
+              targetTimeMs = initDate.getTime();
               const m = initDate.getMonth() + 1;
               const d = initDate.getDate();
               const h = String(initDate.getHours()).padStart(2, '0');
               const min = String(initDate.getMinutes()).padStart(2, '0');
               timeLabel = `預測 +${fHour}h (${m}/${d} ${h}:${min})`;
+            }
+            if (targetTimeMs > maxTimeMs) {
+              maxTimeMs = targetTimeMs;
             }
             
             cwaTrack.push({
@@ -4459,7 +4547,15 @@ function parseCwaTyphoonResponse(data) {
           else if (ws >= 32.7) item.classZh = '中度颱風 (Category 2-3)';
           else item.classZh = '輕度颱風 (Category 1)';
           
-          parsed.push(item);
+          // Check if typhoon is active: has forecast points in the future,
+          // OR was updated within the last 12 hours
+          const nowMs = Date.now();
+          const isActive = (maxTimeMs > nowMs) || (nowMs - currentPointTimeMs < 12 * 60 * 60 * 1000);
+          if (isActive) {
+            parsed.push(item);
+          } else {
+            console.log(`Filtering out expired/dissipated typhoon: ${item.nameZh} (${item.nameEn}), last updated at ${currentPointTimeStr}`);
+          }
         }
       });
       
@@ -4493,6 +4589,9 @@ function parseCwaTyphoonResponse(data) {
       const forecastGroups = cy.analysisAndForecasts?.analysisAndForecast || cy.analysisAndForecast || cy.AnalysisAndForecasts?.AnalysisAndForecast || [];
       const fgArr = Array.isArray(forecastGroups) ? forecastGroups : [forecastGroups];
       
+      let maxTimeMs = 0;
+      let lastFixTimeMs = 0;
+      
       fgArr.forEach(fg => {
         const agency = fg.forecastAgency || fg.ForecastAgency || 'CWA';
         const points = fg.forecastPoints?.forecastPoint || fg.forecastPoint || fg.ForecastPoints?.ForecastPoint || [];
@@ -4506,11 +4605,21 @@ function parseCwaTyphoonResponse(data) {
           
           const timeRaw = pt.forecastTime || pt.ForecastTime || '';
           let timeLabel = timeRaw;
-          if (timeRaw && timeRaw.includes('T')) {
+          let targetTimeMs = 0;
+          if (timeRaw) {
             const dateObj = new Date(timeRaw);
-            const hour = dateObj.getHours();
-            const min = dateObj.getMinutes();
-            timeLabel = `預測 +${hour}h (${dateObj.getMonth()+1}/${dateObj.getDate()} ${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')})`;
+            targetTimeMs = dateObj.getTime();
+            if (timeRaw.includes('T')) {
+              const hour = dateObj.getHours();
+              const min = dateObj.getMinutes();
+              timeLabel = `預測 +${hour}h (${dateObj.getMonth()+1}/${dateObj.getDate()} ${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')})`;
+            }
+          }
+          if (targetTimeMs > maxTimeMs) {
+            maxTimeMs = targetTimeMs;
+          }
+          if (trackPoints.length === 0 && targetTimeMs > 0) {
+            lastFixTimeMs = targetTimeMs;
           }
           
           const wind = parseFloat(pt.maxWindSpeed || pt.MaxWindSpeed || 25);
@@ -4550,7 +4659,13 @@ function parseCwaTyphoonResponse(data) {
       }
       
       if (Object.keys(item.tracks).length > 0) {
-        parsed.push(item);
+        const nowMs = Date.now();
+        const isActive = (maxTimeMs > nowMs) || (lastFixTimeMs > 0 && nowMs - lastFixTimeMs < 12 * 60 * 60 * 1000);
+        if (isActive) {
+          parsed.push(item);
+        } else {
+          console.log(`Filtering out expired/dissipated fallback typhoon: ${item.nameZh} (${item.nameEn})`);
+        }
       }
     });
   } catch (e) {
