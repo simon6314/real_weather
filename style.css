@@ -866,7 +866,7 @@ body {
 .radar-canvas-outer {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   cursor: grab;
   display: flex;
   align-items: center;
@@ -1947,6 +1947,8 @@ body {
   #radar-img {
     max-height: 330px;
     border-radius: var(--radius-sm);
+    transform: scale(1.35);
+    transform-origin: center center;
   }
   
   /* Detailed Forecast sliding Drawer mobile adaptation */

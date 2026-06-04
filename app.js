@@ -2900,6 +2900,31 @@ function initRadarControls() {
   window.addEventListener('mouseup', () => {
     AppState.isDraggingRadar = false;
   });
+
+  // Touch drag support for mobile
+  outer.addEventListener('touchstart', (e) => {
+    if (AppState.radarZoom <= 1) return; // Only pan when zoomed
+    if (e.touches.length === 1) {
+      AppState.isDraggingRadar = true;
+      const touch = e.touches[0];
+      AppState.dragStart = { x: touch.clientX - AppState.radarPan.x, y: touch.clientY - AppState.radarPan.y };
+      e.preventDefault();
+    }
+  }, { passive: false });
+  
+  window.addEventListener('touchmove', (e) => {
+    if (!AppState.isDraggingRadar) return;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      AppState.radarPan = { x: touch.clientX - AppState.dragStart.x, y: touch.clientY - AppState.dragStart.y };
+      applyRadarTransform();
+      e.preventDefault();
+    }
+  }, { passive: false });
+  
+  window.addEventListener('touchend', () => {
+    AppState.isDraggingRadar = false;
+  });
 }
 
 function applyRadarTransform() {
