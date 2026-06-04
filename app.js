@@ -110,7 +110,8 @@ const AppState = {
   radarZoom: 1,
   radarPan: { x: 0, y: 0 },
   isDraggingRadar: false,
-  dragStart: { x: 0, y: 0 }
+  dragStart: { x: 0, y: 0 },
+  drawerMap: null                // Leaflet map instance inside details drawer
 };
 
 // Ensure API Key is initialized in local storage if not present
@@ -822,6 +823,29 @@ function formatAlertTime(timeStr) {
   }
 }
 
+// Filter out redundant precipitation alerts (e.g. hide "大雨特報" if "豪雨特報" is already active)
+function filterRedundantAlerts(alerts) {
+  if (!alerts || alerts.length <= 1) return alerts;
+  
+  const rainLevels = ['超大豪雨特報', '大豪雨特報', '豪雨特報', '大雨特報'];
+  const activeRainAlerts = alerts.filter(a => rainLevels.includes(a.title));
+  
+  if (activeRainAlerts.length > 1) {
+    let highestRainAlert = null;
+    for (const level of rainLevels) {
+      const match = activeRainAlerts.find(a => a.title === level);
+      if (match) {
+        highestRainAlert = match;
+        break;
+      }
+    }
+    if (highestRainAlert) {
+      return alerts.filter(a => !rainLevels.includes(a.title) || a === highestRainAlert);
+    }
+  }
+  return alerts;
+}
+
 // Map of mountainous townships for each county in Taiwan
 function isTownInMountainArea(county, town) {
   const c = county.replace(/台/g, '臺');
@@ -896,6 +920,32 @@ function isAlertMatch(alertArea, parsedLocation) {
   }
   
   return false;
+}
+
+// Resolve coordinates for the specified parsed location identifier (uses rain observation coordinate fallback to county)
+function getCoordsForLocation(parsed) {
+  if (!parsed) return { lat: 23.973875, lon: 120.982024 };
+  
+  // Try to find matched rain observation station coordinates first
+  const rainObs = findRainObservation(parsed.county, parsed.town || '');
+  if (rainObs && rainObs.GeoInfo && rainObs.GeoInfo.Coordinates) {
+    const wgs84 = rainObs.GeoInfo.Coordinates.find(c => c.CoordinateFormat === 'decimal degrees' || c.CoordinateName === 'WGS84');
+    if (wgs84 && wgs84.StationLatitude && wgs84.StationLongitude) {
+      return {
+        lat: parseFloat(wgs84.StationLatitude),
+        lon: parseFloat(wgs84.StationLongitude)
+      };
+    }
+  }
+  
+  // Fallback to parent county coordinate in TAIWAN_COUNTIES
+  const normCounty = parsed.county.replace(/台/g, '臺');
+  const county = TAIWAN_COUNTIES.find(c => c.name.replace(/台/g, '臺') === normCounty);
+  if (county) {
+    return { lat: county.lat, lon: county.lon };
+  }
+  
+  return { lat: 23.973875, lon: 120.982024 }; // Center of Taiwan
 }
 
 // Generate an intelligent array of geographical keywords for weather alert filtering
@@ -2328,8 +2378,10 @@ function renderMainLocationWeather() {
   
   // Render active warning badges if any exist for the current county/township
   const parsedActive = parseIdentifier(activeCountyName);
-  const activeAlertsForHero = (AppState.activeAlerts || []).filter(a => 
-    a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive))
+  const activeAlertsForHero = filterRedundantAlerts(
+    (AppState.activeAlerts || []).filter(a => 
+      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive))
+    )
   );
   
   const descEl = document.getElementById('current-weather-desc');
@@ -2596,8 +2648,10 @@ function renderAddedRegionsList() {
     const cur = data.current;
     
     // Check for active alerts in the custom region's parent county or specific township
-    const activeAlertsForRegion = (AppState.activeAlerts || []).filter(a => 
-      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsed))
+    const activeAlertsForRegion = filterRedundantAlerts(
+      (AppState.activeAlerts || []).filter(a => 
+        a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsed))
+      )
     );
     let regionAlertBadgeHtml = '';
     if (activeAlertsForRegion.length > 0) {
@@ -2844,6 +2898,12 @@ function initDetailsDrawer() {
   const closeDrawer = () => {
     overlay.classList.remove('active');
     drawer.classList.remove('active');
+    
+    // Clean up Leaflet map inside details drawer to avoid leaks and binding issues
+    if (AppState.drawerMap) {
+      AppState.drawerMap.remove();
+      AppState.drawerMap = null;
+    }
   };
   
   closeBtn.addEventListener('click', closeDrawer);
@@ -2952,8 +3012,10 @@ function openDrawerForecast(identifier) {
   const normCounty = countyName.replace(/台/g, '臺');
   const normTown = parsed.town ? parsed.town.replace(/台/g, '臺') : '';
   
-  const countyAlerts = (AppState.activeAlerts || []).filter(alert => 
-    alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed))
+  const countyAlerts = filterRedundantAlerts(
+    (AppState.activeAlerts || []).filter(alert => 
+      alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed))
+    )
   );
   
   if (countyAlerts.length > 0 && alertsContainer) {
@@ -3006,6 +3068,69 @@ function openDrawerForecast(identifier) {
       alertsContainer.appendChild(alertBox);
     });
   }
+  
+  // Render details drawer mini warning map if alerts exist for this region
+  const mapContainer = document.getElementById('drawer-mini-map');
+  if (countyAlerts.length > 0) {
+    if (mapContainer) {
+      mapContainer.style.display = 'block';
+      
+      // Clean up previous map instance
+      if (AppState.drawerMap) {
+        AppState.drawerMap.remove();
+        AppState.drawerMap = null;
+      }
+      
+      // Resolve coordinates for map centering
+      const coords = getCoordsForLocation(parsed);
+      
+      // Initialize Leaflet map inside details drawer
+      AppState.drawerMap = L.map('drawer-mini-map', {
+        center: [coords.lat, coords.lon],
+        zoom: 11,
+        zoomControl: false,
+        attributionControl: false
+      });
+      
+      // Add Dark Matter CartoDB tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 18
+      }).addTo(AppState.drawerMap);
+      
+      // Add a red warning circle of 5km radius to highlight the alert area
+      L.circle([coords.lat, coords.lon], {
+        color: '#EF4444',
+        fillColor: '#EF4444',
+        fillOpacity: 0.15,
+        radius: 5000
+      }).addTo(AppState.drawerMap);
+      
+      // Add a pulsing-like marker at the center
+      L.circleMarker([coords.lat, coords.lon], {
+        radius: 6,
+        color: '#FF0000',
+        fillColor: '#FFFFFF',
+        fillOpacity: 0.8,
+        weight: 2
+      }).addTo(AppState.drawerMap);
+      
+      // Invalidate Leaflet map size after sliding animation completes to render tiles properly
+      setTimeout(() => {
+        if (AppState.drawerMap) {
+          AppState.drawerMap.invalidateSize();
+        }
+      }, 300);
+    }
+  } else {
+    if (mapContainer) {
+      mapContainer.style.display = 'none';
+    }
+    if (AppState.drawerMap) {
+      AppState.drawerMap.remove();
+      AppState.drawerMap = null;
+    }
+  }
+  
   // Set rainfall values in drawer
   const r10m = data.current.rain10Min !== undefined ? Number(data.current.rain10Min).toFixed(1) : '0.0';
   const r1h = data.current.rain1Hr !== undefined ? Number(data.current.rain1Hr).toFixed(1) : '0.0';

@@ -16,7 +16,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 
@@ -469,6 +469,9 @@
     <div class="drawer-body">
       <!-- Active Alerts Container -->
       <div id="drawer-alerts-container"></div>
+      
+      <!-- Mini Map for active alerts -->
+      <div id="drawer-mini-map" style="display: none; height: 180px; width: 100%; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); z-index: 1;"></div>
 
       <!-- Section: Real-time Rainfall -->
       <div class="drawer-section glass-panel" id="drawer-rain-section" style="margin-top: 16px; margin-bottom: 16px;">
