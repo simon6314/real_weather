@@ -822,6 +822,82 @@ function formatAlertTime(timeStr) {
   }
 }
 
+// Map of mountainous townships for each county in Taiwan
+function isTownInMountainArea(county, town) {
+  const c = county.replace(/台/g, '臺');
+  const t = town.replace(/台/g, '臺');
+  
+  const mountainMap = {
+    '臺北市': ['士林區', '北投區', '內湖區', '文山區', '南港區'],
+    '新北市': ['烏來區', '三峽區', '石碇區', '坪林區', '平溪區', '雙溪區', '貢寮區', '瑞芳區', '萬里區', '金山區'],
+    '桃園市': ['復興區'],
+    '新竹縣': ['尖石鄉', '五峰鄉', '橫山鄉', '北埔鄉', '峨眉鄉'],
+    '苗栗縣': ['泰安鄉', '南庄鄉', '獅潭鄉', '大湖鄉', '卓蘭鎮', '三灣鄉', '公館鄉'],
+    '臺中市': ['和平區', '東勢區', '新社區', '石岡區'],
+    '南投縣': ['仁愛鄉', '信義鄉', '竹山鎮', '鹿谷鄉', '魚池鄉', '水里鄉', '埔里鎮', '國姓鄉'],
+    '雲林縣': ['古坑鄉'],
+    '嘉義縣': ['阿里山鄉', '梅山鄉', '竹崎鄉', '番路鄉', '大埔鄉', '中埔鄉'],
+    '臺南市': ['南化區', '楠西區', '玉井區', '左鎮區', '東山區', '白河區'],
+    '高雄市': ['桃源區', '那瑪夏區', '茂林區', '六龜區', '甲仙區', '杉林區', '美濃區', '內門區'],
+    '屏東縣': ['霧臺鄉', '三地門鄉', '瑪家鄉', '泰武鄉', '來義鄉', '春日鄉', '獅子鄉', '牡丹鄉'],
+    '宜蘭縣': ['大同鄉', '南澳鄉'],
+    '花蓮縣': ['秀林鄉', '萬榮鄉', '卓溪鄉'],
+    '臺東縣': ['海端鄉', '延平鄉', '金峰鄉', '達仁鄉']
+  };
+  
+  const list = mountainMap[c];
+  if (!list) return false;
+  return list.some(m => t.includes(m) || m.includes(t));
+}
+
+// Determine if a weather alert applies to the specified location (county/township)
+function isAlertMatch(alertArea, parsedLocation) {
+  if (!alertArea || !parsedLocation) return false;
+  const normArea = alertArea.replace(/台/g, '臺');
+  const normCounty = parsedLocation.county.replace(/台/g, '臺');
+  
+  // If the alert is for a completely different county, no match
+  if (!normArea.startsWith(normCounty)) {
+    return false;
+  }
+  
+  // If it's a county-level view (no specific town is queried)
+  if (parsedLocation.type === 'county') {
+    return true; 
+  }
+  
+  // If it's a town-level view (e.g. 竹北市)
+  if (parsedLocation.type === 'town' && parsedLocation.town) {
+    const normTown = parsedLocation.town.replace(/台/g, '臺');
+    
+    // If the warning specifies the town name directly
+    if (normArea.includes(normTown)) {
+      return true;
+    }
+    
+    // If it's a general county warning (e.g., "新竹縣" or "新竹縣平地及山區" or "新竹縣平地")
+    if (normArea === normCounty || normArea === `${normCounty}平地` || normArea === `${normCounty}平地及山區`) {
+      const isMountain = isTownInMountainArea(normCounty, normTown);
+      if (normArea.includes('平地') && isMountain) {
+        return false; // Plains warnings don't apply to mountain towns
+      }
+      return true; 
+    }
+    
+    // If it is a mountain-only warning (e.g., "新竹縣山區")
+    if (normArea === `${normCounty}山區`) {
+      return isTownInMountainArea(normCounty, normTown);
+    }
+    
+    // If it is a plains-only warning (e.g., "新竹縣平地")
+    if (normArea === `${normCounty}平地`) {
+      return !isTownInMountainArea(normCounty, normTown);
+    }
+  }
+  
+  return false;
+}
+
 // Generate an intelligent array of geographical keywords for weather alert filtering
 function getCountyKeywords(county) {
   if (!county) return [];
@@ -2250,16 +2326,10 @@ function renderMainLocationWeather() {
   const cur = countyData.current;
   document.getElementById('current-temp').textContent = Number(cur.temp).toFixed(1);
   
-  // Render active warning badges if any exist for the current county (or any of its townships)
+  // Render active warning badges if any exist for the current county/township
   const parsedActive = parseIdentifier(activeCountyName);
-  const activeCountyOnly = parsedActive.county;
-  const normHeroCounty = activeCountyOnly.replace(/台/g, '臺');
-  
   const activeAlertsForHero = (AppState.activeAlerts || []).filter(a => 
-    a.affectedAreas && a.affectedAreas.some(area => {
-      const normArea = area.replace(/台/g, '臺');
-      return normArea === normHeroCounty || normArea.includes(normHeroCounty);
-    })
+    a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive))
   );
   
   const descEl = document.getElementById('current-weather-desc');
@@ -2526,23 +2596,9 @@ function renderAddedRegionsList() {
     const cur = data.current;
     
     // Check for active alerts in the custom region's parent county or specific township
-    const activeAlertsForRegion = (AppState.activeAlerts || []).filter(a => {
-      if (!a.affectedAreas) return false;
-      const normCounty = parsed.county.replace(/台/g, '臺');
-      const normTown = parsed.town ? parsed.town.replace(/台/g, '臺') : '';
-      
-      return a.affectedAreas.some(area => {
-        const normArea = area.replace(/台/g, '臺');
-        if (normArea === normCounty) return true;
-        if (parsed.type === 'town' && normTown && normArea.includes(normCounty) && normArea.includes(normTown)) {
-          return true;
-        }
-        if (parsed.type === 'county' && normArea.includes(normCounty)) {
-          return true;
-        }
-        return false;
-      });
-    });
+    const activeAlertsForRegion = (AppState.activeAlerts || []).filter(a => 
+      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsed))
+    );
     let regionAlertBadgeHtml = '';
     if (activeAlertsForRegion.length > 0) {
       regionAlertBadgeHtml = activeAlertsForRegion.map(a => {
@@ -2896,20 +2952,9 @@ function openDrawerForecast(identifier) {
   const normCounty = countyName.replace(/台/g, '臺');
   const normTown = parsed.town ? parsed.town.replace(/台/g, '臺') : '';
   
-  const countyAlerts = (AppState.activeAlerts || []).filter(alert => {
-    if (!alert.affectedAreas) return false;
-    return alert.affectedAreas.some(area => {
-      const normArea = area.replace(/台/g, '臺');
-      if (normArea === normCounty) return true;
-      if (parsed.type === 'town' && normTown && normArea.includes(normCounty) && normArea.includes(normTown)) {
-        return true;
-      }
-      if (parsed.type === 'county' && normArea.includes(normCounty)) {
-        return true;
-      }
-      return false;
-    });
-  });
+  const countyAlerts = (AppState.activeAlerts || []).filter(alert => 
+    alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed))
+  );
   
   if (countyAlerts.length > 0 && alertsContainer) {
     countyAlerts.forEach(alert => {
