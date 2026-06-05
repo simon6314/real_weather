@@ -764,6 +764,13 @@ body {
   transform: scale(1.1);
 }
 
+/* Show delete button by default on touch-only devices (mobile/tablet) since hover doesn't exist */
+@media (hover: none) {
+  .delete-card-btn {
+    opacity: 0.75;
+  }
+}
+
 /* --------------------------------------------------------------------------
    7. Radar Echo Tab Styling
    -------------------------------------------------------------------------- */
