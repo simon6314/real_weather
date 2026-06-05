@@ -4729,7 +4729,7 @@ function setupEmptyTyphoonState() {
   const statusText = document.getElementById('typhoon-status-text');
 
   if (pulseDot) pulseDot.className = 'pulse-dot'; // Standard green pulse
-  if (statusText) statusText.textContent = '現在西太平洋無颱風';
+  if (statusText) statusText.textContent = '現在西北太平洋無颱風';
 
   AppState.typhoonList = [];
   
@@ -4747,7 +4747,7 @@ function setupEmptyTyphoonState() {
   const radius10El = document.getElementById('typhoon-storm-radius-10');
 
   if (nameTitle) nameTitle.textContent = "目前無活躍颱風";
-  if (classBadge) classBadge.textContent = "目前西太平洋無活躍的颱風威脅";
+  if (classBadge) classBadge.textContent = "目前西北太平洋無活躍的颱風威脅";
   if (pressureEl) pressureEl.textContent = "--";
   if (maxWindEl) maxWindEl.textContent = "-- m/s";
   if (gustWindEl) gustWindEl.textContent = "-- m/s";
