@@ -2889,7 +2889,7 @@ function renderAddedRegionsList() {
     const r10m = cur.rain10Min !== undefined ? Number(cur.rain10Min).toFixed(1) : '0.0';
     const r1h = cur.rain1Hr !== undefined ? Number(cur.rain1Hr).toFixed(1) : '0.0';
     const rDaily = cur.rainDaily !== undefined ? Number(cur.rainDaily).toFixed(1) : '0.0';
-    const rainText = `🌧️ ${r10m}/${r1h}/${rDaily} mm`;
+    const rainText = `<span style="white-space: nowrap;">🌧️ ${r10m}/${r1h}/${rDaily} mm</span>`;
     
     card.className = 'region-card glass-panel';
     card.innerHTML = `
