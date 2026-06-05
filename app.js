@@ -2203,87 +2203,35 @@ function getTaiwanDateTimeParts(date) {
 }
 
 function getChartIconSvg(iconName, x, y, size = 20) {
-  let innerPaths = '';
+  let innerRef = '#svg-cloudy'; // Fallback
+  let viewClass = 'cloudy';
   
   if (iconName === 'sunny') {
-    innerPaths = `
-      <circle cx="32" cy="32" r="10" fill="url(#grad-sun)" />
-      <g stroke="url(#grad-sun-rays)" stroke-width="2.8" stroke-linecap="round" class="anim-sun-rays">
-        <line x1="32" y1="12" x2="32.01" y2="4" />
-        <line x1="32" y1="52" x2="32.01" y2="60" />
-        <line x1="12" y1="32" x2="4" y2="32.01" />
-        <line x1="52" y1="32" x2="60" y2="32.01" />
-        <line x1="49.32" y1="22.00" x2="56.25" y2="18.00" />
-        <line x1="42.00" y1="14.68" x2="46.00" y2="7.75" />
-        <line x1="22.00" y1="14.68" x2="18.00" y2="7.75" />
-        <line x1="14.68" y1="22.00" x2="7.75" y2="18.00" />
-        <line x1="14.68" y1="42.00" x2="7.75" y2="46.00" />
-        <line x1="22.00" y1="49.32" x2="18.00" y2="56.25" />
-        <line x1="42.00" y1="49.32" x2="46.00" y2="56.25" />
-        <line x1="49.32" y1="42.00" x2="56.25" y2="46.00" />
-      </g>
-    `;
+    innerRef = '#svg-sunny';
+    viewClass = 'sunny';
   } else if (iconName === 'sunny-cloudy') {
-    innerPaths = `
-      <!-- Back Cloud -->
-      <path d="M24 38c-3.3 0-6-2.7-6-6 0-3 2.2-5.5 5.1-5.9.8-3.4 3.8-6.1 7.4-6.1 3 0 5.6 1.8 6.7 4.4C38 24 39.8 25.5 40 27.5c1.7.5 3 2.1 3 4 0 2.5-2 4.5-4.5 4.5" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
-      <!-- Front Cloud -->
-      <path d="M18 44c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 26 39.5 28 40 30.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" class="anim-cloud-drift-front" />
-    `;
+    innerRef = '#svg-cloudy'; // Overlapping clouds
+    viewClass = 'sunny-cloudy';
   } else if (iconName === 'cloudy') {
-    innerPaths = `
-      <!-- Back Cloud -->
-      <path d="M24 38c-3.3 0-6-2.7-6-6 0-3 2.2-5.5 5.1-5.9.8-3.4 3.8-6.1 7.4-6.1 3 0 5.6 1.8 6.7 4.4C38 24 39.8 25.5 40 27.5c1.7.5 3 2.1 3 4 0 2.5-2 4.5-4.5 4.5" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
-      <!-- Front Cloud -->
-      <path d="M18 44c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 26 39.5 28 40 30.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" class="anim-cloud-drift-front" />
-    `;
+    innerRef = '#svg-cloudy';
+    viewClass = 'cloudy';
   } else if (iconName === 'rainy') {
-    innerPaths = `
-      <!-- Cloud -->
-      <path d="M18 36c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 18 39.5 20 40 22.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" />
-      <!-- Rain Drops -->
-      <g stroke="url(#grad-rain)" stroke-width="2.5" stroke-linecap="round" fill="none" class="anim-rain">
-        <line x1="20" y1="42" x2="17" y2="49" class="rain-1" />
-        <line x1="28" y1="42" x2="25" y2="49" class="rain-2" />
-        <line x1="36" y1="42" x2="33" y2="49" class="rain-3" />
-      </g>
-    `;
+    innerRef = '#svg-rainy';
+    viewClass = 'rainy';
   } else if (iconName === 'thunderstorm') {
-    innerPaths = `
-      <!-- Dark Cloud -->
-      <path d="M18 36c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 18 39.5 20 40 22.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-dark)" />
-      <!-- Rain Drops -->
-      <g stroke="url(#grad-rain)" stroke-width="2.5" stroke-linecap="round" fill="none" class="anim-rain">
-        <line x1="20" y1="42" x2="17" y2="49" class="rain-1" />
-        <line x1="28" y1="42" x2="25" y2="49" class="rain-2" />
-        <line x1="36" y1="42" x2="33" y2="49" class="rain-3" />
-      </g>
-      <!-- Lightning Bolt -->
-      <polygon points="28,34 22,44 27,44 24,54 34,42 29,42" fill="url(#grad-lightning)" class="anim-lightning" />
-    `;
+    innerRef = '#svg-thunderstorm';
+    viewClass = 'thunderstorm';
   } else if (iconName === 'windy') {
-    innerPaths = `
-      <!-- Light clouds with wind lines -->
-      <path d="M12 28c-2.2 0-4-1.8-4-4 0-2 1.5-3.7 3.5-3.9A4.9 4.9 0 0 1 20 18c2 0 3.8 1.2 4.5 3 1.2 0 2.2 1 2.5 2.2c1 .3 2 1.2 2 2.3v.5H12z" fill="url(#grad-cloud-back)" class="anim-cloud-drift-back" />
-      <g stroke="url(#grad-wind)" stroke-width="2.5" stroke-linecap="round" fill="none" class="anim-wind">
-        <path d="M10,34 C18,34 25,32 30,34 C33,35 34,37 32,38 C30,39 28,37 29,35" class="wind-line-1" />
-        <path d="M6,42 C16,42 22,40 28,42 C30,43 31,45 29,46 C27,47 25,45 26,43" class="wind-line-2" />
-      </g>
-    `;
+    innerRef = '#svg-windy';
+    viewClass = 'windy';
   } else if (iconName === 'night') {
-    innerPaths = `
-      <path d="M36 40c-9.9 0-18-8.1-18-18 0-4.6 1.7-8.8 4.6-12C14.7 11.2 10 18.1 10 26c0 9.9 8.1 18 18 18 7.9 0 14.8-4.7 16-12.6-3.2 2.9-7.4 4.6-12 4.6z" fill="url(#grad-moon)" />
-      <g fill="#FFF" class="anim-stars">
-        <polygon points="18,12 19,14 21,14 19,15 20,17 18,16 16,17 17,15 15,14 17,14" class="star-1" />
-        <polygon points="36,12 37,13 39,13 37,14 38,16 36,15 34,16 35,14 33,13 35,13" class="star-2" />
-        <polygon points="42,24 43,25 45,25 43,26 44,28 42,27 40,28 41,26 39,25 41,25" class="star-3" />
-      </g>
-    `;
+    innerRef = '#svg-night';
+    viewClass = 'night';
   }
   
   return `
-    <g transform="translate(${x - size/2}, ${y - size/2}) scale(${size / 64})">
-      ${innerPaths}
+    <g class="weather-icon-animated ${viewClass}" transform="translate(${x - size/2}, ${y - size/2}) scale(${size / 64})">
+      <use href="${innerRef}" />
     </g>
   `;
 }
@@ -2962,46 +2910,6 @@ function drawHourlySvgChart(hourlyData) {
         <filter id="glow-shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="var(--color-accent-glow)" flood-opacity="0.8" />
         </filter>
-        
-        <!-- Re-declared Gradients for bulletproof self-contained rendering -->
-        <linearGradient id="grad-sun" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#FFD269" />
-          <stop offset="100%" stop-color="#FF9E00" />
-        </linearGradient>
-        <linearGradient id="grad-sun-rays" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#FFA800" />
-          <stop offset="100%" stop-color="#FF5100" />
-        </linearGradient>
-        <linearGradient id="grad-cloud-front" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#FFFFFF" />
-          <stop offset="100%" stop-color="#B0C4DE" />
-        </linearGradient>
-        <linearGradient id="grad-cloud-back" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#F5F5F5" stop-opacity="0.8" />
-          <stop offset="100%" stop-color="#9CB3C9" stop-opacity="0.8" />
-        </linearGradient>
-        <linearGradient id="grad-cloud-dark" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#697C91" />
-          <stop offset="100%" stop-color="#32404F" />
-        </linearGradient>
-        <linearGradient id="grad-rain" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#7EA5F0" />
-          <stop offset="100%" stop-color="#3B6FCB" />
-        </linearGradient>
-        <linearGradient id="grad-lightning" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#FFE135" />
-          <stop offset="100%" stop-color="#FF9900" />
-        </linearGradient>
-        <linearGradient id="grad-wind" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#EAEAEA" stop-opacity="0.2" />
-          <stop offset="50%" stop-color="#D3E0EA" stop-opacity="0.9" />
-          <stop offset="100%" stop-color="#EAEAEA" stop-opacity="0.2" />
-        </linearGradient>
-        <linearGradient id="grad-moon" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#FDFDED" />
-          <stop offset="60%" stop-color="#ECEB9D" />
-          <stop offset="100%" stop-color="#C2C056" />
-        </linearGradient>
       </defs>
   `;
   
