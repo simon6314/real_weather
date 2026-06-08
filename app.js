@@ -216,7 +216,7 @@ function initNavigation() {
 function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
-  // Clean up legacy caches from prior versions (V11, V10, V9, V8, V7, V2) to reclaim space and force immediate updates!
+  // Clean up legacy caches from prior versions (V13, V12, V11, V10, V9, V8, V7, V2) to reclaim space and force immediate updates!
   const legacyKeys = [
     'cwa_weather_cache_v11', 'cwa_weather_cache_time_v11',
     'cwa_weather_cache_v10', 'cwa_weather_cache_time_v10',
@@ -231,7 +231,9 @@ function validateAndCleanAllCaches() {
     'cwa_alerts_cache_v14', 'cwa_alerts_cache_time_v14',
     'cwa_typhoon_cache_v3', 'cwa_typhoon_cache_time_v3',
     'cwa_rainfall_cache_v1', 'cwa_rainfall_cache_time_v1',
-    'cwa_cap_wind_cache_v1', 'cwa_cap_wind_cache_time_v1'
+    'cwa_cap_wind_cache_v1', 'cwa_cap_wind_cache_time_v1',
+    'cwa_weather_cache_v13', 'cwa_weather_cache_time_v13',
+    'cwa_alerts_cache_v15', 'cwa_alerts_cache_time_v15'
   ];
   legacyKeys.forEach(k => localStorage.removeItem(k));
   
@@ -249,8 +251,8 @@ function validateAndCleanAllCaches() {
   legacyTownshipKeys.forEach(k => localStorage.removeItem(k));
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v13';
-  const countyTimeKey = 'cwa_weather_cache_time_v13';
+  const countyCacheKey = 'cwa_weather_cache_v14';
+  const countyTimeKey = 'cwa_weather_cache_time_v14';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -536,6 +538,8 @@ function shouldBypassCache() {
 // Clear all CWA weather caches, township caches, and typhoon caches from localStorage
 function clearAllWeatherCaches() {
   console.log('Clearing all weather, township, and typhoon caches from localStorage...');
+  localStorage.removeItem('cwa_weather_cache_v14');
+  localStorage.removeItem('cwa_weather_cache_time_v14');
   localStorage.removeItem('cwa_weather_cache_v13');
   localStorage.removeItem('cwa_weather_cache_time_v13');
   localStorage.removeItem('cwa_typhoon_cache_v4');
@@ -575,6 +579,8 @@ function clearAllWeatherCaches() {
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
   // Clear alerts cache
+  localStorage.removeItem('cwa_alerts_cache_v16');
+  localStorage.removeItem('cwa_alerts_cache_time_v16');
   localStorage.removeItem('cwa_alerts_cache_v15');
   localStorage.removeItem('cwa_alerts_cache_time_v15');
   localStorage.removeItem('cwa_alerts_cache_v14');
@@ -593,8 +599,8 @@ function clearAllWeatherCaches() {
 async function fetchActiveAlerts() {
   if (AppState.isSimulationActive) return;
   
-  const cacheKey = 'cwa_alerts_cache_v15';
-  const cacheTimeKey = 'cwa_alerts_cache_time_v15';
+  const cacheKey = 'cwa_alerts_cache_v16';
+  const cacheTimeKey = 'cwa_alerts_cache_time_v16';
   const capCacheKey = 'cwa_cap_wind_cache_v2';
   const capCacheTimeKey = 'cwa_cap_wind_cache_time_v2';
   
@@ -1037,6 +1043,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
   // If the description contains coastal keywords but absolutely no plain/land keywords,
   // it is 100% a coastal-only warning for all affected areas.
   if (hasCoastalKeywords && !hasPlainsKeywords) {
+    console.log(`[isCountyCoastalRestricted] ${countyName}: 100% coastal-only (no plains keywords)`);
     return true;
   }
   
@@ -1052,6 +1059,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
       
       // If "全區", "各地", "平地" or "陸地" is mentioned near the county, it affects the whole area
       if (windowText.includes('全區') || windowText.includes('各地') || windowText.includes('平地') || windowText.includes('陸地') || windowText.includes('各鄉鎮')) {
+        console.log(`[isCountyCoastalRestricted] ${countyName}: Plain/All-area keyword found near county in window: "${windowText}"`);
         return false;
       }
       
@@ -1060,10 +1068,12 @@ function isCountyCoastalRestricted(countyName, contentText) {
       }
       index = descText.indexOf(normCounty, index + 1);
     }
+    console.log(`[isCountyCoastalRestricted] ${countyName}: hasCoastalSpecifier=${hasCoastalSpecifier}`);
     return hasCoastalSpecifier;
   } else {
     // County not explicitly named in the description (covered by regional phrases like "南部沿海地區")
     // Check if the description contains coastal/open area keywords anywhere
+    console.log(`[isCountyCoastalRestricted] ${countyName}: not named in desc, fallback to hasCoastalKeywords=${hasCoastalKeywords}`);
     return hasCoastalKeywords;
   }
 }
@@ -1099,7 +1109,9 @@ function isAlertMatch(alertArea, parsedLocation, alertObj = null) {
   if (isWindAlert && Array.isArray(AppState.strongWindCapTowns) && AppState.strongWindCapTowns.length > 0) {
     if (parsedLocation.type === 'town' && normTown) {
       const fullTownKey = normCounty + normTown;
-      return AppState.strongWindCapTowns.includes(fullTownKey);
+      const capMatched = AppState.strongWindCapTowns.includes(fullTownKey);
+      console.log(`[isAlertMatch] CAP Wind Alert check for ${fullTownKey}: matched=${capMatched}`);
+      return capMatched;
     }
     if (parsedLocation.type === 'county') {
       return AppState.strongWindCapTowns.some(t => t.startsWith(normCounty));
@@ -1122,9 +1134,12 @@ function isAlertMatch(alertArea, parsedLocation, alertObj = null) {
     if (isWindAlert) {
       if (normArea === normCounty || normArea === `${normCounty}平地` || normArea === `${normCounty}平地及山區` || normArea === `${normCounty}沿海` || normArea === `${normCounty}沿海地區`) {
         const isCoastalOnly = isCountyCoastalRestricted(normCounty, alertObj.contentText);
+        console.log(`[isAlertMatch] Wind warning check for ${normCounty} ${normTown}: area=${normArea}, isCoastalOnly=${isCoastalOnly}`);
         if (isCoastalOnly) {
           const coastalTowns = TAIWAN_COASTAL_TOWNS[normCounty];
-          return coastalTowns ? coastalTowns.includes(normTown) : false;
+          const isMatched = coastalTowns ? coastalTowns.includes(normTown) : false;
+          console.log(`[isAlertMatch] Coastal restriction check for ${normCounty} ${normTown}: isMatched=${isMatched}`);
+          return isMatched;
         }
       }
     }
@@ -1272,8 +1287,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v13';
-  const cacheTimeKey = 'cwa_weather_cache_time_v13';
+  const cacheKey = 'cwa_weather_cache_v14';
+  const cacheTimeKey = 'cwa_weather_cache_time_v14';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
