@@ -1124,9 +1124,7 @@ function isAlertMatch(alertArea, parsedLocation, alertObj = null) {
         const isCoastalOnly = isCountyCoastalRestricted(normCounty, alertObj.contentText);
         if (isCoastalOnly) {
           const coastalTowns = TAIWAN_COASTAL_TOWNS[normCounty];
-          if (coastalTowns) {
-            return coastalTowns.includes(normTown);
-          }
+          return coastalTowns ? coastalTowns.includes(normTown) : false;
         }
       }
     }
