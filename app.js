@@ -1022,7 +1022,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
   
   // 1. Separate description and county list at the end to avoid matching the pure list
   let descText = normText;
-  const listKeywords = ['影響區域', '警戒區域', '警戒範圍', '詳細地區', '詳細範圍', '影響地區', '警戒地區', '特報縣市', '特報地區', '受影響縣市', '影響範圍', '特報範圍', '發布範圍', '發布縣市', '警戒縣市'];
+  const listKeywords = ['影響區域', '警戒區域', '警戒範圍', '詳細地區', '詳細範圍', '影響地區', '警戒地區', '特報縣市', '特報地區', '受影響縣市', '影響範圍', '特報範圍', '發布範圍', '發布縣市', '警戒縣市', '特報區域'];
   for (const kw of listKeywords) {
     const splitIndex = normText.indexOf(kw);
     if (splitIndex !== -1) {
@@ -1031,7 +1031,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
     }
   }
   
-  const hasCoastalKeywords = descText.includes('沿海') || descText.includes('空曠') || descText.includes('海面');
+  const hasCoastalKeywords = descText.includes('沿海') || descText.includes('空曠') || descText.includes('海面') || descText.includes('局部地區') || descText.includes('局部山區') || descText.includes('局部');
   const hasPlainsKeywords = descText.includes('平地') || descText.includes('全區') || descText.includes('各地') || descText.includes('陸地') || descText.includes('全域') || descText.includes('各鄉鎮');
   
   // If the description contains coastal keywords but absolutely no plain/land keywords,
@@ -1055,7 +1055,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
         return false;
       }
       
-      if (windowText.includes('沿海') || windowText.includes('空曠') || windowText.includes('海面')) {
+      if (windowText.includes('沿海') || windowText.includes('空曠') || windowText.includes('海面') || windowText.includes('局部地區') || windowText.includes('局部')) {
         hasCoastalSpecifier = true;
       }
       index = descText.indexOf(normCounty, index + 1);
