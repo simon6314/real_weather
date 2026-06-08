@@ -1022,7 +1022,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
   
   // 1. Separate description and county list at the end to avoid matching the pure list
   let descText = normText;
-  const listKeywords = ['影響區域', '警戒區域', '警戒範圍', '詳細地區', '詳細範圍', '影響地區', '警戒地區'];
+  const listKeywords = ['影響區域', '警戒區域', '警戒範圍', '詳細地區', '詳細範圍', '影響地區', '警戒地區', '特報縣市', '特報地區', '受影響縣市', '影響範圍', '特報範圍', '發布範圍', '發布縣市', '警戒縣市'];
   for (const kw of listKeywords) {
     const splitIndex = normText.indexOf(kw);
     if (splitIndex !== -1) {
@@ -1031,14 +1031,23 @@ function isCountyCoastalRestricted(countyName, contentText) {
     }
   }
   
+  const hasCoastalKeywords = descText.includes('沿海') || descText.includes('空曠') || descText.includes('海面');
+  const hasPlainsKeywords = descText.includes('平地') || descText.includes('全區') || descText.includes('各地') || descText.includes('陸地') || descText.includes('全域') || descText.includes('各鄉鎮');
+  
+  // If the description contains coastal keywords but absolutely no plain/land keywords,
+  // it is 100% a coastal-only warning for all affected areas.
+  if (hasCoastalKeywords && !hasPlainsKeywords) {
+    return true;
+  }
+  
   // 2. Check if the county name is mentioned in the description
   let index = descText.indexOf(normCounty);
   if (index !== -1) {
     let hasCoastalSpecifier = false;
     while (index !== -1) {
-      // Look at a window of 30 characters before and after the county name
-      const start = Math.max(0, index - 30);
-      const end = Math.min(descText.length, index + normCounty.length + 30);
+      // Look at a wider window of 45 characters before and after the county name to be safe
+      const start = Math.max(0, index - 45);
+      const end = Math.min(descText.length, index + normCounty.length + 45);
       const windowText = descText.substring(start, end);
       
       // If "全區", "各地", "平地" or "陸地" is mentioned near the county, it affects the whole area
@@ -1055,7 +1064,7 @@ function isCountyCoastalRestricted(countyName, contentText) {
   } else {
     // County not explicitly named in the description (covered by regional phrases like "南部沿海地區")
     // Check if the description contains coastal/open area keywords anywhere
-    return descText.includes('沿海') || descText.includes('空曠') || descText.includes('海面');
+    return hasCoastalKeywords;
   }
 }
 
@@ -1118,7 +1127,7 @@ function isAlertMatch(alertArea, parsedLocation, alertObj = null) {
           if (coastalTowns) {
             return coastalTowns.includes(normTown);
           }
-
+        }
       }
     }
     
