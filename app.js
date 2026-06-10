@@ -2935,7 +2935,7 @@ function applyDynamicBackdropTheme(iconType) {
       star.className = 'star-twinkle';
       star.style.left = `${Math.random() * 100}%`;
       star.style.top = `${Math.random() * 28}%`;
-      const size = Math.random() * 2.5 + 1;
+      const size = Math.random() * 3 + 1.5;            // Increased size range: 1.5px to 4.5px for better visibility
       star.style.width = `${size}px`;
       star.style.height = `${size}px`;
       star.style.animationDuration = `${Math.random() * 3 + 2}s`;
@@ -3048,6 +3048,23 @@ function renderAddedRegionsList() {
     
     container.appendChild(card);
   }
+}
+
+// Helper to force browser to repaint SVG <use> elements (fixes invisible icons bug in Safari/Chrome when rendered inside hidden/animating drawers)
+function forceSvgRepaint(container) {
+  if (!container) return;
+  const uses = container.querySelectorAll('use');
+  uses.forEach(use => {
+    const href = use.getAttribute('href') || use.getAttribute('xlink:href');
+    if (href) {
+      use.setAttribute('href', '');
+      use.removeAttribute('xlink:href');
+      if (use.parentNode) {
+        void use.parentNode.getBoundingClientRect();
+      }
+      use.setAttribute('href', href);
+    }
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -3486,6 +3503,9 @@ function openDrawerForecast(identifier) {
     
     // Render Apple style ranges
     renderAppleWeeklyRangeBars(data.weekly);
+    
+    // Force SVG repaint to prevent browser lazy-rendering bug
+    forceSvgRepaint(drawer);
   }, 420); // Delay rendering slightly past slide transition to secure 60fps scrolling
 }
 

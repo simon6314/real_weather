@@ -351,13 +351,13 @@ body {
   position: absolute;
   background: #FFF;
   border-radius: 50%;
-  box-shadow: 0 0 3px #FFF, 0 0 6px rgba(255,255,255,0.7);
+  box-shadow: 0 0 4px 1px #FFF, 0 0 8px 2px rgba(255, 255, 255, 0.9); /* Stronger premium glow halo */
   animation: twinkling ease-in-out infinite;
 }
 
 @keyframes twinkling {
-  0%, 100% { opacity: 0.1; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
+  0%, 100% { opacity: 0.55; transform: scale(0.85); } /* Keep stars visible even during the dim phase */
+  50% { opacity: 1; transform: scale(1.25); }
 }
 
 /* --------------------------------------------------------------------------
