@@ -2925,7 +2925,11 @@ function applyDynamicBackdropTheme(iconType) {
     }
   } else if (isNight) {
     // Starry Stars (restricted to top 28% sky canopy)
-    const starCount = 45;
+    // Reduce star count if it is cloudy or windy (highly realistic!)
+    let starCount = 45;
+    if (iconType === 'cloudy') starCount = 8;        // Very few stars peek through clouds
+    else if (iconType === 'windy') starCount = 20;     // Hazy sky, fewer stars visible
+    
     for (let i = 0; i < starCount; i++) {
       const star = document.createElement('div');
       star.className = 'star-twinkle';
