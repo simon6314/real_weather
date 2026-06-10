@@ -20,9 +20,68 @@
 </head>
 <body>
 
-  <!-- Dynamic Backdrop for Weather Animations -->
-  <div id="dynamic-backdrop" class="backdrop-sunny">
+  <!-- Dynamic Backdrop for Weather Animations (Photorealistic Forest Stream) -->
+  <div id="dynamic-backdrop" class="state-day weather-sunny">
     <div class="sky-glow"></div>
+    
+    <!-- Dynamic Weather Overlay (Sun, Moon, Clouds, Volumetric Fog & Flowing Water Ripple Overlay) -->
+    <svg class="weather-overlay" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="sun-glow">
+          <feGaussianBlur stdDeviation="35" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="moon-glow">
+          <feGaussianBlur stdDeviation="20" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        
+        <!-- Volumetric Fog Gradient -->
+        <linearGradient id="fog-grad-overlay" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--fog-color)" stop-opacity="0" />
+          <stop offset="60%" stop-color="var(--fog-color)" stop-opacity="var(--fog-opacity)" />
+          <stop offset="100%" stop-color="var(--fog-color)" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- Feathered Creek Mask Blur -->
+        <filter id="mask-blur">
+          <feGaussianBlur stdDeviation="8" />
+        </filter>
+
+        <!-- Creek Mask (Clipped to the river path in the photo, white indicates visible, black transparent) -->
+        <mask id="creek-mask">
+          <rect width="100%" height="100%" fill="black" />
+          <!-- Winding river path aligning with typical forest photo layouts -->
+          <path d="M 680 500 Q 640 580 700 660 T 580 780 T 720 900" fill="none" stroke="white" stroke-width="48" stroke-linecap="round" filter="url(#mask-blur)" />
+        </mask>
+
+        <!-- Water Ripple Displacement Filter with SMIL Animation -->
+        <filter id="water-ripple">
+          <feTurbulence type="fractalNoise" baseFrequency="0.015 0.04" numOctaves="2" result="noise">
+            <animate attributeName="baseFrequency" dur="15s" keyTimes="0;0.5;1" values="0.015 0.04; 0.025 0.07; 0.015 0.04" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+
+      <!-- Animated Creek Layer: duplicate of base photo masked & rippled -->
+      <image href="forest_stream_bg.png" width="100%" height="100%" preserveAspectRatio="xMidYMax slice" mask="url(#creek-mask)" filter="url(#water-ripple)" />
+
+      <!-- Sun -->
+      <circle id="scene-sun" cx="1150" cy="220" r="70" fill="var(--sun-color)" filter="url(#sun-glow)" opacity="var(--sun-opacity)" />
+      
+      <!-- Moon -->
+      <path id="scene-moon" fill="var(--moon-color)" filter="url(#moon-glow)" opacity="var(--moon-opacity)" transform="rotate(-15, 1150, 220)" />
+
+      <!-- Cloud Shapes -->
+      <g id="bg-clouds" opacity="var(--bg-clouds-opacity)">
+        <path d="M 150 180 Q 180 150 220 160 Q 250 130 290 150 Q 330 140 350 170 Q 370 180 370 200 L 150 200 Z" fill="rgba(255,255,255,0.2)" class="cloud-drift-1" />
+        <path d="M 750 120 Q 780 90 820 100 Q 850 70 890 90 Q 930 80 950 110 Q 970 120 970 140 L 750 140 Z" fill="rgba(255,255,255,0.15)" class="cloud-drift-2" />
+      </g>
+
+      <!-- Volumetric Fog Overlay (covers both bank and creek) -->
+      <rect width="100%" height="100%" fill="url(#fog-grad-overlay)" />
+    </svg>
     <div class="weather-particles" id="weather-particles"></div>
   </div>
 

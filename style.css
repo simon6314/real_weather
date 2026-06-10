@@ -17,11 +17,11 @@
   --text-muted: #5e6c84;
   
   /* Glassmorphism Tokens */
-  --glass-bg: rgba(13, 20, 35, 0.45);
-  --glass-bg-hover: rgba(18, 27, 47, 0.6);
-  --glass-bg-active: rgba(22, 38, 69, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --glass-bg: rgba(13, 20, 35, 0.15);
+  --glass-bg-hover: rgba(18, 27, 47, 0.25);
+  --glass-bg-active: rgba(22, 38, 69, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.04);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
   --glass-shadow: rgba(0, 0, 0, 0.4);
   --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   
@@ -98,8 +98,26 @@ body {
   height: 100%;
   z-index: -1;
   overflow: hidden;
-  transition: var(--transition-smooth);
-  transition-duration: 2s; /* Super slow, smooth crossfading background colors */
+  background-image: url('forest_stream_bg.png');
+  background-size: cover;
+  background-position: center bottom;
+  transition: all 2.5s ease-in-out;
+}
+
+/* Multiplied color tint layer for realistic lighting changes on the forest photo */
+#dynamic-backdrop::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: multiply;
+  background: var(--image-tint, transparent);
+  opacity: var(--image-tint-opacity, 0);
+  transition: all 2.5s ease-in-out;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .sky-glow {
@@ -111,24 +129,160 @@ body {
   opacity: 0.85;
 }
 
-/* Backdrop Themes */
-.backdrop-sunny {
-  background: radial-gradient(circle at 75% 20%, rgba(255, 168, 0, 0.25) 0%, rgba(8, 18, 38, 1) 70%);
+/* Weather SVG Overlay Styling */
+.weather-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2; /* Sits on top of the image and tint layer */
+  pointer-events: none;
 }
-.backdrop-cloudy {
-  background: radial-gradient(circle at 75% 20%, rgba(138, 162, 190, 0.18) 0%, rgba(6, 12, 22, 1) 70%);
+
+/* Transitions for dynamic crossfading SVG overlay colors and opacities */
+#dynamic-backdrop svg *,
+#dynamic-backdrop * {
+  transition: fill 2.5s cubic-bezier(0.16, 1, 0.3, 1), 
+              stroke 2.5s cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 2.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.backdrop-rainy {
-  background: radial-gradient(circle at 75% 20%, rgba(35, 78, 158, 0.22) 0%, rgba(4, 8, 16, 1) 70%);
+
+/* Cloud drifting animations in the backdrop */
+.cloud-drift-1 {
+  animation: cloud-drift-slow 60s linear infinite alternate;
 }
-.backdrop-thunder {
-  background: radial-gradient(circle at 75% 20%, rgba(110, 35, 158, 0.22) 0%, rgba(3, 5, 12, 1) 70%);
+
+.cloud-drift-2 {
+  animation: cloud-drift-slow 85s linear infinite alternate-reverse;
 }
-.backdrop-windy {
-  background: radial-gradient(circle at 75% 20%, rgba(0, 191, 165, 0.18) 0%, rgba(5, 15, 25, 1) 70%);
+
+@keyframes cloud-drift-slow {
+  0% {
+    transform: translateX(-50px);
+  }
+  100% {
+    transform: translateX(100px);
+  }
 }
-.backdrop-night {
-  background: radial-gradient(circle at 75% 20%, rgba(98, 0, 234, 0.15) 0%, rgba(4, 6, 12, 1) 70%);
+
+/* --------------------------------------------------------------------------
+   Backdrop Weather-Day-Night Combinations & Palettes
+   -------------------------------------------------------------------------- */
+
+/* Default / Sunny Day */
+#dynamic-backdrop.state-day.weather-sunny {
+  --image-tint: transparent;
+  --image-tint-opacity: 0;
+  --sun-color: #ffe082;
+  --sun-opacity: 0.8;
+  --moon-color: #fff;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.2;
+  --fog-color: #e3effa;
+  --fog-opacity: 0.15;
+}
+
+/* Clear Night */
+#dynamic-backdrop.state-night.weather-sunny,
+#dynamic-backdrop.state-night {
+  --image-tint: linear-gradient(to bottom, #06091d, #03040a);
+  --image-tint-opacity: 0.65;
+  --sun-opacity: 0;
+  --moon-color: #e0f7fa;
+  --moon-opacity: 0.85;
+  --bg-clouds-opacity: 0.05;
+  --fog-color: #050814;
+  --fog-opacity: 0.15;
+}
+
+/* Cloudy Day */
+#dynamic-backdrop.state-day.weather-cloudy {
+  --image-tint: #cbd6df;
+  --image-tint-opacity: 0.25;
+  --sun-color: #fffde7;
+  --sun-opacity: 0.35;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.75;
+  --fog-color: #c0cedb;
+  --fog-opacity: 0.45;
+}
+
+/* Cloudy Night */
+#dynamic-backdrop.state-night.weather-cloudy {
+  --image-tint: linear-gradient(to bottom, #050814, #020306);
+  --image-tint-opacity: 0.75;
+  --sun-opacity: 0;
+  --moon-color: #e0f7fa;
+  --moon-opacity: 0.15;
+  --bg-clouds-opacity: 0.6;
+  --fog-color: #0b0f1a;
+  --fog-opacity: 0.45;
+}
+
+/* Rainy Day */
+#dynamic-backdrop.state-day.weather-rainy {
+  --image-tint: #5c6b73;
+  --image-tint-opacity: 0.45;
+  --sun-opacity: 0;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.8;
+  --fog-color: #6a767d;
+  --fog-opacity: 0.65;
+}
+
+/* Rainy Night */
+#dynamic-backdrop.state-night.weather-rainy {
+  --image-tint: linear-gradient(to bottom, #030408, #010204);
+  --image-tint-opacity: 0.8;
+  --sun-opacity: 0;
+  --moon-color: #e0f7fa;
+  --moon-opacity: 0.05;
+  --bg-clouds-opacity: 0.8;
+  --fog-color: #05060b;
+  --fog-opacity: 0.6;
+}
+
+/* Thunderstorm */
+#dynamic-backdrop.weather-thunder {
+  --sun-opacity: 0;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.95;
+  --fog-color: #293136;
+}
+#dynamic-backdrop.state-day.weather-thunder {
+  --image-tint: #37474f;
+  --image-tint-opacity: 0.6;
+  --fog-opacity: 0.8;
+}
+#dynamic-backdrop.state-night.weather-thunder {
+  --image-tint: linear-gradient(to bottom, #010204, #000);
+  --image-tint-opacity: 0.9;
+  --fog-opacity: 0.8;
+}
+
+/* Windy Day */
+#dynamic-backdrop.state-day.weather-windy {
+  --image-tint: #6bbbc6;
+  --image-tint-opacity: 0.15;
+  --sun-color: #ffe082;
+  --sun-opacity: 0.65;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.45;
+  --fog-color: #a4dbd4;
+  --fog-opacity: 0.25;
+}
+
+/* Windy Night */
+#dynamic-backdrop.state-night.weather-windy {
+  --image-tint: linear-gradient(to bottom, #011215, #000);
+  --image-tint-opacity: 0.7;
+  --sun-opacity: 0;
+  --moon-color: #e0f7fa;
+  --moon-opacity: 0.65;
+  --bg-clouds-opacity: 0.35;
+  --fog-color: #03181a;
+  --fog-opacity: 0.25;
 }
 
 /* Falling Weather Particles Overlay */
@@ -161,6 +315,7 @@ body {
   position: absolute;
   background: #FFF;
   border-radius: 50%;
+  box-shadow: 0 0 3px #FFF, 0 0 6px rgba(255,255,255,0.7);
   animation: twinkling ease-in-out infinite;
 }
 
@@ -175,8 +330,8 @@ body {
 .glass-panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-glow-shadow);
   transition: var(--transition-smooth);

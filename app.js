@@ -2754,21 +2754,71 @@ function renderApparentTempPerson(apparentTemp) {
 }
 
 
+// Calculate the astronomically accurate moon phase path (centered at cx=1150, cy=220, r=40)
+function getMoonPhasePath(date) {
+  // Reference new moon: Jan 6, 2000 UTC
+  const refNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+  const elapsedMs = date.getTime() - refNewMoon.getTime();
+  const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+  const cycle = 29.530588853;
+  const age = ((elapsedDays % cycle) + cycle) % cycle;
+  
+  const phase = age / cycle; // 0.0 to 1.0
+  
+  const cx = 1150;
+  const cy = 220;
+  const r = 40;
+  
+  if (phase < 0.03 || phase > 0.97) {
+    // New Moon: fully dark/hidden
+    return "";
+  }
+  
+  // rx represents the width of the shadow-bounding inner arc
+  const rx = Math.abs(r - 2 * r * (phase % 0.5) / 0.5);
+  
+  if (phase > 0 && phase < 0.25) {
+    // Waxing Crescent: Right side illuminated, crescent shape
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} A ${rx} ${r} 0 0 0 ${cx} ${cy - r} Z`;
+  } else if (phase >= 0.25 && phase < 0.5) {
+    // Waxing Gibbous: Right side illuminated, gibbous shape
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} A ${rx} ${r} 0 0 1 ${cx} ${cy - r} Z`;
+  } else if (phase >= 0.5 && phase < 0.75) {
+    // Waning Gibbous: Left side illuminated, gibbous shape
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} A ${rx} ${r} 0 0 0 ${cx} ${cy - r} Z`;
+  } else {
+    // Waning Crescent: Left side illuminated, crescent shape
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} A ${rx} ${r} 0 0 1 ${cx} ${cy - r} Z`;
+  }
+}
+
+
 // Map active icon to background styles and trigger custom screen particles!
 function applyDynamicBackdropTheme(iconType) {
   const backdrop = document.getElementById('dynamic-backdrop');
   backdrop.className = ''; // Wipe old classes
   
-  let backdropClass = 'backdrop-sunny';
-  if (iconType === 'sunny') backdropClass = 'backdrop-sunny';
-  else if (iconType === 'sunny-cloudy') backdropClass = 'backdrop-sunny';
-  else if (iconType === 'cloudy') backdropClass = 'backdrop-cloudy';
-  else if (iconType === 'rainy') backdropClass = 'backdrop-rainy';
-  else if (iconType === 'thunderstorm') backdropClass = 'backdrop-thunder';
-  else if (iconType === 'windy') backdropClass = 'backdrop-windy';
-  else if (iconType === 'night') backdropClass = 'backdrop-night';
+  const isNight = isNightTime(AppState.currentLocationCounty, new Date());
+  backdrop.classList.add(isNight ? 'state-night' : 'state-day');
   
-  backdrop.classList.add(backdropClass);
+  let weatherClass = 'weather-sunny';
+  if (iconType === 'sunny' || iconType === 'sunny-cloudy') weatherClass = 'weather-sunny';
+  else if (iconType === 'cloudy') weatherClass = 'weather-cloudy';
+  else if (iconType === 'rainy') weatherClass = 'weather-rainy';
+  else if (iconType === 'thunderstorm') weatherClass = 'weather-thunder';
+  else if (iconType === 'windy') weatherClass = 'weather-windy';
+  else if (iconType === 'night') {
+    weatherClass = 'weather-sunny'; // Clear night is clear weather
+  }
+  
+  backdrop.classList.add(weatherClass);
+
+  // Update dynamic moon phase path if it is night time
+  const moonEl = document.getElementById('scene-moon');
+  if (moonEl) {
+    const moonPath = getMoonPhasePath(new Date());
+    moonEl.setAttribute('d', moonPath);
+  }
   
   // Spawn background particle systems (rain or stars!)
   const particlesContainer = document.getElementById('weather-particles');
@@ -2787,14 +2837,14 @@ function applyDynamicBackdropTheme(iconType) {
       drop.style.animationDelay = `${Math.random() * 2}s`;
       particlesContainer.appendChild(drop);
     }
-  } else if (iconType === 'night' || (iconType === 'sunny' && isNightTime(AppState.currentLocationCounty, new Date()))) {
-    // Starry Stars
-    const starCount = 35;
+  } else if (isNight) {
+    // Starry Stars (restricted to top 28% sky canopy)
+    const starCount = 45;
     for (let i = 0; i < starCount; i++) {
       const star = document.createElement('div');
       star.className = 'star-twinkle';
       star.style.left = `${Math.random() * 100}%`;
-      star.style.top = `${Math.random() * 70}%`;
+      star.style.top = `${Math.random() * 28}%`;
       const size = Math.random() * 2.5 + 1;
       star.style.width = `${size}px`;
       star.style.height = `${size}px`;
