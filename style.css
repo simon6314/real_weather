@@ -187,8 +187,8 @@ body {
 /* Clear Night */
 #dynamic-backdrop.state-night.weather-sunny,
 #dynamic-backdrop.state-night {
-  --image-tint: linear-gradient(to bottom, #020205, #000000);
-  --image-tint-opacity: 0.88;
+  --image-tint: linear-gradient(to bottom, #030508 0%, #151e30 40%, #506585 100%);
+  --image-tint-opacity: 0.85;
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.85;
@@ -211,8 +211,8 @@ body {
 
 /* Cloudy Night */
 #dynamic-backdrop.state-night.weather-cloudy {
-  --image-tint: linear-gradient(to bottom, #010103, #000000);
-  --image-tint-opacity: 0.92;
+  --image-tint: linear-gradient(to bottom, #020406 0%, #101622 45%, #3e4d63 100%);
+  --image-tint-opacity: 0.88;
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.15;
@@ -234,8 +234,8 @@ body {
 
 /* Rainy Night */
 #dynamic-backdrop.state-night.weather-rainy {
-  --image-tint: linear-gradient(to bottom, #000000, #000000);
-  --image-tint-opacity: 0.94;
+  --image-tint: linear-gradient(to bottom, #010203 0%, #0c1018 50%, #2b3542 100%);
+  --image-tint-opacity: 0.90;
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.05;
@@ -257,8 +257,8 @@ body {
   --fog-opacity: 0.8;
 }
 #dynamic-backdrop.state-night.weather-thunder {
-  --image-tint: linear-gradient(to bottom, #000000, #000);
-  --image-tint-opacity: 0.96;
+  --image-tint: linear-gradient(to bottom, #000000 0%, #080c10 50%, #202832 100%);
+  --image-tint-opacity: 0.92;
   --fog-color: #0a0c0e;
   --fog-opacity: 0.8;
 }
@@ -277,8 +277,8 @@ body {
 
 /* Windy Night */
 #dynamic-backdrop.state-night.weather-windy {
-  --image-tint: linear-gradient(to bottom, #010204, #000000);
-  --image-tint-opacity: 0.88;
+  --image-tint: linear-gradient(to bottom, #020406 0%, #121c2c 40%, #4a6080 100%);
+  --image-tint-opacity: 0.85;
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.65;
