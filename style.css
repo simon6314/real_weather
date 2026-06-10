@@ -262,6 +262,27 @@ body {
   --fog-opacity: 0.8;
 }
 
+/* Dynamic screen-wide lightning flash overlay for thunderstorm backdrop */
+#dynamic-backdrop.weather-thunder::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #FFF;
+  opacity: 0;
+  z-index: 0; /* Placed behind the tint overlay, directly on top of the forest photo */
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  animation: bg-lightning-flash 6s ease-out infinite;
+}
+
+@keyframes bg-lightning-flash {
+  0%, 92%, 94%, 96%, 100% { opacity: 0; }
+  93%, 95% { opacity: 0.35; }
+}
+
 /* Windy Day */
 #dynamic-backdrop.state-day.weather-windy {
   --image-tint: #6bbbc6;
