@@ -158,6 +158,9 @@ function initClock() {
     const mi = pad(now.getMinutes());
     const ss = pad(now.getSeconds());
     clockEl.textContent = `${yyyy}/${mm}/${dd} ${hh}:${mi}:${ss}`;
+    
+    // Smoothly update astronomical positions of sun and moon in real-time
+    updateAstronomyPositions();
   };
   updateClock();
   setInterval(updateClock, 1000);
@@ -2754,8 +2757,8 @@ function renderApparentTempPerson(apparentTemp) {
 }
 
 
-// Calculate the astronomically accurate moon phase path (centered at cx=1150, cy=220, r=40)
-function getMoonPhasePath(date) {
+// Calculate the astronomically accurate moon phase path (centered at cx, cy, r=40)
+function getMoonPhasePath(date, cx = 1150, cy = 220) {
   // Reference new moon: Jan 6, 2000 UTC
   const refNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
   const elapsedMs = date.getTime() - refNewMoon.getTime();
@@ -2764,9 +2767,6 @@ function getMoonPhasePath(date) {
   const age = ((elapsedDays % cycle) + cycle) % cycle;
   
   const phase = age / cycle; // 0.0 to 1.0
-  
-  const cx = 1150;
-  const cy = 220;
   const r = 40;
   
   if (phase < 0.03 || phase > 0.97) {
@@ -2793,6 +2793,96 @@ function getMoonPhasePath(date) {
 }
 
 
+// Calculates the mathematically accurate sunrise and sunset times for Taiwan (approx 23.5 deg N)
+function getTaiwanSunriseSunset(date) {
+  const startOfYear = new Date(date.getFullYear(), 0, 1);
+  const diff = date - startOfYear;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const N = Math.floor(diff / oneDay) + 1; // Day of the year (1-365)
+
+  // Solar declination (approximate in radians)
+  const delta = 0.409 * Math.sin((2 * Math.PI / 365) * (N - 80));
+  
+  // Latitude of Taiwan (approx 23.5 degrees N in radians)
+  const phi = 23.5 * Math.PI / 180;
+  
+  // Hour angle
+  const cosH = -Math.tan(phi) * Math.tan(delta);
+  const clampedCosH = Math.max(-1, Math.min(1, cosH));
+  const H = Math.acos(clampedCosH);
+  
+  const dayLength = (24 / Math.PI) * H;
+  
+  // Time correction for Taiwan (longitude approx 121.5° E, timezone UTC+8)
+  const timeCorrection = -0.1; 
+  
+  const sunrise = 12.0 - dayLength / 2 + timeCorrection;
+  const sunset = 12.0 + dayLength / 2 + timeCorrection;
+  
+  return { sunrise, sunset };
+}
+
+
+// Dynamically updates the real-time altitude/azimuth of Sun and Moon in the sky
+function updateAstronomyPositions() {
+  const sunEl = document.getElementById('scene-sun');
+  const moonEl = document.getElementById('scene-moon');
+  if (!sunEl && !moonEl) return;
+
+  const now = new Date();
+  // Calculate hour of day in decimal (0.0 to 24.0)
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+
+  // 1. Sun Elevation Path (Calculated dynamically based on Taiwan's latitude and season)
+  const { sunrise, sunset } = getTaiwanSunriseSunset(now);
+  const dayLength = sunset - sunrise;
+
+  if (hours >= sunrise && hours <= sunset) {
+    const t = (hours - sunrise) / dayLength; // 0 to 1
+    const cx = 150 + t * 1140; // Span horizontally across SVG
+    const cy = 380 - Math.sin(Math.PI * t) * 260; // Curve upwards
+    if (sunEl) {
+      sunEl.setAttribute('cx', cx);
+      sunEl.setAttribute('cy', cy);
+      sunEl.style.opacity = ''; // Fallback to CSS opacity
+    }
+  } else {
+    if (sunEl) {
+      sunEl.style.opacity = '0'; // Hide below horizon
+    }
+  }
+
+  // 2. Moon Elevation Path (Rises based on lunar phase cycle, visible for 12 hours)
+  const refNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+  const elapsedMs = now.getTime() - refNewMoon.getTime();
+  const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+  const cycle = 29.530588853;
+  const age = ((elapsedDays % cycle) + cycle) % cycle;
+  const phase = age / cycle;
+
+  // Moonrise shifts 50m later every day, calculated from the current phase:
+  const moonrise = (6 + phase * 24) % 24;
+  const hoursSinceRise = (hours - moonrise + 24) % 24;
+  const isMoonVisible = hoursSinceRise < 12;
+
+  if (isMoonVisible) {
+    const t = hoursSinceRise / 12; // 0 to 1
+    const cx = 150 + t * 1140; // Span horizontally
+    const cy = 380 - Math.sin(Math.PI * t) * 260; // Curve upwards
+    if (moonEl) {
+      const moonPath = getMoonPhasePath(now, cx, cy);
+      moonEl.setAttribute('d', moonPath);
+      moonEl.setAttribute('transform', `rotate(-15, ${cx}, ${cy})`);
+      moonEl.style.opacity = ''; // Fallback to CSS opacity
+    }
+  } else {
+    if (moonEl) {
+      moonEl.style.opacity = '0'; // Hide below horizon
+    }
+  }
+}
+
+
 // Map active icon to background styles and trigger custom screen particles!
 function applyDynamicBackdropTheme(iconType) {
   const backdrop = document.getElementById('dynamic-backdrop');
@@ -2813,12 +2903,8 @@ function applyDynamicBackdropTheme(iconType) {
   
   backdrop.classList.add(weatherClass);
 
-  // Update dynamic moon phase path if it is night time
-  const moonEl = document.getElementById('scene-moon');
-  if (moonEl) {
-    const moonPath = getMoonPhasePath(new Date());
-    moonEl.setAttribute('d', moonPath);
-  }
+  // Position Sun & Moon immediately
+  updateAstronomyPositions();
   
   // Spawn background particle systems (rain or stars!)
   const particlesContainer = document.getElementById('weather-particles');
