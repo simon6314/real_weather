@@ -16,7 +16,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=34">
+  <link rel="stylesheet" href="style.css?v=35">
 </head>
 <body>
 
@@ -43,29 +43,7 @@
           <stop offset="100%" stop-color="var(--fog-color)" stop-opacity="0" />
         </linearGradient>
 
-        <!-- Feathered Creek Mask Blur -->
-        <filter id="mask-blur">
-          <feGaussianBlur stdDeviation="8" />
-        </filter>
-
-        <!-- Creek Mask (Clipped to the river path in the photo, white indicates visible, black transparent) -->
-        <mask id="creek-mask">
-          <rect width="100%" height="100%" fill="black" />
-          <!-- Winding river path aligning with typical forest photo layouts -->
-          <path d="M 680 500 Q 640 580 700 660 T 580 780 T 720 900" fill="none" stroke="white" stroke-width="48" stroke-linecap="round" filter="url(#mask-blur)" />
-        </mask>
-
-        <!-- Water Ripple Displacement Filter with SMIL Animation -->
-        <filter id="water-ripple">
-          <feTurbulence type="fractalNoise" baseFrequency="0.015 0.04" numOctaves="2" result="noise">
-            <animate attributeName="baseFrequency" dur="15s" keyTimes="0;0.5;1" values="0.015 0.04; 0.025 0.07; 0.015 0.04" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
       </defs>
-
-      <!-- Animated Creek Layer: duplicate of base photo masked & rippled -->
-      <image href="forest_stream_bg.png" width="100%" height="100%" preserveAspectRatio="xMidYMax slice" mask="url(#creek-mask)" filter="url(#water-ripple)" />
 
       <!-- Sun -->
       <circle id="scene-sun" cx="1150" cy="220" r="70" fill="var(--sun-color)" filter="url(#sun-glow)" opacity="var(--sun-opacity)" />
@@ -735,6 +713,6 @@
   </svg>
 
   <!-- JavaScript Application -->
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>
