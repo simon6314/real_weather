@@ -2912,15 +2912,15 @@ function applyDynamicBackdropTheme(iconType) {
   
   if (iconType === 'rainy' || iconType === 'thunderstorm') {
     // Rain Particles
-    const dropCount = 45;
+    const dropCount = 95;
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
       drop.className = 'raindrop';
       drop.style.left = `${Math.random() * 100}%`;
-      drop.style.top = `${Math.random() * -50}px`;
-      drop.style.height = `${Math.random() * 20 + 20}px`;
-      drop.style.animationDuration = `${Math.random() * 0.6 + 0.5}s`;
-      drop.style.animationDelay = `${Math.random() * 2}s`;
+      drop.style.top = `${Math.random() * -80}px`;
+      drop.style.height = `${Math.random() * 30 + 45}px`;
+      drop.style.animationDuration = `${Math.random() * 0.4 + 0.4}s`;
+      drop.style.animationDelay = `${Math.random() * 1.5}s`;
       particlesContainer.appendChild(drop);
     }
   } else if (isNight) {
