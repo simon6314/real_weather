@@ -123,7 +123,27 @@ if (!localStorage.getItem('cwa_api_key')) {
 // --------------------------------------------------------------------------
 // 3. UI Selectors & Event Binding
 // --------------------------------------------------------------------------
+// Fix backdrop height on mobile to prevent scaling/shaking when mobile browser address bar collapses/expands
+function fixBackdropHeight() {
+  const backdrop = document.getElementById('dynamic-backdrop');
+  if (!backdrop) return;
+  
+  // Set height to absolute window.innerHeight to prevent percent-based resizing
+  backdrop.style.height = `${window.innerHeight}px`;
+  
+  // Keep track of window width. Only update height on resize if width changes
+  // (means device orientation changed, rather than scroll-induced address bar collapse)
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth !== lastWidth) {
+      lastWidth = window.innerWidth;
+      backdrop.style.height = `${window.innerHeight}px`;
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  fixBackdropHeight();
   initClock();
   initSettings();
   initNavigation();
