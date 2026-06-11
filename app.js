@@ -1515,6 +1515,31 @@ async function loadWeatherDashboard() {
     // Render views from active state
     renderMainLocationWeather();
     renderAddedRegionsList();
+    
+    // Auto-update the detailed drawer if it is currently open
+    updateActiveDrawerIfOpen();
+  }
+}
+
+async function updateActiveDrawerIfOpen() {
+  const drawer = document.getElementById('details-drawer');
+  if (drawer && drawer.classList.contains('active') && AppState.activeRegionDetailed) {
+    const activeId = AppState.activeRegionDetailed;
+    console.log(`Detailed drawer is active for ${activeId}. Fetching fresh region data for drawer update...`);
+    
+    // Force a fresh fetch of the township forecast
+    await loadWeatherForRegion(activeId, true);
+    
+    const data = AppState.allCountiesWeatherData[activeId];
+    if (data && !data.error && data.current) {
+      console.log(`Auto re-rendering detailed drawer for ${activeId} with fresh data...`);
+      document.getElementById('drawer-current-desc').textContent = `${data.current.desc} • 現在溫度 ${Number(data.current.temp).toFixed(1)}°C`;
+      document.getElementById('drawer-hero-icon').innerHTML = getAnimatedSvgCode(data.current.icon, 64, 64);
+      
+      // Re-draw chart and weekly items
+      drawHourlySvgChart(data.hourly);
+      renderAppleWeeklyRangeBars(data.weekly);
+    }
   }
 }
 
@@ -4173,18 +4198,20 @@ function initSearchIndex() {
   }
 }
 
-async function loadWeatherForRegion(id) {
-  // Validate that the region has valid weather data loaded in memory (not error, not NaN/undefined temperature)
-  const existingData = AppState.allCountiesWeatherData[id];
-  const isInMemoryValid = existingData && 
-                          !existingData.error && 
-                          existingData.current && 
-                          existingData.current.temp !== undefined && 
-                          existingData.current.temp !== null && 
-                          !isNaN(existingData.current.temp) && 
-                          existingData.current.desc !== undefined;
-  
-  if (isInMemoryValid) return; // Already loaded successfully and valid!
+async function loadWeatherForRegion(id, force = false) {
+  if (!force) {
+    // Validate that the region has valid weather data loaded in memory (not error, not NaN/undefined temperature)
+    const existingData = AppState.allCountiesWeatherData[id];
+    const isInMemoryValid = existingData && 
+                            !existingData.error && 
+                            existingData.current && 
+                            existingData.current.temp !== undefined && 
+                            existingData.current.temp !== null && 
+                            !isNaN(existingData.current.temp) && 
+                            existingData.current.desc !== undefined;
+    
+    if (isInMemoryValid) return; // Already loaded successfully and valid!
+  }
   
   const parsed = parseIdentifier(id);
   
@@ -4201,7 +4228,7 @@ async function loadWeatherForRegion(id) {
   const townCacheKey = `cwa_town_cache_v12_${parsed.county}`;
   const cachedTownStr = localStorage.getItem(townCacheKey);
   let hasLoadedCachedTown = false;
-  if (cachedTownStr) {
+  if (!force && cachedTownStr) {
     try {
       const parsedTowns = JSON.parse(cachedTownStr);
       const townData = parsedTowns[id];
@@ -4220,7 +4247,7 @@ async function loadWeatherForRegion(id) {
   }
 
   try {
-    const success = await fetchCwaTownshipData(parsed.county);
+    const success = await fetchCwaTownshipData(parsed.county, force);
     if (success) {
       updateDataBadge('即時氣象署資料', 'live');
       if (AppState.allCountiesWeatherData[id] && AppState.allCountiesWeatherData[id].error) {
@@ -4243,7 +4270,7 @@ async function loadWeatherForRegion(id) {
   }
 }
 
-async function fetchCwaTownshipData(countyName) {
+async function fetchCwaTownshipData(countyName, force = false) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
@@ -4253,7 +4280,7 @@ async function fetchCwaTownshipData(countyName) {
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
   
-  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
+  if (!force && !shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
     try {
       const parsedTowns = JSON.parse(cachedDataStr);
       
