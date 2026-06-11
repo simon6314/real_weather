@@ -1872,21 +1872,23 @@ body {
 
 /* Cloudy Animations */
 .anim-cloud-drift-front {
-  animation: cloud-drift-f 4.5s ease-in-out infinite alternate;
+  transform-origin: 22px 30px;
+  animation: cloud-drift-f 2.5s ease-in-out infinite alternate; /* Speed up cycle slightly */
 }
 
 .anim-cloud-drift-back {
-  animation: cloud-drift-b 6s ease-in-out infinite alternate;
+  transform-origin: 32px 28px;
+  animation: cloud-drift-b 3.5s ease-in-out infinite alternate; /* Speed up cycle slightly */
 }
 
 @keyframes cloud-drift-f {
-  from { transform: translate(0, 0); }
-  to { transform: translate(3px, 1px); }
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate(9px, 3px) scale(1.08) rotate(1.5deg); } /* Large displacement, breathing scaling, and rotating */
 }
 
 @keyframes cloud-drift-b {
-  from { transform: translate(0, 0); }
-  to { transform: translate(-3px, -1px); }
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate(-9px, -3px) scale(0.92) rotate(-1.5deg); } /* Counter drift, shrinking, and reverse rotating */
 }
 
 /* Rainy Animations */
