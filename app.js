@@ -3489,7 +3489,7 @@ function drawHourlySvgChart(hourlyData) {
   
   // Start building SVG string
   let svgCode = `
-    <svg width="100%" height="100%" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="680" height="200" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <!-- Dynamic Temperature Gradient based on absolute values -->
         <linearGradient id="temp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -3671,6 +3671,24 @@ function initDetailsDrawer() {
   
   closeBtn.addEventListener('click', closeDrawer);
   overlay.addEventListener('click', closeDrawer);
+
+  // iOS WebKit scroll repaint fix: force compositing updates on scroll to prevent disappearing elements
+  const drawerBody = drawer.querySelector('.drawer-body');
+  const chartOuter = drawer.querySelector('.chart-outer-container');
+  
+  if (drawerBody) {
+    drawerBody.addEventListener('scroll', () => {
+      // Toggle a subpixel translateZ on the container to force WebKit layer re-rasterization
+      drawerBody.style.transform = drawerBody.style.transform === 'translateZ(0px)' ? 'translateZ(0.1px)' : 'translateZ(0px)';
+    }, { passive: true });
+  }
+  
+  if (chartOuter) {
+    chartOuter.addEventListener('scroll', () => {
+      // Toggle a subpixel translateZ on horizontal scroll container to keep SVGs repainting properly
+      chartOuter.style.transform = chartOuter.style.transform === 'translateZ(0px)' ? 'translateZ(0.1px)' : 'translateZ(0px)';
+    }, { passive: true });
+  }
 }
 
 function openDrawerForecast(identifier) {
@@ -3942,8 +3960,8 @@ function openDrawerForecast(identifier) {
     }
   };
   
-  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 650ms to ensure animation finishes and GPU settles down)
-  setTimeout(renderDrawerContent, 650);
+  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 1500ms to ensure animation finishes and GPU settles down)
+  setTimeout(renderDrawerContent, 1500);
 }
 
 // --------------------------------------------------------------------------
