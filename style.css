@@ -368,7 +368,7 @@ body {
   position: absolute;
   background: #FFF;
   border-radius: 50%;
-  box-shadow: 0 0 4px 1px #FFF, 0 0 8px 2px rgba(255, 255, 255, 0.9); /* Stronger premium glow halo */
+  box-shadow: 0 0 3px 0.5px rgba(255, 255, 255, 0.8); /* Reduced glow to make stars look sharper and less blurry */
   animation: twinkling ease-in-out infinite;
 }
 
