@@ -222,14 +222,14 @@ body {
 
 /* Cloudy Day */
 #dynamic-backdrop.state-day.weather-cloudy {
-  --image-tint: #cbd6df;
-  --image-tint-opacity: 0.25;
+  --image-tint: #aab9c5; /* Slightly deeper cold gray-blue for realistic overcast skies */
+  --image-tint-opacity: 0.38; /* Darken the background slightly to resemble a gloomy day */
   --sun-color: #fffde7;
-  --sun-opacity: 0.35;
+  --sun-opacity: 0; /* Hide the sun completely on cloudy days as the thick cloud cover blocks it */
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.75;
-  --fog-color: #c0cedb;
-  --fog-opacity: 0.45;
+  --bg-clouds-opacity: 0.85; /* Make background cloud shapes more distinct */
+  --fog-color: #b2c1ce;
+  --fog-opacity: 0.5; /* Increase cloudiness/mistiness in the air */
 }
 
 /* Cloudy Night */
