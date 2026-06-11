@@ -4,13 +4,14 @@
   style.textContent = `
     @media (max-width: 768px) {
       .details-drawer {
-        background: #080b11 !important; /* Solid background to eliminate alpha compositing overhead */
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        background: rgba(8, 11, 17, 0.6) !important; /* Smoked glass transparent background */
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
       }
       .drawer-overlay.active {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
+        background: rgba(3, 5, 10, 0.4) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
       }
       .weekly-item:hover {
         transform: none !important; /* Disable scale scale-up on mobile touch */
@@ -3964,8 +3965,8 @@ function openDrawerForecast(identifier) {
     }
   };
   
-  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 1500ms to ensure animation finishes and GPU settles down)
-  setTimeout(renderDrawerContent, 1500);
+  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 400ms to match slide animation)
+  setTimeout(renderDrawerContent, 400);
 }
 
 // --------------------------------------------------------------------------

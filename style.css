@@ -1297,14 +1297,14 @@ body {
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
   .details-drawer {
     width: 100%;
-    background: #080b11 !important; /* Solid application background to eliminate alpha compositor overhead */
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+    background: rgba(8, 11, 17, 0.6) !important; /* Premium smoked glass background */
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
   }
   .drawer-overlay.active {
-    background: rgba(3, 5, 10, 0.05) !important; /* Extremely transparent overlay on mobile to prevent color bleed */
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+    background: rgba(3, 5, 10, 0.4) !important; /* Glassmorphism blurred overlay */
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
   }
 }
 
