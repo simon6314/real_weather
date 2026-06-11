@@ -18,6 +18,12 @@
       body.drawer-open .weather-particles {
         display: none !important; /* Completely hide background animations when drawer is open */
       }
+      /* Disable weather icon animations only inside the details drawer on mobile to prevent scroll lag */
+      #details-drawer .weather-icon-animated * {
+        animation: none !important;
+        transform: none !important;
+        transition: none !important;
+      }
     }
   `;
   document.head.appendChild(style);
