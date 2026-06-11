@@ -1293,9 +1293,9 @@ body {
 @media (max-width: 600px) {
   .details-drawer {
     width: 100%;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    background: rgba(8, 11, 17, 0.78) !important; /* Premium dark glassmorphism background for optimal readability and stunning visual look */
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    background: rgba(8, 11, 17, 0.58) !important; /* Lighter glassmorphism opacity (58%) for a more transparent premium visual look */
   }
 }
 
