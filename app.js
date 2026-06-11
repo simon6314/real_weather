@@ -3163,14 +3163,23 @@ function drawHourlySvgChart(hourlyData) {
   const paddingX = 40;
   const paddingY = 40;
   
+  // Defensive check: Parse and secure numerical temperatures to prevent NaN propagation
+  const validData = data.map(d => {
+    const tempNum = parseFloat(d.temp);
+    return {
+      ...d,
+      temp: isNaN(tempNum) ? 25.0 : tempNum // Fallback to 25.0 if temperature is invalid (e.g. '--')
+    };
+  });
+  
   // Find min/max temp to map y coordinates
-  const temps = data.map(d => d.temp);
+  const temps = validData.map(d => d.temp);
   const minTemp = Math.min(...temps) - 1.5;
   const maxTemp = Math.max(...temps) + 1.5;
-  const tempDiff = maxTemp - minTemp;
+  const tempDiff = (maxTemp - minTemp) || 1.0; // Prevent division by zero
   
   // Map x, y point values
-  const points = data.map((d, i) => {
+  const points = validData.map((d, i) => {
     const x = paddingX + (i * (svgWidth - paddingX * 2) / (size - 1));
     const y = svgHeight - paddingY - ((d.temp - minTemp) / tempDiff) * (svgHeight - paddingY * 2);
     return { x, y, temp: d.temp, time: d.displayTime, icon: d.icon, rainProb: d.rainProb };
@@ -3201,8 +3210,8 @@ function drawHourlySvgChart(hourlyData) {
           <stop offset="100%" stop-color="${colorMin}" stop-opacity="0.0" />
         </linearGradient>
         
-        <!-- Premium dark drop shadow filter for high contrast path rendering -->
-        <filter id="glow-shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <!-- Premium dark drop shadow filter for high contrast path rendering (unique ID to prevent collisions) -->
+        <filter id="chart-line-shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
         </filter>
       </defs>
@@ -3235,7 +3244,7 @@ function drawHourlySvgChart(hourlyData) {
     pathD += `C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p2.x} ${p2.y} `;
   }
   
-  svgCode += `<path d="${pathD}" class="chart-line" style="stroke: url(#temp-line-gradient);" filter="url(#glow-shadow)" />`;
+  svgCode += `<path d="${pathD}" class="chart-line" style="stroke: url(#temp-line-gradient);" filter="url(#chart-line-shadow)" />`;
   
   // Render labels and interaction nodes (enhanced sizes for mobile readability)
   points.forEach(p => {
