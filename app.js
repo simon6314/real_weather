@@ -3619,6 +3619,7 @@ function initDetailsDrawer() {
   const closeBtn = document.getElementById('btn-close-drawer');
   
   const closeDrawer = () => {
+    drawer.style.willChange = 'transform'; // Enable GPU layer for close transition
     overlay.classList.remove('active');
     drawer.classList.remove('active');
     
@@ -3631,6 +3632,7 @@ function initDetailsDrawer() {
     // Wipe all heavy dynamic elements from DOM on close to release CPU/GPU memory immediately
     setTimeout(() => {
       if (!drawer.classList.contains('active')) {
+        drawer.style.willChange = 'auto'; // Reset will-change state
         document.getElementById('svg-chart-container').innerHTML = '';
         document.getElementById('drawer-weekly-list').innerHTML = '';
         const alertsContainer = document.getElementById('drawer-alerts-container');
@@ -3766,6 +3768,7 @@ function openDrawerForecast(identifier) {
   }
   
   // Open UI elements (Trigger sliding transition instantly & smoothly!)
+  drawer.style.willChange = 'transform'; // Enable GPU layer for slide transition
   overlay.classList.add('active');
   drawer.classList.add('active');
   
@@ -3774,8 +3777,8 @@ function openDrawerForecast(identifier) {
     if (rendered) return;
     rendered = true;
     
-    // Clean up event listener
-    drawer.removeEventListener('transitionend', handleTransitionEnd);
+    // Clean up GPU layer once drawer is open to allow glitch-free scrolling inside
+    drawer.style.willChange = 'auto';
     
     // Safety check: ensure drawer is still open and showing the same region
     if (AppState.activeRegionDetailed !== identifier || !drawer.classList.contains('active')) {
