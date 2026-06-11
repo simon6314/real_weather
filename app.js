@@ -3416,13 +3416,18 @@ function drawHourlySvgChart(hourlyData) {
     <line x1="${paddingX}" y1="${svgHeight - paddingY}" x2="${svgWidth - paddingX}" y2="${svgHeight - paddingY}" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
   `;
   
+  // Detect if all temperatures in the chart are identical (flat line)
+  const isFlat = temps.every(t => t === temps[0]);
+  const strokeStyle = isFlat ? `stroke: ${getAbsoluteTempColor(temps[0])};` : `stroke: url(#temp-line-gradient);`;
+  const fillStyle = isFlat ? `fill: ${getAbsoluteTempColor(temps[0])}; fill-opacity: 0.15;` : `fill: url(#temp-fill-gradient);`;
+
   // Draw Area under the line (polygon)
   let areaPoints = `M ${points[0].x} ${svgHeight - paddingY} `;
   points.forEach(p => {
     areaPoints += `L ${p.x} ${p.y} `;
   });
   areaPoints += `L ${points[size-1].x} ${svgHeight - paddingY} Z`;
-  svgCode += `<path d="${areaPoints}" class="chart-gradient-fill" style="fill: url(#temp-fill-gradient); opacity: 1;" />`;
+  svgCode += `<path d="${areaPoints}" class="chart-gradient-fill" style="${fillStyle} opacity: 1;" />`;
   
   // Construct polyline path (Smooth curves using bezier approximations)
   let pathD = `M ${points[0].x} ${points[0].y} `;
@@ -3437,7 +3442,7 @@ function drawHourlySvgChart(hourlyData) {
     pathD += `C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p2.x} ${p2.y} `;
   }
   
-  svgCode += `<path d="${pathD}" class="chart-line" style="stroke: url(#temp-line-gradient);" filter="url(#chart-line-shadow)" />`;
+  svgCode += `<path d="${pathD}" class="chart-line" style="${strokeStyle}" filter="url(#chart-line-shadow)" />`;
   
   // Render labels and interaction nodes (enhanced sizes for mobile readability)
   points.forEach(p => {
