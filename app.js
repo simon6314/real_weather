@@ -189,7 +189,7 @@ function initClock() {
   setInterval(updateClock, 1000);
 }
 
-// Weather manual refresh handler
+// Weather manual refresh handler & page visibility auto-refresh
 function initWeatherRefresh() {
   const badge = document.getElementById('data-status-badge');
   if (badge) {
@@ -219,6 +219,15 @@ function initWeatherRefresh() {
       }
     });
   }
+
+  // Auto-refresh when user switches back to this tab/app (Page Visibility API)
+  // Reuses the built-in 10-minute cache freshness check in loadWeatherDashboard() to prevent constant network requests
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      console.log('User returned to the tab. Checking dashboard freshness...');
+      loadWeatherDashboard();
+    }
+  });
 }
 
 // Header Navigation Tabs
