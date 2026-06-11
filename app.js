@@ -152,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch();
   initRadarControls();
   initDetailsDrawer();
+  initWeatherRefresh();
   
 
   // Make main location panel clickable to open detailed forecast
@@ -186,6 +187,38 @@ function initClock() {
   };
   updateClock();
   setInterval(updateClock, 1000);
+}
+
+// Weather manual refresh handler
+function initWeatherRefresh() {
+  const badge = document.getElementById('data-status-badge');
+  if (badge) {
+    badge.addEventListener('click', async (e) => {
+      e.stopPropagation(); // Stop click from propagating to main-panel click event!
+      
+      const icon = badge.querySelector('.refresh-mini-icon');
+      if (icon) {
+        icon.classList.add('spinning');
+      }
+      
+      console.log('User clicked refresh badge. Force-reloading weather data...');
+      updateDataBadge('強制更新中...', 'loading');
+      
+      clearAllWeatherCaches();
+      
+      try {
+        await loadWeatherDashboard();
+      } catch (err) {
+        console.error('Manual refresh failed:', err);
+      } finally {
+        setTimeout(() => {
+          if (icon) {
+            icon.classList.remove('spinning');
+          }
+        }, 1000); // Let it spin for at least 1s for nice visual response
+      }
+    });
+  }
 }
 
 // Header Navigation Tabs
@@ -337,7 +370,26 @@ function validateAndCleanAllCaches() {
 
 function startupSequence() {
   validateAndCleanAllCaches();
+  
+  // Set up loader status and display loader overlay
+  const loader = document.getElementById('global-app-loader');
+  if (loader) loader.classList.remove('hidden');
+  const loaderStatus = document.getElementById('global-loader-status');
+  if (loaderStatus) loaderStatus.textContent = '正在取得定位資訊...';
+  
   updateDataBadge('定位中...', 'loading');
+  
+  // SWR: Restore last known location to avoid empty state on startup
+  const lastLocation = localStorage.getItem('cwa_last_location');
+  if (lastLocation) {
+    AppState.currentLocationCounty = lastLocation;
+    console.log(`Restored last known location: ${lastLocation}`);
+    loadWeatherDashboardCachedOnly();
+  } else {
+    // If no last location, let's load default Taipei first so the dashboard isn't blank
+    AppState.currentLocationCounty = '臺北市中正區';
+    loadWeatherDashboardCachedOnly();
+  }
   
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -345,32 +397,39 @@ function startupSequence() {
         const { latitude, longitude } = position.coords;
         console.log(`GPS Coordinates received: Lat ${latitude}, Lon ${longitude}`);
         
+        if (loaderStatus) loaderStatus.textContent = '定位成功，解析行政區中...';
+        
         // Try reverse geocoding to get township-level details
         const geocoded = await reverseGeocodeTownship(latitude, longitude);
         
+        let newLocation = '';
         if (geocoded) {
-          AppState.currentLocationCounty = geocoded.county + geocoded.town;
-          console.log(`Geocoded location: ${AppState.currentLocationCounty}`);
+          newLocation = geocoded.county + geocoded.town;
         } else {
           // Fallback to geometric matching
           const matchedCounty = getClosestTaiwanCounty(latitude, longitude);
           const fallbackTown = COUNTY_CAPITALS[matchedCounty.name] || '中正區';
-          AppState.currentLocationCounty = matchedCounty.name + fallbackTown;
-          console.log(`Geocoding failed. Geometric fallback: ${AppState.currentLocationCounty}`);
+          newLocation = matchedCounty.name + fallbackTown;
         }
         
-        // Load data for the matched location
-        loadWeatherDashboard();
+        console.log(`Geocoded location: ${newLocation}`);
+        
+        if (newLocation !== AppState.currentLocationCounty) {
+          AppState.currentLocationCounty = newLocation;
+          localStorage.setItem('cwa_last_location', newLocation);
+        }
+        
+        // Load data (this will either load cache if fresh, or fetch fresh data)
+        await loadWeatherDashboard();
       },
-      (error) => {
-        console.warn('Geolocation failed or denied. Defaulting to Taipei City. Code:', error.code);
-        AppState.currentLocationCounty = '臺北市中正區';
-        loadWeatherDashboard();
+      async (error) => {
+        console.warn('Geolocation failed or denied. Code:', error.code);
+        // Geolocation failed, load dashboard for current location
+        await loadWeatherDashboard();
       },
       { timeout: 8000, enableHighAccuracy: false }
     );
   } else {
-    AppState.currentLocationCounty = '臺北市中正區';
     loadWeatherDashboard();
   }
 }
@@ -679,57 +738,69 @@ async function fetchActiveAlerts() {
   
   const parsedAlerts = [];
   
-  // 1. Fetch Standard Weather Alerts (W-C0033-002)
+  // Construct CAP URL
+  let capUrl = '';
+  if (CLOUDFLARE_PROXY_URL) {
+    let proxyBase = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
+    if (!proxyBase.startsWith('http://') && !proxyBase.startsWith('https://')) {
+      proxyBase = 'https://' + proxyBase;
+    }
+    capUrl = `${proxyBase}/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
+    if (AppState.apiKey) {
+      capUrl += `&Authorization=${AppState.apiKey}`;
+    }
+  } else {
+    capUrl = `https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
+    if (AppState.apiKey) {
+      capUrl += `&Authorization=${AppState.apiKey}`;
+    }
+  }
+
   try {
-    const res = await fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-002${queryParams}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success === 'true' && data.records && data.records.record) {
-        const records = Array.isArray(data.records.record) ? data.records.record : [data.records.record];
-        const grouped = {};
+    console.log('Fetching active alerts in parallel (W-C0033-002, W-C0033-005, W-C0033-006)...');
+    
+    const pAlerts = fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-002${queryParams}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => {
+        console.error('Failed to fetch standard weather alerts (W-C0033-002):', err);
+        return null;
+      });
+
+    const pHeat = fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-005${queryParams}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => {
+        console.error('Failed to fetch high temperature alerts (W-C0033-005):', err);
+        return null;
+      });
+
+    const pCap = fetch(capUrl)
+      .then(res => res.ok ? res.text() : null)
+      .catch(err => {
+        console.error('Failed to fetch/parse CAP strong wind warning (W-C0033-006):', err);
+        return null;
+      });
+
+    const [alertsData, heatData, capXmlText] = await Promise.all([pAlerts, pHeat, pCap]);
+
+    // 1. Process Standard Weather Alerts (W-C0033-002)
+    if (alertsData && alertsData.success === 'true' && alertsData.records && alertsData.records.record) {
+      const records = Array.isArray(alertsData.records.record) ? alertsData.records.record : [alertsData.records.record];
+      const grouped = {};
+      
+      for (const r of records) {
+        const contentText = r.contents?.content?.contentText || r.contentText || '';
+        if (!contentText) continue;
         
-        for (const r of records) {
-          const contentText = r.contents?.content?.contentText || r.contentText || '';
-          if (!contentText) continue;
-          
-          const startTime = r.datasetInfo?.validTime?.startTime || r.startTime || '';
-          const endTime = r.datasetInfo?.validTime?.endTime || r.endTime || '';
-          
-          const hazards = r.hazardConditions?.hazards?.hazard;
-          const hazardArr = Array.isArray(hazards) ? hazards : (hazards ? [hazards] : []);
-          
-          if (hazardArr.length > 0) {
-            for (const h of hazardArr) {
-              const phenomena = h.info?.phenomena || r.phenomena || '';
-              const significance = h.info?.significance || r.significance || '特報';
-              const title = `${phenomena}${significance}`;
-              const key = `${title}_${contentText}_${startTime}_${endTime}`;
-              
-              if (!grouped[key]) {
-                grouped[key] = {
-                  title: title || '天氣警特報',
-                  phenomena: phenomena,
-                  significance: significance,
-                  contentText: contentText,
-                  startTime: startTime,
-                  endTime: endTime,
-                  affectedAreas: []
-                };
-              }
-              
-              const locations = h.info?.affectedAreas?.location;
-              const locationArr = Array.isArray(locations) ? locations : (locations ? [locations] : []);
-              locationArr.forEach(loc => {
-                const name = loc.locationName || '';
-                if (name && !grouped[key].affectedAreas.includes(name.trim())) {
-                  grouped[key].affectedAreas.push(name.trim());
-                }
-              });
-            }
-          } else {
-            // Fallback for flat structure
-            const phenomena = r.phenomena || '';
-            const significance = r.significance || '特報';
+        const startTime = r.datasetInfo?.validTime?.startTime || r.startTime || '';
+        const endTime = r.datasetInfo?.validTime?.endTime || r.endTime || '';
+        
+        const hazards = r.hazardConditions?.hazards?.hazard;
+        const hazardArr = Array.isArray(hazards) ? hazards : (hazards ? [hazards] : []);
+        
+        if (hazardArr.length > 0) {
+          for (const h of hazardArr) {
+            const phenomena = h.info?.phenomena || r.phenomena || '';
+            const significance = h.info?.significance || r.significance || '特報';
             const title = `${phenomena}${significance}`;
             const key = `${title}_${contentText}_${startTime}_${endTime}`;
             
@@ -745,190 +816,174 @@ async function fetchActiveAlerts() {
               };
             }
             
-            if (r.locationName && !grouped[key].affectedAreas.includes(r.locationName.trim())) {
-              grouped[key].affectedAreas.push(r.locationName.trim());
-            }
-          }
-        }
-        
-        for (const key of Object.keys(grouped)) {
-          parsedAlerts.push(grouped[key]);
-        }
-      }
-    } else {
-      console.warn('CWA Alerts API returned status ' + res.status);
-    }
-  } catch (err) {
-    console.error('Failed to fetch standard weather alerts (W-C0033-002):', err);
-  }
-  
-  // 2. Fetch High Temperature Information (W-C0033-005)
-  try {
-    const resHeat = await fetch(`${baseUrl}/api/v1/rest/datastore/W-C0033-005${queryParams}`);
-    if (resHeat.ok) {
-      const heatData = await resHeat.json();
-      if (heatData && heatData.success === 'true' && heatData.records && heatData.records.info) {
-        const infos = Array.isArray(heatData.records.info) ? heatData.records.info : [heatData.records.info];
-        for (const inf of infos) {
-          // Check expiration
-          const expiresMs = inf.expires ? new Date(inf.expires).getTime() : Infinity;
-          if (!isNaN(expiresMs) && now > expiresMs) {
-            continue; // Skip expired warnings
-          }
-          
-          // Reconstruct description contentText
-          let contentText = '';
-          if (inf.description) {
-            if (typeof inf.description === 'string') {
-              contentText = inf.description;
-            } else if (Array.isArray(inf.description.section)) {
-              contentText = inf.description.section.map(s => s.value || '').join('\n');
-            } else if (inf.description.value) {
-              contentText = inf.description.value;
-            } else if (typeof inf.description === 'object') {
-              contentText = JSON.stringify(inf.description);
-            }
-          }
-          if (!contentText) {
-            contentText = inf.headline || '';
-          }
-          
-          // Parse affectedAreas
-          const affectedAreas = [];
-          if (inf.area) {
-            const areas = Array.isArray(inf.area) ? inf.area : [inf.area];
-            for (const a of areas) {
-              if (a.areaDesc) {
-                affectedAreas.push(a.areaDesc.trim());
+            const locations = h.info?.affectedAreas?.location;
+            const locationArr = Array.isArray(locations) ? locations : (locations ? [locations] : []);
+            locationArr.forEach(loc => {
+              const name = loc.locationName || '';
+              if (name && !grouped[key].affectedAreas.includes(name.trim())) {
+                grouped[key].affectedAreas.push(name.trim());
               }
-            }
+            });
+          }
+        } else {
+          // Fallback for flat structure
+          const phenomena = r.phenomena || '';
+          const significance = r.significance || '特報';
+          const title = `${phenomena}${significance}`;
+          const key = `${title}_${contentText}_${startTime}_${endTime}`;
+          
+          if (!grouped[key]) {
+            grouped[key] = {
+              title: title || '天氣警特報',
+              phenomena: phenomena,
+              significance: significance,
+              contentText: contentText,
+              startTime: startTime,
+              endTime: endTime,
+              affectedAreas: []
+            };
           }
           
-          // Build event title and phenomena
-          const phenomena = inf.event || '高溫';
-          const title = inf.eventName || inf.headline || `${phenomena}資訊`;
-          
-          parsedAlerts.push({
-            title: title,
-            phenomena: phenomena,
-            significance: '特報',
-            contentText: contentText,
-            startTime: inf.onset || inf.effective || '',
-            endTime: inf.expires || '',
-            affectedAreas: affectedAreas
-          });
+          if (r.locationName && !grouped[key].affectedAreas.includes(r.locationName.trim())) {
+            grouped[key].affectedAreas.push(r.locationName.trim());
+          }
         }
       }
-    } else {
-      console.warn('CWA High Temp API returned status ' + resHeat.status);
+      
+      for (const key of Object.keys(grouped)) {
+        parsedAlerts.push(grouped[key]);
+      }
     }
-  } catch (errHeat) {
-    console.error('Failed to fetch high temperature alerts (W-C0033-005):', errHeat);
-  }
-  
-  // Group and merge warnings with identical title and time windows to prevent duplicate alerts (e.g. Yellow and Orange heat warnings both showing on a county-level card)
-  const alertGroups = {};
-  parsedAlerts.forEach(alert => {
-    const key = `${alert.title}_${alert.startTime}_${alert.endTime}`;
-    if (!alertGroups[key]) {
-      alertGroups[key] = {
-        title: alert.title,
-        phenomena: alert.phenomena,
-        significance: alert.significance,
-        contentText: alert.contentText,
-        startTime: alert.startTime,
-        endTime: alert.endTime,
-        affectedAreas: [...alert.affectedAreas]
-      };
-    } else {
-      // Merge affected areas
-      alert.affectedAreas.forEach(area => {
-        if (!alertGroups[key].affectedAreas.includes(area)) {
-          alertGroups[key].affectedAreas.push(area);
+
+    // 2. Process High Temperature Information (W-C0033-005)
+    if (heatData && heatData.success === 'true' && heatData.records && heatData.records.info) {
+      const infos = Array.isArray(heatData.records.info) ? heatData.records.info : [heatData.records.info];
+      for (const inf of infos) {
+        // Check expiration
+        const expiresMs = inf.expires ? new Date(inf.expires).getTime() : Infinity;
+        if (!isNaN(expiresMs) && now > expiresMs) {
+          continue; // Skip expired warnings
         }
-      });
-      // Resolve contentText descriptions (use the longer one if one nests the other, or concatenate)
-      if (alertGroups[key].contentText !== alert.contentText) {
-        if (alertGroups[key].contentText.includes(alert.contentText)) {
-          // Do nothing
-        } else if (alert.contentText.includes(alertGroups[key].contentText)) {
-          alertGroups[key].contentText = alert.contentText;
-        } else {
-          alertGroups[key].contentText += '\n' + alert.contentText;
+        
+        // Reconstruct description contentText
+        let contentText = '';
+        if (inf.description) {
+          if (typeof inf.description === 'string') {
+            contentText = inf.description;
+          } else if (Array.isArray(inf.description.section)) {
+            contentText = inf.description.section.map(s => s.value || '').join('\n');
+          } else if (inf.description.value) {
+            contentText = inf.description.value;
+          } else if (typeof inf.description === 'object') {
+            contentText = JSON.stringify(inf.description);
+          }
+        }
+        if (!contentText) {
+          contentText = inf.headline || '';
+        }
+        
+        // Parse affectedAreas
+        const affectedAreas = [];
+        if (inf.area) {
+          const areas = Array.isArray(inf.area) ? inf.area : [inf.area];
+          for (const a of areas) {
+            if (a.areaDesc) {
+              affectedAreas.push(a.areaDesc.trim());
+            }
+          }
+        }
+        
+        // Build event title and phenomena
+        const phenomena = inf.event || '高溫';
+        const title = inf.eventName || inf.headline || `${phenomena}資訊`;
+        
+        parsedAlerts.push({
+          title: title,
+          phenomena: phenomena,
+          significance: '特報',
+          contentText: contentText,
+          startTime: inf.onset || inf.effective || '',
+          endTime: inf.expires || '',
+          affectedAreas: affectedAreas
+        });
+      }
+    }
+
+    // Group and merge warnings with identical title and time windows
+    const alertGroups = {};
+    parsedAlerts.forEach(alert => {
+      const key = `${alert.title}_${alert.startTime}_${alert.endTime}`;
+      if (!alertGroups[key]) {
+        alertGroups[key] = {
+          title: alert.title,
+          phenomena: alert.phenomena,
+          significance: alert.significance,
+          contentText: alert.contentText,
+          startTime: alert.startTime,
+          endTime: alert.endTime,
+          affectedAreas: [...alert.affectedAreas]
+        };
+      } else {
+        // Merge affected areas
+        alert.affectedAreas.forEach(area => {
+          if (!alertGroups[key].affectedAreas.includes(area)) {
+            alertGroups[key].affectedAreas.push(area);
+          }
+        });
+        // Resolve contentText descriptions
+        if (alertGroups[key].contentText !== alert.contentText) {
+          if (alertGroups[key].contentText.includes(alert.contentText)) {
+            // Do nothing
+          } else if (alert.contentText.includes(alertGroups[key].contentText)) {
+            alertGroups[key].contentText = alert.contentText;
+          } else {
+            alertGroups[key].contentText += '\n' + alert.contentText;
+          }
         }
       }
-    }
-  });
-  
-  const finalAlerts = Object.values(alertGroups);
-  
-  AppState.activeAlerts = finalAlerts;
-  localStorage.setItem(cacheKey, JSON.stringify(finalAlerts));
-  localStorage.setItem(cacheTimeKey, now.toString());
-  console.log('Fetched, deduplicated, and cached alerts successfully:', finalAlerts);
-  
-  // 3. Fetch CAP Strong Wind Warning (W-C0033-006)
-  try {
-    let capUrl = '';
-    if (CLOUDFLARE_PROXY_URL) {
-      let proxyBase = CLOUDFLARE_PROXY_URL.trim().replace(/\/$/, '');
-      if (!proxyBase.startsWith('http://') && !proxyBase.startsWith('https://')) {
-        proxyBase = 'https://' + proxyBase;
-      }
-      capUrl = `${proxyBase}/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
-      if (AppState.apiKey) {
-        capUrl += `&Authorization=${AppState.apiKey}`;
-      }
-    } else {
-      capUrl = `https://opendata.cwa.gov.tw/fileapi/v1/opendataapi/W-C0033-006?_t=${Date.now()}`;
-      if (AppState.apiKey) {
-        capUrl += `&Authorization=${AppState.apiKey}`;
-      }
-    }
+    });
     
-    console.log('Fetching CWA CAP strong wind alert (W-C0033-006)...');
-    const resCap = await fetch(capUrl);
-    if (resCap.ok) {
-      const xmlText = await resCap.text();
-      if (xmlText && xmlText.includes('<alert')) {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-        
-        // Check if message type is Cancel
-        const msgTypeEl = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'msgType')[0] : xmlDoc.getElementsByTagName('msgType')[0];
-        const isCancel = msgTypeEl && msgTypeEl.textContent.trim() === 'Cancel';
-        
-        if (!isCancel) {
-          const areaDescs = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'areaDesc') : xmlDoc.getElementsByTagName('areaDesc');
-          const towns = [];
-          for (let i = 0; i < areaDescs.length; i++) {
-            const tName = areaDescs[i].textContent.trim();
-            if (tName) {
-              towns.push(tName.replace(/台/g, '臺'));
-            }
+    const finalAlerts = Object.values(alertGroups);
+    AppState.activeAlerts = finalAlerts;
+    localStorage.setItem(cacheKey, JSON.stringify(finalAlerts));
+    localStorage.setItem(cacheTimeKey, now.toString());
+    console.log('Fetched, deduplicated, and cached alerts successfully:', finalAlerts);
+
+    // 3. Process CAP Strong Wind Warning (W-C0033-006)
+    if (capXmlText && capXmlText.includes('<alert')) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(capXmlText, 'text/xml');
+      
+      const msgTypeEl = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'msgType')[0] : xmlDoc.getElementsByTagName('msgType')[0];
+      const isCancel = msgTypeEl && msgTypeEl.textContent.trim() === 'Cancel';
+      
+      if (!isCancel) {
+        const areaDescs = xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS('*', 'areaDesc') : xmlDoc.getElementsByTagName('areaDesc');
+        const towns = [];
+        for (let i = 0; i < areaDescs.length; i++) {
+          const tName = areaDescs[i].textContent.trim();
+          if (tName) {
+            towns.push(tName.replace(/台/g, '臺'));
           }
-          AppState.strongWindCapTowns = towns;
-          localStorage.setItem(capCacheKey, JSON.stringify(towns));
-          localStorage.setItem(capCacheTimeKey, now.toString());
-          console.log('Successfully loaded CAP strong wind townships:', towns);
-        } else {
-          AppState.strongWindCapTowns = [];
-          localStorage.setItem(capCacheKey, JSON.stringify([]));
-          localStorage.setItem(capCacheTimeKey, now.toString());
-          console.log('CAP strong wind alert is canceled.');
         }
+        AppState.strongWindCapTowns = towns;
+        localStorage.setItem(capCacheKey, JSON.stringify(towns));
+        localStorage.setItem(capCacheTimeKey, now.toString());
+        console.log('Successfully loaded CAP strong wind townships:', towns);
       } else {
         AppState.strongWindCapTowns = [];
         localStorage.setItem(capCacheKey, JSON.stringify([]));
         localStorage.setItem(capCacheTimeKey, now.toString());
-        console.log('CAP strong wind alert response is empty or invalid.');
+        console.log('CAP strong wind alert is canceled.');
       }
     } else {
-      console.warn('CWA CAP API returned status ' + resCap.status);
-      AppState.strongWindCapTowns = null;
+      AppState.strongWindCapTowns = [];
+      localStorage.setItem(capCacheKey, JSON.stringify([]));
+      localStorage.setItem(capCacheTimeKey, now.toString());
+      console.log('CAP strong wind alert response is empty or invalid.');
     }
-  } catch (capErr) {
-    console.error('Failed to fetch/parse CAP strong wind warning:', capErr);
+  } catch (err) {
+    console.error('Failed to parallel fetch active alerts:', err);
     AppState.strongWindCapTowns = null;
   }
 }
@@ -1252,14 +1307,140 @@ function getCountyKeywords(county) {
 // --------------------------------------------------------------------------
 // 5. CWA API Fetching & LocalStorage Caching Client
 // --------------------------------------------------------------------------
+function loadWeatherDashboardCachedOnly() {
+  const cacheKey = 'cwa_weather_cache_v14';
+  const cachedDataStr = localStorage.getItem(cacheKey);
+  if (cachedDataStr) {
+    try {
+      const parsedData = JSON.parse(cachedDataStr);
+      // Validate county cache integrity
+      const counties = Object.values(parsedData);
+      const sampleCounty = counties.find(c => c && c.current && !c.error);
+      if (sampleCounty) {
+        // Load rainfall cache if weather cache is valid
+        const rainCacheKey = 'cwa_rainfall_cache_v2';
+        const cachedRainStr = localStorage.getItem(rainCacheKey);
+        if (cachedRainStr) {
+          try {
+            AppState.rainfallObservations = JSON.parse(cachedRainStr);
+          } catch (e) {}
+        }
+        
+        // Preserve any loaded township data in AppState.allCountiesWeatherData
+        const existingTownships = {};
+        for (const [key, val] of Object.entries(AppState.allCountiesWeatherData)) {
+          if (val && val.isTownship) {
+            existingTownships[key] = val;
+          }
+        }
+        AppState.allCountiesWeatherData = Object.assign({}, parsedData, existingTownships);
+        
+        if (parsedData._observations) {
+          AppState.observations = parsedData._observations;
+          for (const [id, data] of Object.entries(AppState.allCountiesWeatherData)) {
+            if (id.startsWith('_')) continue;
+            if (data && data.current) {
+              const parsedId = parseIdentifier(id);
+              applyObservationToCurrent(data.current, parsedId.county, parsedId.town);
+            }
+          }
+        }
+        
+        // Check if current location is a township and load its cache if available
+        const parsed = parseIdentifier(AppState.currentLocationCounty);
+        if (parsed.type === 'town') {
+          const townCacheKey = `cwa_town_cache_v12_${parsed.county}`;
+          const cachedTownStr = localStorage.getItem(townCacheKey);
+          if (cachedTownStr) {
+            try {
+              const parsedTowns = JSON.parse(cachedTownStr);
+              Object.assign(AppState.allCountiesWeatherData, parsedTowns);
+            } catch (e) {}
+          }
+        }
+        
+        // Render views immediately
+        renderMainLocationWeather();
+        renderAddedRegionsList();
+        
+        // Hide loader overlay if cache loaded successfully!
+        const loader = document.getElementById('global-app-loader');
+        if (loader) {
+          loader.classList.add('hidden');
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('Instant cache render failed:', e);
+    }
+  }
+  return false;
+}
+
 async function loadWeatherDashboard() {
+  const loaderStatus = document.getElementById('global-loader-status');
+  if (loaderStatus) {
+    loaderStatus.textContent = '正在與氣象署連線取得最新觀測資訊...';
+  }
+  
   updateDataBadge('載入資料中...', 'loading');
   
-  try {
-    const dataSuccess = await fetchAllWeatherData();
+  // Stale-While-Revalidate check
+  const cacheKey = 'cwa_weather_cache_v14';
+  const cacheTimeKey = 'cwa_weather_cache_time_v14';
+  const cachedDataStr = localStorage.getItem(cacheKey);
+  const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+  const now = new Date().getTime();
+  
+  let isCacheFresh = false;
+  if (!shouldBypassCache() && cachedDataStr && cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000) {
+    isCacheFresh = true;
+  }
+  
+  if (isCacheFresh) {
+    // Cache is fresh, just load cache synchronously and return
+    const success = await fetchAllWeatherData(); // This will return true immediately via cache path
+    await fetchActiveAlerts(); // This will return immediately via cache path
     
-    // Fetch active weather warnings/alerts
-    await fetchActiveAlerts();
+    // Load township data if needed
+    const parsed = parseIdentifier(AppState.currentLocationCounty);
+    if (parsed.type === 'town') {
+      await loadWeatherForRegion(AppState.currentLocationCounty);
+    }
+    
+    if (success) {
+      AppState.isSimulationActive = false;
+      updateDataBadge('即時氣象署資料', 'live');
+    } else {
+      AppState.isSimulationActive = false;
+      updateDataBadge('無法取得即時資料', 'error');
+    }
+    
+    // Hide global loader overlay
+    const loader = document.getElementById('global-app-loader');
+    if (loader) loader.classList.add('hidden');
+    
+    // Render views
+    renderMainLocationWeather();
+    renderAddedRegionsList();
+    return;
+  }
+  
+  // Cache is expired or missing. If cache exists, load it first for instant UI response (SWR)
+  let hasRenderedCache = false;
+  if (cachedDataStr) {
+    hasRenderedCache = loadWeatherDashboardCachedOnly();
+    if (hasRenderedCache) {
+      updateDataBadge('更新中...', 'loading');
+    }
+  }
+  
+  try {
+    // Fetch weather data and alerts concurrently
+    const [dataSuccess] = await Promise.all([
+      fetchAllWeatherData(), // This will run fresh fetch since isCacheFresh is false
+      fetchActiveAlerts()
+    ]);
     
     // Also load township data if current location is a township
     const parsed = parseIdentifier(AppState.currentLocationCounty);
@@ -1278,12 +1459,17 @@ async function loadWeatherDashboard() {
     console.error('Fatal load error:', err);
     AppState.isSimulationActive = false;
     updateDataBadge('連線失敗', 'error');
+  } finally {
+    // Hide global loader overlay
+    const loader = document.getElementById('global-app-loader');
+    if (loader) loader.classList.add('hidden');
+    
+    // Render views from active state
+    renderMainLocationWeather();
+    renderAddedRegionsList();
   }
-  
-  // Render views from active state
-  renderMainLocationWeather();
-  renderAddedRegionsList();
 }
+
 
 // Update the top pulse indicator badge
 function updateDataBadge(text, state) {
@@ -1402,60 +1588,62 @@ async function fetchAllWeatherData() {
   }
   
   try {
-    // 1. Fetch 36h forecast (F-C0032-001) - gives general weather description, rain pop, temp
-    const res36h = await fetch(`${baseUrl}/api/v1/rest/datastore/F-C0032-001${queryParams}`);
-    if (!res36h.ok) throw new Error('CWA 36h API returned status ' + res36h.status);
-    const data36h = await res36h.json();
+    console.log('Fetching all weather data in parallel...');
     
-    // We omit the giant F-D0047-089 API request here because it is a massive 10MB+ file
-    // that causes severe boot latency and frequent timeouts. Township-level detailed
-    // forecasts are instead dynamically fetched on-demand when the user opens them.
-    const data72h = null;
+    // Launch all 5 CWA API fetches concurrently
+    const p36h = fetch(`${baseUrl}/api/v1/rest/datastore/F-C0032-001${queryParams}`)
+      .then(res => {
+        if (!res.ok) throw new Error('CWA 36h API returned status ' + res.status);
+        return res.json();
+      });
+      
+    const p7d = fetch(`${baseUrl}/api/v1/rest/datastore/F-D0047-091${queryParams}`)
+      .then(res => {
+        if (!res.ok) throw new Error('CWA 7d API returned status ' + res.status);
+        return res.json();
+      });
+      
+    const pObs1 = fetch(`${baseUrl}/api/v1/rest/datastore/O-A0001-001${queryParams}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => {
+        console.warn('Failed to fetch O-A0001-001 manned observations:', err);
+        return null;
+      });
+      
+    const pObs3 = fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => {
+        console.warn('Failed to fetch O-A0003-001 automatic observations:', err);
+        return null;
+      });
+      
+    const pRain = fetch(`${baseUrl}/api/v1/rest/datastore/O-A0002-001${queryParams}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => {
+        console.warn('Failed to fetch O-A0002-001 rainfall observations:', err);
+        return null;
+      });
+
+    // Wait for all fetches to resolve
+    const [data36h, data7d, obsData1, obsData3, rainData] = await Promise.all([
+      p36h,
+      p7d,
+      pObs1,
+      pObs3,
+      pRain
+    ]);
+
+    const data72h = null; // Omitted F-D0047-089 due to size (10MB+)
     
-    // 3. Fetch 7-day forecast (F-D0047-091)
-    const res7d = await fetch(`${baseUrl}/api/v1/rest/datastore/F-D0047-091${queryParams}`);
-    if (!res7d.ok) throw new Error('CWA 7d API returned status ' + res7d.status);
-    const data7d = await res7d.json();
+    // Process observation stations
+    let stations1 = obsData1?.records?.Station || obsData1?.records?.station || [];
+    let stations3 = obsData3?.records?.Station || obsData3?.records?.station || [];
     
-    // 4. Fetch real-time weather observations from both manned (O-A0001-001) and automatic (O-A0003-001) stations
-    let stations1 = [];
-    let stations3 = [];
-    
-    // Fetch primary manned stations (O-A0001-001)
-    try {
-      console.log('Fetching CWA real-time manned weather observations (O-A0001-001)...');
-      const resObs1 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0001-001${queryParams}`);
-      if (resObs1.ok) {
-        const obsData1 = await resObs1.json();
-        stations1 = obsData1.records?.Station || obsData1.records?.station || [];
-      }
-    } catch (obsErr1) {
-      console.warn('Failed to fetch O-A0001-001 manned observations:', obsErr1);
-    }
-    
-    // Fetch automatic weather stations (O-A0003-001)
-    try {
-      console.log('Fetching CWA real-time automatic weather observations (O-A0003-001)...');
-      const resObs3 = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0003-001${queryParams}`);
-      if (resObs3.ok) {
-        const obsData3 = await resObs3.json();
-        stations3 = obsData3.records?.Station || obsData3.records?.station || [];
-      }
-    } catch (obsErr3) {
-      console.warn('Failed to fetch O-A0003-001 automatic observations:', obsErr3);
-    }
-    
-    // Merge and deduplicate stations by StationId/stationId. 
-    // Manned stations (O-A0001-001) typically update hourly, while automatic stations (O-A0003-001) update every 10 minutes.
-    // By processing manned stations first and overriding them with automatic ones of the same ID, 
-    // we ensure the 10-minute real-time observations always take precedence over the hourly manned ones!
     const stationMap = {};
-    
     stations1.forEach(s => {
       const sId = s.StationId || s.stationId;
       if (sId) stationMap[sId] = s;
     });
-    
     stations3.forEach(s => {
       const sId = s.StationId || s.stationId;
       if (sId) stationMap[sId] = s;
@@ -1463,22 +1651,15 @@ async function fetchAllWeatherData() {
     
     AppState.observations = Object.values(stationMap);
 
-    // Fetch real-time rainfall observations (O-A0002-001)
-    try {
-      console.log('Fetching CWA real-time rainfall observations (O-A0002-001)...');
-      const resRain = await fetch(`${baseUrl}/api/v1/rest/datastore/O-A0002-001${queryParams}`);
-      if (resRain.ok) {
-        const rainData = await resRain.json();
-        const rainStations = rainData.records?.Station || rainData.records?.station || [];
-        if (rainStations.length > 0) {
-          AppState.rainfallObservations = rainStations;
-          localStorage.setItem('cwa_rainfall_cache_v2', JSON.stringify(rainStations));
-          localStorage.setItem('cwa_rainfall_cache_time_v2', String(now));
-          console.log(`Fetched and cached ${rainStations.length} rainfall stations.`);
-        }
+    // Process rainfall data
+    if (rainData) {
+      const rainStations = rainData.records?.Station || rainData.records?.station || [];
+      if (rainStations.length > 0) {
+        AppState.rainfallObservations = rainStations;
+        localStorage.setItem('cwa_rainfall_cache_v2', JSON.stringify(rainStations));
+        localStorage.setItem('cwa_rainfall_cache_time_v2', String(now));
+        console.log(`Fetched and cached ${rainStations.length} rainfall stations in parallel.`);
       }
-    } catch (rainErr) {
-      console.warn('Failed to fetch O-A0002-001 rainfall observations:', rainErr);
     }
     
     // Parse and integrate the three datasets
@@ -3951,7 +4132,28 @@ async function loadWeatherForRegion(id) {
   }
   
   // Dynamic fetch for township
-  updateDataBadge(`載入 ${parsed.town}資料...`, 'loading');
+  // SWR: Let's check if we have expired cache in localStorage first, so we render it immediately
+  const townCacheKey = `cwa_town_cache_v12_${parsed.county}`;
+  const cachedTownStr = localStorage.getItem(townCacheKey);
+  let hasLoadedCachedTown = false;
+  if (cachedTownStr) {
+    try {
+      const parsedTowns = JSON.parse(cachedTownStr);
+      const townData = parsedTowns[id];
+      if (townData && townData.current && !townData.error) {
+        Object.assign(AppState.allCountiesWeatherData, parsedTowns);
+        hasLoadedCachedTown = true;
+        renderAddedRegionsList(); // Render cached town data immediately!
+      }
+    } catch (e) {}
+  }
+  
+  if (!hasLoadedCachedTown) {
+    updateDataBadge(`載入 ${parsed.town}資料...`, 'loading');
+  } else {
+    updateDataBadge('更新中...', 'loading');
+  }
+
   try {
     const success = await fetchCwaTownshipData(parsed.county);
     if (success) {
@@ -3960,13 +4162,19 @@ async function loadWeatherForRegion(id) {
         delete AppState.allCountiesWeatherData[id];
       }
     } else {
-      updateDataBadge('無法取得資料', 'error');
+      if (!hasLoadedCachedTown) {
+        updateDataBadge('無法取得資料', 'error');
+        AppState.allCountiesWeatherData[id] = { error: true, name: parsed.town, parentCounty: parsed.county };
+      }
+    }
+  } catch (err) {
+    console.error('Failed loading region:', err);
+    if (!hasLoadedCachedTown) {
+      updateDataBadge('連線失敗', 'error');
       AppState.allCountiesWeatherData[id] = { error: true, name: parsed.town, parentCounty: parsed.county };
     }
-  } catch (e) {
-    console.error('Failed loading township data:', e);
-    updateDataBadge('連線失敗', 'error');
-    AppState.allCountiesWeatherData[id] = { error: true, name: parsed.town, parentCounty: parsed.county };
+  } finally {
+    renderAddedRegionsList();
   }
 }
 
@@ -4034,9 +4242,21 @@ async function fetchCwaTownshipData(countyName) {
   }
   
   try {
-    const res3 = await fetch(`${baseUrl}/api/v1/rest/datastore/${apis[3]}${queryParams}`);
-    if (!res3.ok) throw new Error('Township 3d API status ' + res3.status);
-    const data3 = await res3.json();
+    console.log(`Fetching township 3d and 7d data in parallel for ${countyName}...`);
+    
+    const p3 = fetch(`${baseUrl}/api/v1/rest/datastore/${apis[3]}${queryParams}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Township 3d API status ' + res.status);
+        return res.json();
+      });
+      
+    const p7 = fetch(`${baseUrl}/api/v1/rest/datastore/${apis[7]}${queryParams}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Township 7d API status ' + res.status);
+        return res.json();
+      });
+      
+    const [data3, data7] = await Promise.all([p3, p7]);
     
     // Add debugging logs for JSON structure
     console.log('data3 keys:', Object.keys(data3));
@@ -4052,10 +4272,6 @@ async function fetchCwaTownshipData(countyName) {
         console.log('data3.records.location length:', data3.records.location.length);
       }
     }
-    
-    const res7 = await fetch(`${baseUrl}/api/v1/rest/datastore/${apis[7]}${queryParams}`);
-    if (!res7.ok) throw new Error('Township 7d API status ' + res7.status);
-    const data7 = await res7.json();
     
     const parsedTowns = parseTownshipCwaResponse(countyName, data3, data7);
     console.log('Parsed towns output count:', Object.keys(parsedTowns).length);
