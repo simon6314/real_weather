@@ -423,30 +423,21 @@ body {
 }
 
 .logo-icon {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px;
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  padding: 0;
   color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(0, 180, 255, 0.25);
-  animation: pulse-glow 3s infinite alternate;
-}
-
-@keyframes pulse-glow {
-  0% { box-shadow: 0 0 10px rgba(0, 180, 255, 0.2); }
-  100% { box-shadow: 0 0 20px rgba(0, 180, 255, 0.5); }
+  filter: drop-shadow(0 0 6px var(--color-accent-glow)); /* Apply soft neon glow directly to the sun icon shape */
 }
 
 .brand-text h1 {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 1px;
-  background: linear-gradient(135deg, #FFF 0%, #C4D5EB 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #FFFFFF; /* Pure white title for maximum readability */
 }
 
 .sub-brand {
@@ -1976,9 +1967,9 @@ body {
   }
   
   .logo-icon {
-    padding: 6px;
-    width: 36px;
-    height: 36px;
+    padding: 0;
+    width: auto;
+    height: auto;
   }
   
   .logo-icon svg {
