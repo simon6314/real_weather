@@ -3622,6 +3622,7 @@ function initDetailsDrawer() {
   
   const closeDrawer = () => {
     drawer.style.willChange = 'transform'; // Enable GPU layer for close transition
+    drawer.style.transform = ''; // Clear inline transform so it transitions out using CSS translateX(100%)
     overlay.classList.remove('active');
     drawer.classList.remove('active');
     
@@ -3635,6 +3636,7 @@ function initDetailsDrawer() {
     setTimeout(() => {
       if (!drawer.classList.contains('active')) {
         drawer.style.willChange = 'auto'; // Reset will-change state
+        drawer.style.transform = ''; // Double check clear
         document.getElementById('svg-chart-container').innerHTML = '';
         document.getElementById('drawer-weekly-list').innerHTML = '';
         const alertsContainer = document.getElementById('drawer-alerts-container');
@@ -3782,6 +3784,7 @@ function openDrawerForecast(identifier) {
       
       // Clean up GPU layer once drawer is open to allow glitch-free scrolling inside
       drawer.style.willChange = 'auto';
+      drawer.style.transform = 'none'; // Release GPU stacking context completely for stable scrolling
       
       // Safety check: ensure drawer is still open and showing the same region
       if (AppState.activeRegionDetailed !== identifier || !drawer.classList.contains('active')) {

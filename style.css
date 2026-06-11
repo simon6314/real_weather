@@ -1406,8 +1406,6 @@ body {
   min-width: 650px;
   height: 220px;
   position: relative;
-  transform: translate3d(0, 0, 0); /* Pre-render the entire 650px SVG width onto the GPU */
-  will-change: transform;
   /* Removed fade-in animation to prevent GPU composition rasterization dropouts on mobile Chrome */
 }
 
@@ -1524,8 +1522,6 @@ body {
   flex-direction: column;
   gap: 12px;
   margin-top: 16px;
-  transform: translate3d(0, 0, 0); /* Pre-render the entire weekly list onto the GPU */
-  will-change: transform;
 }
 
 .weekly-item {
@@ -2269,7 +2265,6 @@ body {
   .drawer-body {
     padding: 12px;
     gap: 12px;
-    transform: translate3d(0, 0, 0); /* Force GPU compositing scroll layer on mobile */
     -webkit-overflow-scrolling: touch;
   }
   
@@ -2281,7 +2276,6 @@ body {
   .chart-outer-container {
     padding: 10px;
     border-radius: var(--radius-sm);
-    transform: translate3d(0, 0, 0); /* Force GPU compositing scroll layer on mobile */
     -webkit-overflow-scrolling: touch;
   }
   
