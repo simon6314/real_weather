@@ -1865,6 +1865,22 @@ body {
 /* --------------------------------------------------------------------------
    11. SVG Weather Icon Animations
    -------------------------------------------------------------------------- */
+/* Custom property control for dynamic animation play-states in SVG <use> elements */
+.anim-sun-rays,
+.anim-cloud-drift-front,
+.anim-cloud-drift-back,
+.anim-rain .rain-1,
+.anim-rain .rain-2,
+.anim-rain .rain-3,
+.anim-lightning,
+.anim-wind .wind-line-1,
+.anim-wind .wind-line-2,
+.anim-stars .star-1,
+.anim-stars .star-2,
+.anim-stars .star-3 {
+  animation-play-state: var(--weather-anim-state, running) !important;
+}
+
 /* Sunny Animation */
 .anim-sun-rays {
   transform-origin: 32px 32px;
