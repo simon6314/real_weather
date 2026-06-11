@@ -128,8 +128,10 @@ function fixBackdropHeight() {
   const backdrop = document.getElementById('dynamic-backdrop');
   if (!backdrop) return;
   
-  // Set height to absolute window.innerHeight to prevent percent-based resizing
-  backdrop.style.height = `${window.innerHeight}px`;
+  const addressBarBuffer = 120; // 120px buffer to ensure height covers collapsed address bar at bottom
+  
+  // Set height to absolute window.innerHeight + buffer to prevent percent-based resizing and covering empty footer gap
+  backdrop.style.height = `${window.innerHeight + addressBarBuffer}px`;
   
   // Keep track of window width. Only update height on resize if width changes
   // (means device orientation changed, rather than scroll-induced address bar collapse)
@@ -137,7 +139,7 @@ function fixBackdropHeight() {
   window.addEventListener('resize', () => {
     if (window.innerWidth !== lastWidth) {
       lastWidth = window.innerWidth;
-      backdrop.style.height = `${window.innerHeight}px`;
+      backdrop.style.height = `${window.innerHeight + addressBarBuffer}px`;
     }
   });
 }
