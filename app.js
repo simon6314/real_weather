@@ -3524,7 +3524,9 @@ function drawHourlySvgChart(hourlyData) {
     pathD += `C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p2.x} ${p2.y} `;
   }
   
-  svgCode += `<path d="${pathD}" class="chart-line" style="${strokeStyle}" filter="url(#chart-line-shadow)" />`;
+  const isMobile = window.innerWidth <= 768;
+  const lineFilter = isMobile ? '' : 'filter="url(#chart-line-shadow)"';
+  svgCode += `<path d="${pathD}" class="chart-line" style="${strokeStyle}" ${lineFilter} />`;
   
   // Render labels and interaction nodes (enhanced sizes for mobile readability)
   points.forEach(p => {
@@ -3774,134 +3776,144 @@ function openDrawerForecast(identifier) {
   
   let rendered = false;
   const renderDrawerContent = () => {
-    if (rendered) return;
-    rendered = true;
-    
-    // Clean up GPU layer once drawer is open to allow glitch-free scrolling inside
-    drawer.style.willChange = 'auto';
-    
-    // Safety check: ensure drawer is still open and showing the same region
-    if (AppState.activeRegionDetailed !== identifier || !drawer.classList.contains('active')) {
-      return;
-    }
-    
-    // Build and render localized warning summaries if warnings are active for this county
-    const countyName = parsed.county;
-    const countyAlerts = filterRedundantAlerts(
-      (AppState.activeAlerts || []).filter(alert => 
-        alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed, alert))
-      )
-    );
-    
-    if (countyAlerts.length > 0 && alertsContainer) {
-      alertsContainer.innerHTML = '';
-      countyAlerts.forEach(alert => {
-        const keywords = getCountyKeywords(countyName);
-        const sentences = alert.contentText.split(/[。！]/).filter(s => s.trim().length > 0);
-        let relevantSentences = sentences.filter(s => keywords.some(k => s.includes(k)));
-        
-        const highlightText = (text) => {
-          let res = text;
-          keywords.forEach(k => {
-            const regex = new RegExp(k, 'g');
-            res = res.replace(regex, `<span class="alert-highlight">${k}</span>`);
-          });
-          return res;
-        };
-        
-        let summaryHtml = '';
-        if (relevantSentences.length > 0) {
-          summaryHtml = relevantSentences.map(s => `<li>${highlightText(s)}。</li>`).join('');
-        } else {
-          summaryHtml = sentences.slice(0, 2).map(s => `<li>${highlightText(s)}。</li>`).join('');
-        }
-        
-        const alertBox = document.createElement('div');
-        alertBox.className = 'drawer-alert-box glass-panel';
-        alertBox.innerHTML = `
-          <div class="drawer-alert-header">
-            <div class="drawer-alert-title">
-              <span class="alert-icon">⚠️</span>
-              <h4>${alert.title}</h4>
+    try {
+      if (rendered) return;
+      rendered = true;
+      
+      // Clean up GPU layer once drawer is open to allow glitch-free scrolling inside
+      drawer.style.willChange = 'auto';
+      
+      // Safety check: ensure drawer is still open and showing the same region
+      if (AppState.activeRegionDetailed !== identifier || !drawer.classList.contains('active')) {
+        return;
+      }
+      
+      // Build and render localized warning summaries if warnings are active for this county
+      const countyName = parsed.county;
+      const countyAlerts = filterRedundantAlerts(
+        (AppState.activeAlerts || []).filter(alert => 
+          alert.affectedAreas && alert.affectedAreas.some(area => isAlertMatch(area, parsed, alert))
+        )
+      );
+      
+      if (countyAlerts.length > 0 && alertsContainer) {
+        alertsContainer.innerHTML = '';
+        countyAlerts.forEach(alert => {
+          const keywords = getCountyKeywords(countyName);
+          const sentences = alert.contentText.split(/[。！]/).filter(s => s.trim().length > 0);
+          let relevantSentences = sentences.filter(s => keywords.some(k => s.includes(k)));
+          
+          const highlightText = (text) => {
+            let res = text;
+            keywords.forEach(k => {
+              const regex = new RegExp(k, 'g');
+              res = res.replace(regex, `<span class="alert-highlight">${k}</span>`);
+            });
+            return res;
+          };
+          
+          let summaryHtml = '';
+          if (relevantSentences.length > 0) {
+            summaryHtml = relevantSentences.map(s => `<li>${highlightText(s)}。</li>`).join('');
+          } else {
+            summaryHtml = sentences.slice(0, 2).map(s => `<li>${highlightText(s)}。</li>`).join('');
+          }
+          
+          const alertBox = document.createElement('div');
+          alertBox.className = 'drawer-alert-box glass-panel';
+          alertBox.innerHTML = `
+            <div class="drawer-alert-header">
+              <div class="drawer-alert-title">
+                <span class="alert-icon">⚠️</span>
+                <h4>${alert.title}</h4>
+              </div>
+              <span class="drawer-alert-time">${formatAlertTime(alert.startTime)} ～ ${formatAlertTime(alert.endTime)}</span>
             </div>
-            <span class="drawer-alert-time">${formatAlertTime(alert.startTime)} ～ ${formatAlertTime(alert.endTime)}</span>
-          </div>
-          <div class="drawer-alert-body">
-            <div class="alert-summary-section">
-              <span class="alert-section-badge">🎯 ${countyName} 專屬影響摘要</span>
-              <ul class="alert-summary-list">
-                ${summaryHtml}
-              </ul>
+            <div class="drawer-alert-body">
+              <div class="alert-summary-section">
+                <span class="alert-section-badge">🎯 ${countyName} 專屬影響摘要</span>
+                <ul class="alert-summary-list">
+                  ${summaryHtml}
+                </ul>
+              </div>
             </div>
-          </div>
-        `;
-        alertsContainer.appendChild(alertBox);
-      });
-    }
-    
-    // Render details drawer mini warning map if alerts exist for this region
-    if (countyAlerts.length > 0) {
-      if (mapContainer) {
-        mapContainer.style.display = 'block';
-        
-        // Resolve coordinates for map centering
-        const coords = getCoordsForLocation(parsed);
-        
-        // Initialize Leaflet map inside details drawer
-        AppState.drawerMap = L.map('drawer-mini-map', {
-          center: [coords.lat, coords.lon],
-          zoom: 11,
-          zoomControl: false,
-          attributionControl: false
+          `;
+          alertsContainer.appendChild(alertBox);
         });
-        
-        // Add Dark Matter CartoDB tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 18
-        }).addTo(AppState.drawerMap);
-        
-        // Add a red warning circle of 5km radius to highlight the alert area
-        L.circle([coords.lat, coords.lon], {
-          color: '#EF4444',
-          fillColor: '#EF4444',
-          fillOpacity: 0.15,
-          radius: 5000
-        }).addTo(AppState.drawerMap);
-        
-        // Add a pulsing-like marker at the center
-        L.circleMarker([coords.lat, coords.lon], {
-          radius: 6,
-          color: '#FF0000',
-          fillColor: '#FFFFFF',
-          fillOpacity: 0.8,
-          weight: 2
-        }).addTo(AppState.drawerMap);
-        
-        AppState.drawerMap.invalidateSize();
       }
-    } else {
-      if (mapContainer) {
-        mapContainer.style.display = 'none';
+      
+      // Render details drawer mini warning map if alerts exist for this region
+      if (countyAlerts.length > 0) {
+        if (mapContainer) {
+          mapContainer.style.display = 'block';
+          
+          // Resolve coordinates for map centering
+          const coords = getCoordsForLocation(parsed);
+          
+          // Initialize Leaflet map inside details drawer
+          AppState.drawerMap = L.map('drawer-mini-map', {
+            center: [coords.lat, coords.lon],
+            zoom: 11,
+            zoomControl: false,
+            attributionControl: false
+          });
+          
+          // Add Dark Matter CartoDB tiles
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18
+          }).addTo(AppState.drawerMap);
+          
+          // Add a red warning circle of 5km radius to highlight the alert area
+          L.circle([coords.lat, coords.lon], {
+            color: '#EF4444',
+            fillColor: '#EF4444',
+            fillOpacity: 0.15,
+            radius: 5000
+          }).addTo(AppState.drawerMap);
+          
+          // Add a pulsing-like marker at the center
+          L.circleMarker([coords.lat, coords.lon], {
+            radius: 6,
+            color: '#FF0000',
+            fillColor: '#FFFFFF',
+            fillOpacity: 0.8,
+            weight: 2
+          }).addTo(AppState.drawerMap);
+          
+          AppState.drawerMap.invalidateSize();
+        }
+      } else {
+        if (mapContainer) {
+          mapContainer.style.display = 'none';
+        }
       }
+      
+      // Set rainfall values in drawer
+      const r10m = data.current.rain10Min !== undefined ? Number(data.current.rain10Min).toFixed(1) : '0.0';
+      const r1h = data.current.rain1Hr !== undefined ? Number(data.current.rain1Hr).toFixed(1) : '0.0';
+      const rDaily = data.current.rainDaily !== undefined ? Number(data.current.rainDaily).toFixed(1) : '0.0';
+      
+      document.getElementById('drawer-rain-10m').textContent = `${r10m} mm`;
+      document.getElementById('drawer-rain-1h').textContent = `${r1h} mm`;
+      document.getElementById('drawer-rain-daily').textContent = `${rDaily} mm`;
+      
+      // Render SVG hourly chart
+      drawHourlySvgChart(data.hourly);
+      
+      // Render Apple style ranges
+      renderAppleWeeklyRangeBars(data.weekly);
+      
+      // Force SVG repaint to prevent browser lazy-rendering bug
+      forceSvgRepaint(drawer);
+    } catch (err) {
+      console.error("Error in renderDrawerContent:", err);
+      document.getElementById('svg-chart-container').innerHTML = `
+        <div style="color: #ff6b6b; padding: 20px; text-align: center; font-family: sans-serif;">
+          <p style="font-weight: bold;">繪製圖表時發生錯誤：</p>
+          <pre style="font-size: 11px; white-space: pre-wrap; word-break: break-all; margin-top: 8px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; text-align: left;">${err.stack || err.message || err}</pre>
+        </div>
+      `;
     }
-    
-    // Set rainfall values in drawer
-    const r10m = data.current.rain10Min !== undefined ? Number(data.current.rain10Min).toFixed(1) : '0.0';
-    const r1h = data.current.rain1Hr !== undefined ? Number(data.current.rain1Hr).toFixed(1) : '0.0';
-    const rDaily = data.current.rainDaily !== undefined ? Number(data.current.rainDaily).toFixed(1) : '0.0';
-    
-    document.getElementById('drawer-rain-10m').textContent = `${r10m} mm`;
-    document.getElementById('drawer-rain-1h').textContent = `${r1h} mm`;
-    document.getElementById('drawer-rain-daily').textContent = `${rDaily} mm`;
-    
-    // Render SVG hourly chart
-    drawHourlySvgChart(data.hourly);
-    
-    // Render Apple style ranges
-    renderAppleWeeklyRangeBars(data.weekly);
-    
-    // Force SVG repaint to prevent browser lazy-rendering bug
-    forceSvgRepaint(drawer);
   };
   
   // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 650ms to ensure animation finishes and GPU settles down)
