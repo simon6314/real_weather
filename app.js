@@ -3403,8 +3403,8 @@ function drawHourlySvgChart(hourlyData) {
           <stop offset="100%" stop-color="${colorMin}" stop-opacity="0.0" />
         </linearGradient>
         
-        <!-- Premium dark drop shadow filter for high contrast path rendering (unique ID to prevent collisions) -->
-        <filter id="chart-line-shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <!-- Premium dark drop shadow filter for high contrast path rendering (preventing collapse on flat 0-height lines via userSpaceOnUse) -->
+        <filter id="chart-line-shadow" filterUnits="userSpaceOnUse" x="0" y="0" width="680" height="200">
           <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
         </filter>
       </defs>
