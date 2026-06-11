@@ -21,7 +21,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=64">
+  <link rel="stylesheet" href="style.css?v=66">
 </head>
 <body>
 
@@ -32,11 +32,11 @@
     <!-- Dynamic Weather Overlay (Sun, Moon, Clouds, Volumetric Fog & Flowing Water Ripple Overlay) -->
     <svg class="weather-overlay" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="sun-glow">
+        <filter id="sun-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="35" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
-        <filter id="moon-glow">
+        <filter id="moon-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="20" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
