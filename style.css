@@ -338,6 +338,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
+  z-index: 3; /* Render on top of background image, tint layer, and clouds so stars/rain are bright and visible */
   pointer-events: none;
   /* Isolate animation layers in GPU to bypass scroll layout recalculations */
   transform: translate3d(0, 0, 0);

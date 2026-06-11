@@ -3199,7 +3199,7 @@ function applyDynamicBackdropTheme(iconType) {
     // Starry Stars (restricted to top 28% sky canopy)
     // Reduce star count if it is cloudy or windy (highly realistic!)
     let starCount = 45;
-    if (iconType === 'cloudy') starCount = 8;        // Very few stars peek through clouds
+    if (iconType === 'cloudy') starCount = 18;        // Increased from 8 to 18 so some stars can peek through the cloudy night sky
     else if (iconType === 'windy') starCount = 20;     // Hazy sky, fewer stars visible
     
     for (let i = 0; i < starCount; i++) {
