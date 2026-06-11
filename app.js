@@ -3760,8 +3760,14 @@ function openDrawerForecast(identifier) {
   overlay.classList.add('active');
   drawer.classList.add('active');
   
-  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done
-  setTimeout(() => {
+  let rendered = false;
+  const renderDrawerContent = () => {
+    if (rendered) return;
+    rendered = true;
+    
+    // Clean up event listener
+    drawer.removeEventListener('transitionend', handleTransitionEnd);
+    
     // Safety check: ensure drawer is still open and showing the same region
     if (AppState.activeRegionDetailed !== identifier || !drawer.classList.contains('active')) {
       return;
@@ -3884,7 +3890,20 @@ function openDrawerForecast(identifier) {
     
     // Force SVG repaint to prevent browser lazy-rendering bug
     forceSvgRepaint(drawer);
-  }, 420); // Delay rendering slightly past slide transition to secure 60fps scrolling
+  };
+  
+  // Transition end handler
+  const handleTransitionEnd = (e) => {
+    // Check if the transform transition finished on the drawer itself
+    if (e.target === drawer && e.propertyName === 'transform') {
+      renderDrawerContent();
+    }
+  };
+  
+  drawer.addEventListener('transitionend', handleTransitionEnd);
+  
+  // Fallback setTimeout (safety net for interrupted transitions or older WebKit)
+  setTimeout(renderDrawerContent, 480);
 }
 
 // --------------------------------------------------------------------------
