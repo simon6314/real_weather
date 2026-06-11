@@ -190,6 +190,47 @@ function initClock() {
 }
 
 // Weather manual refresh handler & page visibility auto-refresh
+async function refreshLocationAndWeather(forceRefresh = false) {
+  if (forceRefresh) {
+    clearAllWeatherCaches();
+  }
+  
+  updateDataBadge('定位中...', 'loading');
+  
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: false });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      console.log(`GPS Coordinates updated: Lat ${latitude}, Lon ${longitude}`);
+      
+      const geocoded = await reverseGeocodeTownship(latitude, longitude);
+      
+      let newLocation = '';
+      if (geocoded) {
+        newLocation = geocoded.county + geocoded.town;
+      } else {
+        const matchedCounty = getClosestTaiwanCounty(latitude, longitude);
+        const fallbackTown = COUNTY_CAPITALS[matchedCounty.name] || '中正區';
+        newLocation = matchedCounty.name + fallbackTown;
+      }
+      
+      console.log(`Geocoded updated location: ${newLocation}`);
+      
+      if (newLocation !== AppState.currentLocationCounty) {
+        AppState.currentLocationCounty = newLocation;
+        localStorage.setItem('cwa_last_location', newLocation);
+      }
+    } catch (error) {
+      console.warn('Geolocation update failed or denied. Code:', error.code || error.message);
+    }
+  }
+  
+  await loadWeatherDashboard();
+}
+
 function initWeatherRefresh() {
   const badge = document.getElementById('data-status-badge');
   if (badge) {
@@ -201,13 +242,11 @@ function initWeatherRefresh() {
         icon.classList.add('spinning');
       }
       
-      console.log('User clicked refresh badge. Force-reloading weather data...');
+      console.log('User clicked refresh badge. Force-reloading location and weather data...');
       updateDataBadge('強制更新中...', 'loading');
       
-      clearAllWeatherCaches();
-      
       try {
-        await loadWeatherDashboard();
+        await refreshLocationAndWeather(true);
       } catch (err) {
         console.error('Manual refresh failed:', err);
       } finally {
@@ -224,8 +263,8 @@ function initWeatherRefresh() {
   // Reuses the built-in 10-minute cache freshness check in loadWeatherDashboard() to prevent constant network requests
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      console.log('User returned to the tab. Checking dashboard freshness...');
-      loadWeatherDashboard();
+      console.log('User returned to the tab. Checking dashboard location and freshness...');
+      refreshLocationAndWeather(false);
     }
   });
 }
