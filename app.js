@@ -3374,6 +3374,15 @@ function forceSvgRepaint(container) {
     void chartWrapper.offsetHeight; // Force layout recalculation & full compositor repaint
     chartWrapper.style.display = originalDisplay;
   }
+  
+  // 3. Force repaint/reflow of the weekly range list to resolve mobile layout compression bugs
+  const weeklyList = container.querySelector('#drawer-weekly-list');
+  if (weeklyList) {
+    const originalDisplay = weeklyList.style.display;
+    weeklyList.style.display = 'none';
+    void weeklyList.offsetHeight; // Force layout recalculation & full compositor repaint
+    weeklyList.style.display = originalDisplay;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -3892,18 +3901,8 @@ function openDrawerForecast(identifier) {
     forceSvgRepaint(drawer);
   };
   
-  // Transition end handler
-  const handleTransitionEnd = (e) => {
-    // Check if the transform transition finished on the drawer itself
-    if (e.target === drawer && e.propertyName === 'transform') {
-      renderDrawerContent();
-    }
-  };
-  
-  drawer.addEventListener('transitionend', handleTransitionEnd);
-  
-  // Fallback setTimeout (safety net for interrupted transitions or older WebKit)
-  setTimeout(renderDrawerContent, 480);
+  // Defer heavy DOM drawing and Leaflet map rendering until the sliding transition is done (using 650ms to ensure animation finishes and GPU settles down)
+  setTimeout(renderDrawerContent, 650);
 }
 
 // --------------------------------------------------------------------------
