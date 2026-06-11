@@ -1,8 +1,28 @@
-/* ==========================================================================
-   天巡者 Weather Dashboard - Core Logic Application (ES6+)
-   Features: Real-time GPS, CWA API client, 1H Caching, High-Fidelity Simulation,
-             Interactive SVG Charting, Apple Weather Range Bars, Zoomable Radar
-   ========================================================================== */
+// Inject critical mobile performance overrides immediately to bypass aggressive stylesheet caching
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media (max-width: 768px) {
+      .details-drawer {
+        background: #080b11 !important; /* Solid background to eliminate alpha compositing overhead */
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .drawer-overlay.active {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .weekly-item:hover {
+        transform: none !important; /* Disable scale scale-up on mobile touch */
+      }
+      body.drawer-open .weather-particles {
+        display: none !important; /* Completely hide background animations when drawer is open */
+      }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 
 // --------------------------------------------------------------------------
 // 1. Taiwan 22 Counties Database & Configuration
@@ -3621,6 +3641,7 @@ function initDetailsDrawer() {
   const closeBtn = document.getElementById('btn-close-drawer');
   
   const closeDrawer = () => {
+    document.body.classList.remove('drawer-open'); // Restore background particles
     drawer.style.willChange = 'transform'; // Enable GPU layer for close transition
     drawer.style.transform = ''; // Clear inline transform so it transitions out using CSS translateX(100%)
     overlay.classList.remove('active');
@@ -3637,6 +3658,7 @@ function initDetailsDrawer() {
       if (!drawer.classList.contains('active')) {
         drawer.style.willChange = 'auto'; // Reset will-change state
         drawer.style.transform = ''; // Double check clear
+        document.body.classList.remove('drawer-open'); // Double check clear
         document.getElementById('svg-chart-container').innerHTML = '';
         document.getElementById('drawer-weekly-list').innerHTML = '';
         const alertsContainer = document.getElementById('drawer-alerts-container');
@@ -3772,6 +3794,7 @@ function openDrawerForecast(identifier) {
   }
   
   // Open UI elements (Trigger sliding transition instantly & smoothly!)
+  document.body.classList.add('drawer-open'); // Hide background particles to optimize performance
   drawer.style.willChange = 'transform'; // Enable GPU layer for slide transition
   overlay.classList.add('active');
   drawer.classList.add('active');
