@@ -2031,7 +2031,13 @@ body {
   }
   
   .location-badge {
-    font-size: 15.5px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  
+  .location-badge svg.badge-icon {
+    width: 18px;
+    height: 18px;
   }
   
   .data-source-badge {
@@ -2044,8 +2050,8 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    margin-bottom: 20px;
-    gap: 12px;
+    margin-bottom: 24px;
+    gap: 14px;
     padding: 4px;
   }
   
@@ -2056,33 +2062,33 @@ body {
   }
   
   .temp-display {
-    font-size: 66px;
+    font-size: 76px;
   }
   
   .temp-unit {
+    font-size: 26px;
+    margin-top: 8px;
+  }
+  
+  .weather-condition-text {
     font-size: 22px;
     margin-top: 6px;
   }
   
-  .weather-condition-text {
-    font-size: 20px;
-    margin-top: 4px;
-  }
-  
   .temp-range {
-    font-size: 13.5px;
-    margin-top: 4px;
+    font-size: 14.5px;
+    margin-top: 6px;
   }
   
   #hero-weather-icon svg {
-    width: 96px;
-    height: 96px;
+    width: 112px;
+    height: 112px;
   }
   
   /* 2-Column Stats Grid on Mobile to save vertical space */
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 10px;
   }
   
   /* Map viewport height adjustment */
@@ -2093,29 +2099,29 @@ body {
   }
   
   .stat-card {
-    padding: 8px 10px;
-    gap: 6px;
+    padding: 10px 12px;
+    gap: 8px;
     border-radius: var(--radius-sm);
   }
   
   .stat-icon {
-    padding: 6px;
+    padding: 8px;
     border-radius: 6px;
   }
   
   .stat-icon svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
   
   .stat-label {
-    font-size: 10px;
+    font-size: 11.5px;
     letter-spacing: 0px;
   }
   
   .stat-value {
-    font-size: 14px;
-    margin-top: 0px;
+    font-size: 16.5px;
+    margin-top: 2px;
   }
   
   /* Custom Regions Panel */
