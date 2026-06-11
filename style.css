@@ -3125,13 +3125,9 @@ body {
 
 /* Responsive SVG Sun/Moon centering on mobile */
 @media (max-width: 600px) {
-  #scene-sun {
-    transform: translate(-410px, -80px) scale(0.85) !important;
-    transform-origin: 1150px 220px;
-  }
-  #scene-moon {
-    transform: translate(-410px, -80px) scale(0.85) rotate(-15deg) !important;
-    transform-origin: 1150px 220px;
+  /* Using JS dynamic bounds calculations instead of hardcoded CSS translations */
+  #scene-sun, #scene-moon {
+    transform: none !important;
   }
 }
 

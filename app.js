@@ -2855,17 +2855,30 @@ function updateAstronomyPositions() {
   // Calculate hour of day in decimal (0.0 to 24.0)
   const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 
+  // Detect if mobile layout to optimize coordinates range
+  const isMobile = window.innerWidth < 600;
+
   // 1. Sun Elevation Path (Calculated dynamically based on Taiwan's latitude and season)
   const { sunrise, sunset } = getTaiwanSunriseSunset(now);
   const dayLength = sunset - sunrise;
 
   if (hours >= sunrise && hours <= sunset) {
     const t = (hours - sunrise) / dayLength; // 0 to 1
-    const cx = 150 + t * 1140; // Span horizontally across SVG
-    const cy = 380 - Math.sin(Math.PI * t) * 260; // Curve upwards
+    
+    // Adapt horizontal bounds on mobile to prevent sun cropping on narrow viewports
+    const minCx = isMobile ? 540 : 150;
+    const maxCx = isMobile ? 900 : 1290;
+    const cx = minCx + t * (maxCx - minCx);
+    
+    // Lift elevation slightly higher on mobile to show sun above mobile layout panels
+    const baseCy = isMobile ? 320 : 380;
+    const heightFactor = isMobile ? 180 : 260;
+    const cy = baseCy - Math.sin(Math.PI * t) * heightFactor;
+    
     if (sunEl) {
       sunEl.setAttribute('cx', cx);
       sunEl.setAttribute('cy', cy);
+      sunEl.setAttribute('r', isMobile ? 52 : 70); // Slightly smaller sun on mobile for balance
       sunEl.style.opacity = ''; // Fallback to CSS opacity
     }
   } else {
@@ -2889,8 +2902,16 @@ function updateAstronomyPositions() {
 
   if (isMoonVisible) {
     const t = hoursSinceRise / 12; // 0 to 1
-    const cx = 150 + t * 1140; // Span horizontally
-    const cy = 380 - Math.sin(Math.PI * t) * 260; // Curve upwards
+    
+    // Adapt horizontal bounds on mobile to prevent moon cropping
+    const minCx = isMobile ? 540 : 150;
+    const maxCx = isMobile ? 900 : 1290;
+    const cx = minCx + t * (maxCx - minCx);
+    
+    const baseCy = isMobile ? 320 : 380;
+    const heightFactor = isMobile ? 180 : 260;
+    const cy = baseCy - Math.sin(Math.PI * t) * heightFactor;
+    
     if (moonEl) {
       const moonPath = getMoonPhasePath(now, cx, cy);
       moonEl.setAttribute('d', moonPath);
