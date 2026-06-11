@@ -2129,11 +2129,15 @@ body {
   }
   
   .card-container-scroll {
-    max-height: 380px;
+    max-height: 440px; /* Increase height to fit 4 custom cards completely */
+  }
+  
+  .regions-grid {
+    gap: 10px; /* Slightly reduce gap to save vertical space */
   }
   
   .region-card {
-    padding: 12px 14px;
+    padding: 10px 14px; /* Slightly reduce padding for a sleeker card size */
     border-radius: var(--radius-sm);
   }
   
