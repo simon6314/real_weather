@@ -3098,20 +3098,54 @@ function drawHourlySvgChart(hourlyData) {
     const y = svgHeight - paddingY - ((d.temp - minTemp) / tempDiff) * (svgHeight - paddingY * 2);
     return { x, y, temp: d.temp, time: d.displayTime, icon: d.icon, rainProb: d.rainProb };
   });
+
+  // Helper function to interpolate temperature colors dynamically in JS
+  const getTempColor = (temp) => {
+    const diff = maxTemp - minTemp;
+    if (diff === 0) return '#ffbc00';
+    const percent = (temp - minTemp) / diff; // 0.0 to 1.0
+    
+    // Define RGB values for Cool (blue), Warm (gold), and Hot (red/coral)
+    const cool = [0, 176, 255];   // #00b0ff
+    const warm = [255, 188, 0];   // #ffbc00
+    const hot = [255, 78, 80];    // #ff4e50
+    
+    let r, g, b;
+    if (percent <= 0.5) {
+      const t = percent * 2;
+      r = Math.round(cool[0] + t * (warm[0] - cool[0]));
+      g = Math.round(cool[1] + t * (warm[1] - cool[1]));
+      b = Math.round(cool[2] + t * (warm[2] - cool[2]));
+    } else {
+      const t = (percent - 0.5) * 2;
+      r = Math.round(warm[0] + t * (hot[0] - warm[0]));
+      g = Math.round(warm[1] + t * (hot[1] - warm[1]));
+      b = Math.round(warm[2] + t * (hot[2] - warm[2]));
+    }
+    return `rgb(${r},${g},${b})`;
+  };
   
   // Start building SVG string
   let svgCode = `
     <svg width="100%" height="100%" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <!-- Background Area Gradient -->
-        <linearGradient id="chart-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.3" />
-          <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0.0" />
+        <!-- Temperature Gradient for the Line -->
+        <linearGradient id="temp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ff4e50" />
+          <stop offset="50%" stop-color="#ffbc00" />
+          <stop offset="100%" stop-color="#00b0ff" />
         </linearGradient>
         
-        <!-- Glowing drop shadow filter -->
+        <!-- Temperature Gradient for the Area Fill under the line -->
+        <linearGradient id="temp-fill-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ff4e50" stop-opacity="0.25" />
+          <stop offset="50%" stop-color="#ffbc00" stop-opacity="0.12" />
+          <stop offset="100%" stop-color="#00b0ff" stop-opacity="0.0" />
+        </linearGradient>
+        
+        <!-- Premium dark drop shadow filter for high contrast path rendering -->
         <filter id="glow-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="var(--color-accent-glow)" flood-opacity="0.8" />
+          <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
         </filter>
       </defs>
   `;
@@ -3128,7 +3162,7 @@ function drawHourlySvgChart(hourlyData) {
     areaPoints += `L ${p.x} ${p.y} `;
   });
   areaPoints += `L ${points[size-1].x} ${svgHeight - paddingY} Z`;
-  svgCode += `<path d="${areaPoints}" class="chart-gradient-fill" />`;
+  svgCode += `<path d="${areaPoints}" class="chart-gradient-fill" style="fill: url(#temp-fill-gradient); opacity: 1;" />`;
   
   // Construct polyline path (Smooth curves using bezier approximations)
   let pathD = `M ${points[0].x} ${points[0].y} `;
@@ -3143,15 +3177,17 @@ function drawHourlySvgChart(hourlyData) {
     pathD += `C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p2.x} ${p2.y} `;
   }
   
-  svgCode += `<path d="${pathD}" class="chart-line" filter="url(#glow-shadow)" />`;
+  svgCode += `<path d="${pathD}" class="chart-line" style="stroke: url(#temp-line-gradient);" filter="url(#glow-shadow)" />`;
   
   // Render labels and interaction nodes (enhanced sizes for mobile readability)
   points.forEach(p => {
-    // Temperature above coordinate node
-    svgCode += `<text x="${p.x}" y="${p.y - 15}" class="chart-label-temp">${Number(p.temp).toFixed(1)}°</text>`;
+    const pColor = getTempColor(p.temp);
+
+    // Temperature above coordinate node (dynamically colored)
+    svgCode += `<text x="${p.x}" y="${p.y - 15}" class="chart-label-temp" style="fill: ${pColor};">${Number(p.temp).toFixed(1)}°</text>`;
     
-    // Coordinate circle point node (enlarged)
-    svgCode += `<circle cx="${p.x}" cy="${p.y}" r="5" class="chart-point" />`;
+    // Coordinate circle point node (enlarged & dynamically colored)
+    svgCode += `<circle cx="${p.x}" cy="${p.y}" r="5" class="chart-point" style="stroke: ${pColor};" />`;
     
     // Render inlined vector weather icon with animations! (Scaled up to 36px for stunning animation views)
     svgCode += getChartIconSvg(p.icon, p.x, svgHeight - 56, 36);
