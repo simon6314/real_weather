@@ -2483,7 +2483,7 @@ function getChartIconSvg(iconName, x, y, size = 20) {
   
   return `
     <g class="weather-icon-animated ${viewClass}" transform="translate(${x - size/2}, ${y - size/2}) scale(${size / 64})">
-      <use href="${innerRef}" />
+      <use href="${innerRef}" xlink:href="${innerRef}" />
     </g>
   `;
 }
@@ -3277,6 +3277,8 @@ function renderAddedRegionsList() {
 // Helper to force browser to repaint SVG <use> elements (fixes invisible icons bug in Safari/Chrome when rendered inside hidden/animating drawers)
 function forceSvgRepaint(container) {
   if (!container) return;
+  
+  // 1. Force repaint of all SVG <use> elements to fix reference link failures
   const uses = container.querySelectorAll('use');
   uses.forEach(use => {
     const href = use.getAttribute('href') || use.getAttribute('xlink:href');
@@ -3287,8 +3289,18 @@ function forceSvgRepaint(container) {
         void use.parentNode.getBoundingClientRect();
       }
       use.setAttribute('href', href);
+      use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', href); // Restore both standard and legacy namespaces for iOS WebKit/Safari/Chrome compatibility
     }
   });
+  
+  // 2. Force repaint/reflow of the entire SVG chart wrapper to resolve mobile Chrome GPU rasterization bugs (invisible elements)
+  const chartWrapper = container.querySelector('.svg-chart-wrapper');
+  if (chartWrapper) {
+    const originalDisplay = chartWrapper.style.display;
+    chartWrapper.style.display = 'none';
+    void chartWrapper.offsetHeight; // Force layout recalculation & full compositor repaint
+    chartWrapper.style.display = originalDisplay;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -4969,7 +4981,7 @@ function getAnimatedSvgCode(iconName, width = 64, height = 64) {
   
   return `
     <svg class="weather-icon-animated ${viewClass}" viewBox="0 0 64 64" width="${width}" height="${height}">
-      <use href="${innerRef}" />
+      <use href="${innerRef}" xlink:href="${innerRef}" />
     </svg>
   `;
 }
