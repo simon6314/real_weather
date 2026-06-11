@@ -3070,6 +3070,40 @@ function forceSvgRepaint(container) {
 // --------------------------------------------------------------------------
 // 8. Custom SVG Line Chart & Apple-style Temperature Range Renderers
 // --------------------------------------------------------------------------
+// Global helper function to interpolate temperature colors dynamically in JS based on absolute temperatures
+// 12°C below: Cool blue (#00b0ff)
+// 18°C: Comfortable cool green (#4caf50)
+// 24°C: Comfortable warm yellow (#ffbc00)
+// 30°C above: Hot red (#ff4e50)
+function getAbsoluteTempColor(temp) {
+  const points = [
+    { t: 12, rgb: [0, 176, 255] },   // Cool blue
+    { t: 18, rgb: [76, 175, 80] },   // Comfortable green
+    { t: 24, rgb: [255, 188, 0] },  // Comfortable warm gold
+    { t: 30, rgb: [255, 78, 80] }    // Hot red
+  ];
+  
+  const val = Number(temp);
+  if (isNaN(val)) return 'rgb(255, 188, 0)';
+  
+  if (val <= points[0].t) return `rgb(${points[0].rgb.join(',')})`;
+  if (val >= points[points.length - 1].t) return `rgb(${points[points.length - 1].rgb.join(',')})`;
+  
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    if (val >= p1.t && val <= p2.t) {
+      const range = p2.t - p1.t;
+      const factor = (val - p1.t) / range;
+      const r = Math.round(p1.rgb[0] + factor * (p2.rgb[0] - p1.rgb[0]));
+      const g = Math.round(p1.rgb[1] + factor * (p2.rgb[1] - p1.rgb[1]));
+      const b = Math.round(p1.rgb[2] + factor * (p2.rgb[2] - p1.rgb[2]));
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+  return 'rgb(255, 188, 0)';
+}
+
 function drawHourlySvgChart(hourlyData) {
   const container = document.getElementById('svg-chart-container');
   container.innerHTML = ''; // Wipe
@@ -3099,48 +3133,29 @@ function drawHourlySvgChart(hourlyData) {
     return { x, y, temp: d.temp, time: d.displayTime, icon: d.icon, rainProb: d.rainProb };
   });
 
-  // Helper function to interpolate temperature colors dynamically in JS
-  const getTempColor = (temp) => {
-    const diff = maxTemp - minTemp;
-    if (diff === 0) return '#ffbc00';
-    const percent = (temp - minTemp) / diff; // 0.0 to 1.0
-    
-    // Define RGB values for Cool (blue), Warm (gold), and Hot (red/coral)
-    const cool = [0, 176, 255];   // #00b0ff
-    const warm = [255, 188, 0];   // #ffbc00
-    const hot = [255, 78, 80];    // #ff4e50
-    
-    let r, g, b;
-    if (percent <= 0.5) {
-      const t = percent * 2;
-      r = Math.round(cool[0] + t * (warm[0] - cool[0]));
-      g = Math.round(cool[1] + t * (warm[1] - cool[1]));
-      b = Math.round(cool[2] + t * (warm[2] - cool[2]));
-    } else {
-      const t = (percent - 0.5) * 2;
-      r = Math.round(warm[0] + t * (hot[0] - warm[0]));
-      g = Math.round(warm[1] + t * (hot[1] - warm[1]));
-      b = Math.round(warm[2] + t * (hot[2] - warm[2]));
-    }
-    return `rgb(${r},${g},${b})`;
-  };
+  const getTempColor = getAbsoluteTempColor;
+  
+  // Calculate absolute temperature colors at maximum, midpoint and minimum of chart bounds
+  const colorMax = getAbsoluteTempColor(maxTemp);
+  const colorMid = getAbsoluteTempColor((maxTemp + minTemp) / 2);
+  const colorMin = getAbsoluteTempColor(minTemp);
   
   // Start building SVG string
   let svgCode = `
     <svg width="100%" height="100%" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <!-- Temperature Gradient for the Line -->
+        <!-- Dynamic Temperature Gradient based on absolute values -->
         <linearGradient id="temp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ff4e50" />
-          <stop offset="50%" stop-color="#ffbc00" />
-          <stop offset="100%" stop-color="#00b0ff" />
+          <stop offset="0%" stop-color="${colorMax}" />
+          <stop offset="50%" stop-color="${colorMid}" />
+          <stop offset="100%" stop-color="${colorMin}" />
         </linearGradient>
         
-        <!-- Temperature Gradient for the Area Fill under the line -->
+        <!-- Dynamic Temperature Fill Gradient based on absolute values -->
         <linearGradient id="temp-fill-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ff4e50" stop-opacity="0.25" />
-          <stop offset="50%" stop-color="#ffbc00" stop-opacity="0.12" />
-          <stop offset="100%" stop-color="#00b0ff" stop-opacity="0.0" />
+          <stop offset="0%" stop-color="${colorMax}" stop-opacity="0.25" />
+          <stop offset="50%" stop-color="${colorMid}" stop-opacity="0.12" />
+          <stop offset="100%" stop-color="${colorMin}" stop-opacity="0.0" />
         </linearGradient>
         
         <!-- Premium dark drop shadow filter for high contrast path rendering -->
@@ -3227,6 +3242,10 @@ function renderAppleWeeklyRangeBars(weeklyList) {
     const leftPercent = ((day.tempMin - absoluteMin) / absoluteRange) * 100;
     const widthPercent = ((day.tempMax - day.tempMin) / absoluteRange) * 100;
     
+    // Calculate absolute temperature gradient colors for the filled bar
+    const colorMin = getAbsoluteTempColor(day.tempMin);
+    const colorMax = getAbsoluteTempColor(day.tempMax);
+    
     // If "Today", draw an additional absolute dot representing current temperature!
     let dotHtml = '';
     if (index === 0) {
@@ -3244,7 +3263,7 @@ function renderAppleWeeklyRangeBars(weeklyList) {
       </div>
       <div class="weekly-range-bar-container">
         <div class="weekly-range-bar-track">
-          <div class="weekly-range-bar-filled" style="left: ${leftPercent}%; width: ${widthPercent}%;">
+          <div class="weekly-range-bar-filled" style="left: ${leftPercent}%; width: ${widthPercent}%; background: linear-gradient(to right, ${colorMin}, ${colorMax});">
             ${dotHtml}
           </div>
         </div>
