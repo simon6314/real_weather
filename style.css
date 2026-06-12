@@ -1935,8 +1935,8 @@ body {
 }
 
 @keyframes lightning-strike {
-  0%, 94%, 98%, 100% { opacity: 0; }
-  95%, 97% { opacity: 1; }
+  0%, 85%, 90%, 95%, 100% { opacity: 0.45; }
+  88%, 93%, 98% { opacity: 1; }
 }
 
 /* Windy Animations */
