@@ -126,6 +126,12 @@ body {
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   will-change: transform;
+
+  /* Default Sunny/Windy Cloud Colors */
+  --cloud-grad-0: #ffffff;
+  --cloud-grad-35: #f2f5fa;
+  --cloud-grad-70: #dee4f0;
+  --cloud-grad-100: #b8c6db;
 }
 
 /* Multiplied color tint layer for realistic lighting changes on the forest photo */
@@ -173,20 +179,60 @@ body {
 }
 
 /* Cloud drifting animations in the backdrop */
+.cloud-drift-1, .cloud-drift-2, .cloud-drift-3, .cloud-drift-4 {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
 .cloud-drift-1 {
-  animation: cloud-drift-slow 60s linear infinite alternate;
+  animation: cloud-drift-left-to-right-1 14s ease-in-out infinite alternate;
 }
 
 .cloud-drift-2 {
-  animation: cloud-drift-slow 85s linear infinite alternate-reverse;
+  animation: cloud-drift-right-to-left-1 22s ease-in-out infinite alternate;
 }
 
-@keyframes cloud-drift-slow {
+.cloud-drift-3 {
+  animation: cloud-drift-left-to-right-2 18s ease-in-out infinite alternate;
+}
+
+.cloud-drift-4 {
+  animation: cloud-drift-right-to-left-2 25s ease-in-out infinite alternate;
+}
+
+@keyframes cloud-drift-left-to-right-1 {
   0% {
-    transform: translateX(-50px);
+    transform: translateX(-150px) scale(1.15);
   }
   100% {
-    transform: translateX(100px);
+    transform: translateX(200px) scale(1.45);
+  }
+}
+
+@keyframes cloud-drift-right-to-left-1 {
+  0% {
+    transform: translateX(180px) scale(1.45);
+  }
+  100% {
+    transform: translateX(-180px) scale(1.15);
+  }
+}
+
+@keyframes cloud-drift-left-to-right-2 {
+  0% {
+    transform: translateX(-180px) scale(1.2);
+  }
+  100% {
+    transform: translateX(150px) scale(1.5);
+  }
+}
+
+@keyframes cloud-drift-right-to-left-2 {
+  0% {
+    transform: translateX(200px) scale(1.4);
+  }
+  100% {
+    transform: translateX(-150px) scale(1.1);
   }
 }
 
@@ -227,9 +273,15 @@ body {
   --sun-color: #fffde7;
   --sun-opacity: 0; /* Hide the sun completely on cloudy days as the thick cloud cover blocks it */
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.85; /* Make background cloud shapes more distinct */
+  --bg-clouds-opacity: 1.0; /* Make background clouds fully opaque */
   --fog-color: #b2c1ce;
   --fog-opacity: 0.5; /* Increase cloudiness/mistiness in the air */
+  
+  /* Overcast light grey-blue clouds */
+  --cloud-grad-0: #eceff1;
+  --cloud-grad-35: #cfd8dc;
+  --cloud-grad-70: #b0bec5;
+  --cloud-grad-100: #90a4ae;
 }
 
 /* Cloudy Night */
@@ -239,9 +291,15 @@ body {
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.15;
-  --bg-clouds-opacity: 0.6;
+  --bg-clouds-opacity: 0.95; /* Make background clouds almost fully opaque */
   --fog-color: #020306;
   --fog-opacity: 0.45;
+  
+  /* Night-time dark grey-blue clouds */
+  --cloud-grad-0: #cfd8dc;
+  --cloud-grad-35: #b0bec5;
+  --cloud-grad-70: #90a4ae;
+  --cloud-grad-100: #78909c;
 }
 
 /* Rainy Day */
@@ -250,9 +308,15 @@ body {
   --image-tint-opacity: 0.65;
   --sun-opacity: 0;
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.8;
+  --bg-clouds-opacity: 0.95;
   --fog-color: #4a5459;
   --fog-opacity: 0.7;
+  
+  /* Darker rainy grey clouds */
+  --cloud-grad-0: #b0bec5;
+  --cloud-grad-35: #90a4ae;
+  --cloud-grad-70: #78909c;
+  --cloud-grad-100: #546e7a;
 }
 
 /* Rainy Night */
@@ -262,17 +326,29 @@ body {
   --sun-opacity: 0;
   --moon-color: #e0f7fa;
   --moon-opacity: 0.05;
-  --bg-clouds-opacity: 0.8;
+  --bg-clouds-opacity: 0.95;
   --fog-color: #010102;
   --fog-opacity: 0.6;
+  
+  /* Night rain dark slate clouds */
+  --cloud-grad-0: #90a4ae;
+  --cloud-grad-35: #78909c;
+  --cloud-grad-70: #546e7a;
+  --cloud-grad-100: #37474f;
 }
 
 /* Thunderstorm */
 #dynamic-backdrop.weather-thunder {
   --sun-opacity: 0;
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.95;
-  --fog-color: #293136;
+  --bg-clouds-opacity: 1.0; /* Fully opaque for thick storm clouds */
+  --fog-color: #1a2226;
+  
+  /* Dark blackish/charcoal storm clouds */
+  --cloud-grad-0: #424e54;
+  --cloud-grad-35: #323d42;
+  --cloud-grad-70: #222b30;
+  --cloud-grad-100: #141a1c;
 }
 #dynamic-backdrop.state-day.weather-thunder {
   --image-tint: #1c272b;
@@ -286,12 +362,18 @@ body {
   --fog-opacity: 0.8;
 }
 
-/* Typhoon Rain Day */
+/* Typhoon Rain base */
 #dynamic-backdrop.weather-typhoon-rain {
   --sun-opacity: 0;
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.98;
-  --fog-color: #333d42;
+  --bg-clouds-opacity: 1.0;
+  --fog-color: #12181b;
+  
+  /* Deepest stormy black-grey clouds */
+  --cloud-grad-0: #323d42;
+  --cloud-grad-35: #222b30;
+  --cloud-grad-70: #141a1c;
+  --cloud-grad-100: #0a0d0e;
 }
 #dynamic-backdrop.state-day.weather-typhoon-rain {
   --image-tint: #141b1f;
@@ -305,12 +387,18 @@ body {
   --fog-opacity: 0.85;
 }
 
-/* Snowy Day */
+/* Snowy Day & Night base */
 #dynamic-backdrop.weather-snowy {
   --sun-opacity: 0;
   --moon-opacity: 0;
-  --bg-clouds-opacity: 0.85;
+  --bg-clouds-opacity: 0.95;
   --fog-color: #d2dbe5;
+  
+  /* Cold frosty white-grey clouds */
+  --cloud-grad-0: #ffffff;
+  --cloud-grad-35: #eceff1;
+  --cloud-grad-70: #dce4ec;
+  --cloud-grad-100: #b8c6d4;
 }
 #dynamic-backdrop.state-day.weather-snowy {
   --image-tint: #4b5866;

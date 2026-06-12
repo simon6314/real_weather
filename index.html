@@ -74,6 +74,21 @@
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+
+        <!-- Realistic Fluffy Cloud Filter -->
+        <filter id="realistic-cloud-filter" x="-50%" y="-50%" width="200%" height="200%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="4" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="55" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+          <feGaussianBlur in="displaced" stdDeviation="8" />
+        </filter>
+
+        <!-- Beautiful soft realistic cloud gradient (volume shading) -->
+        <linearGradient id="realistic-cloud-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--cloud-grad-0, #ffffff)" stop-opacity="1.0" />
+          <stop offset="35%" stop-color="var(--cloud-grad-35, #f2f5fa)" stop-opacity="1.0" />
+          <stop offset="70%" stop-color="var(--cloud-grad-70, #dee4f0)" stop-opacity="1.0" />
+          <stop offset="100%" stop-color="var(--cloud-grad-100, #b8c6db)" stop-opacity="1.0" />
+        </linearGradient>
       </defs>
 
       <!-- Sun -->
@@ -84,8 +99,14 @@
 
       <!-- Cloud Shapes -->
       <g id="bg-clouds" opacity="var(--bg-clouds-opacity)">
-        <path d="M 150 180 Q 180 150 220 160 Q 250 130 290 150 Q 330 140 350 170 Q 370 180 370 200 L 150 200 Z" fill="rgba(255,255,255,0.2)" class="cloud-drift-1" />
-        <path d="M 750 120 Q 780 90 820 100 Q 850 70 890 90 Q 930 80 950 110 Q 970 120 970 140 L 750 140 Z" fill="rgba(255,255,255,0.15)" class="cloud-drift-2" />
+        <!-- Cloud 1 (Left-top) -->
+        <path d="M 100 180 Q 140 140 190 150 Q 230 110 280 140 Q 330 120 360 160 Q 390 170 390 200 L 100 200 Z" fill="url(#realistic-cloud-grad)" filter="url(#realistic-cloud-filter)" class="cloud-drift-1" />
+        <!-- Cloud 2 (Middle-right) -->
+        <path d="M 700 130 Q 740 90 790 100 Q 830 60 880 90 Q 930 70 960 110 Q 990 120 990 150 L 700 150 Z" fill="url(#realistic-cloud-grad)" filter="url(#realistic-cloud-filter)" class="cloud-drift-2" />
+        <!-- Cloud 3 (Middle-left) -->
+        <path d="M 400 150 Q 430 110 480 120 Q 520 80 570 110 Q 610 90 640 130 Q 670 140 670 170 L 400 170 Z" fill="url(#realistic-cloud-grad)" filter="url(#realistic-cloud-filter)" class="cloud-drift-3" />
+        <!-- Cloud 4 (Right-top) -->
+        <path d="M 1000 170 Q 1030 130 1080 140 Q 1120 100 1170 130 Q 1210 110 1240 150 Q 1270 160 1270 190 L 1000 190 Z" fill="url(#realistic-cloud-grad)" filter="url(#realistic-cloud-filter)" class="cloud-drift-4" />
       </g>
 
       <!-- Procedural Sky Lightning Bolt -->
