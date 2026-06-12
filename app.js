@@ -3998,6 +3998,12 @@ function openDrawerForecast(identifier) {
         const overlay = document.getElementById('details-drawer-overlay');
         const drawer = document.getElementById('details-drawer');
         
+        // Reset scroll position to top immediately on open to prevent hidden weather alerts
+        const drawerBody = drawer.querySelector('.drawer-body');
+        if (drawerBody) {
+          drawerBody.scrollTop = 0;
+        }
+        
         // Render detailed drawer in-progress state
         document.getElementById('drawer-region-title').textContent = `${parsed.county} ${capital}`;
         document.getElementById('drawer-current-desc').textContent = `載入預報資料中...`;
@@ -4043,6 +4049,12 @@ function openDrawerForecast(identifier) {
   
   const overlay = document.getElementById('details-drawer-overlay');
   const drawer = document.getElementById('details-drawer');
+  
+  // Reset scroll position to top immediately on open to prevent hidden weather alerts
+  const drawerBody = drawer.querySelector('.drawer-body');
+  if (drawerBody) {
+    drawerBody.scrollTop = 0;
+  }
   
   if (!data || data.error || !data.current || Object.keys(data.current).length === 0) {
     document.getElementById('drawer-current-desc').textContent = `連線失敗 • 無法取得該地區天氣預報`;
