@@ -3308,11 +3308,22 @@ function applyDynamicBackdropTheme(iconType) {
   const isNight = isNightTime(AppState.currentLocationCounty, new Date());
   backdrop.classList.add(isNight ? 'state-night' : 'state-day');
   
+  // Detect if current county is under a Land Typhoon Warning (陸上颱風警報)
+  const parsedActive = parseIdentifier(AppState.currentLocationCounty);
+  const activeAlertsForLoc = filterRedundantAlerts(
+    (AppState.activeAlerts || []).filter(a => 
+      a.affectedAreas && a.affectedAreas.some(area => isAlertMatch(area, parsedActive, a))
+    )
+  );
+  const hasTyphoonWarning = activeAlertsForLoc.some(a => 
+    a.title && (a.title.includes('颱風') || a.title.includes('陸上颱風'))
+  );
+  
   let weatherClass = 'weather-sunny';
   if (iconType === 'sunny' || iconType === 'sunny-cloudy') weatherClass = 'weather-sunny';
   else if (iconType === 'cloudy') weatherClass = 'weather-cloudy';
-  else if (iconType === 'rainy') weatherClass = 'weather-rainy';
-  else if (iconType === 'thunderstorm') weatherClass = 'weather-thunder';
+  else if (iconType === 'rainy') weatherClass = hasTyphoonWarning ? 'weather-typhoon-rain' : 'weather-rainy';
+  else if (iconType === 'thunderstorm') weatherClass = hasTyphoonWarning ? 'weather-typhoon-rain' : 'weather-thunder';
   else if (iconType === 'snowy') weatherClass = 'weather-snowy';
   else if (iconType === 'windy') weatherClass = 'weather-windy';
   else if (iconType === 'night') {
@@ -3341,23 +3352,41 @@ function applyDynamicBackdropTheme(iconType) {
   // Position Sun & Moon immediately
   updateAstronomyPositions();
   
-  // Spawn background particle systems (rain or stars!)
+  // Spawn background particle systems (rain, snow, stars, leaves!)
   const particlesContainer = document.getElementById('weather-particles');
   particlesContainer.innerHTML = ''; // Wipe
   
   if (iconType === 'rainy' || iconType === 'thunderstorm') {
-    // Rain Particles - heavier rain for thunderstorm
-    const dropCount = iconType === 'thunderstorm' ? 120 : 63;
+    // Rain Particles - heavier rain for thunderstorm, and torrential rain for typhoon warning (180 drops)
+    const dropCount = hasTyphoonWarning ? 180 : (iconType === 'thunderstorm' ? 120 : 63);
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
-      drop.className = 'raindrop';
+      drop.className = hasTyphoonWarning ? 'raindrop typhoon-drop' : 'raindrop';
       const r = Math.random();
       drop.style.left = `calc(${r * 100}% + ${r * 30}vh)`;
       drop.style.top = `${Math.random() * -80}px`;
       drop.style.height = `${Math.random() * 30 + 45}px`;
-      drop.style.animationDuration = `${Math.random() * 0.4 + 0.4}s`;
+      // Typhoon gales drive the rain down significantly faster
+      const duration = hasTyphoonWarning ? (Math.random() * 0.18 + 0.18) : (Math.random() * 0.4 + 0.4);
+      drop.style.animationDuration = `${duration}s`;
       drop.style.animationDelay = `${Math.random() * 1.5}s`;
       particlesContainer.appendChild(drop);
+    }
+    
+    // Spawn horizontal wind gusts for typhoon gale simulations
+    if (hasTyphoonWarning) {
+      const gustCount = 8;
+      for (let i = 0; i < gustCount; i++) {
+        const gust = document.createElement('div');
+        gust.className = 'wind-gust';
+        gust.style.left = `${Math.random() * -30}vw`;
+        gust.style.top = `${Math.random() * 80}%`;
+        gust.style.width = `${Math.random() * 120 + 80}px`;
+        gust.style.height = `${Math.random() * 2 + 1}px`;
+        gust.style.animationDuration = `${Math.random() * 0.5 + 0.5}s`;
+        gust.style.animationDelay = `${Math.random() * 3}s`;
+        particlesContainer.appendChild(gust);
+      }
     }
   } else if (iconType === 'snowy') {
     // Snowy Particles - 45 soft drifting snowflakes
@@ -3374,6 +3403,56 @@ function applyDynamicBackdropTheme(iconType) {
       flake.style.animationDelay = `${Math.random() * 5}s`;
       flake.style.opacity = (Math.random() * 0.4 + 0.4).toFixed(2);
       particlesContainer.appendChild(flake);
+    }
+  } else if (!isNight && (iconType === 'sunny' || iconType === 'sunny-cloudy')) {
+    // Spawn wind-driven falling leaves based on active wind grade (Beaufort scale)
+    let windGrade = 2;
+    const countyData = AppState.allCountiesWeatherData[AppState.currentLocationCounty];
+    if (countyData && countyData.current && countyData.current.windGrade !== undefined) {
+      windGrade = parseInt(countyData.current.windGrade) || 2;
+    }
+    
+    if (windGrade > 1) {
+      const leafCount = Math.min(20, Math.round(windGrade * 2.5));
+      const leafColors = [
+        '#4a7c59', // Muted forest green
+        '#3c6e47', // Deep pine green
+        '#d28b3a', // Autumn amber/orange
+        '#b33927', // Rust red/burgundy
+        '#8c6239', // Dried brown
+        '#d4ae37'  // Golden yellow
+      ];
+      for (let i = 0; i < leafCount; i++) {
+        const leaf = document.createElement('div');
+        leaf.className = 'falling-leaf';
+        leaf.style.left = `${Math.random() * 120 - 10}%`; // Horizontal spawn span
+        leaf.style.top = `${Math.random() * -60 - 20}px`; // Vertically off-screen
+        
+        const color = leafColors[Math.floor(Math.random() * leafColors.length)];
+        leaf.style.setProperty('--leaf-color', color);
+        
+        const width = Math.random() * 12 + 18; // 18px to 30px
+        const height = width * 0.6;
+        leaf.style.width = `${width}px`;
+        leaf.style.height = `${height}px`;
+        
+        // Horizontal drift and stable 2D rotation parameters
+        const driftX = -(Math.random() * 20 + 10 + windGrade * 5); // Blows to the left
+        leaf.style.setProperty('--leaf-drift-x', `${driftX}vw`);
+        
+        const startAngle = Math.floor(Math.random() * 360);
+        const angleDiff = (Math.random() * 80 + 40) * (Math.random() > 0.5 ? 1 : -1); // slow gentle 2D rotation
+        const endAngle = startAngle + angleDiff;
+        leaf.style.setProperty('--leaf-angle-start', `${startAngle}deg`);
+        leaf.style.setProperty('--leaf-angle-end', `${endAngle}deg`);
+        
+        // Speed up animation duration as wind grade increases
+        const duration = (8 / (windGrade * 0.35 + 0.4)) + Math.random() * 2.5;
+        leaf.style.animationDuration = `${duration.toFixed(2)}s`;
+        leaf.style.animationDelay = `${(Math.random() * 6).toFixed(2)}s`;
+        
+        particlesContainer.appendChild(leaf);
+      }
     }
   } else if (isNight) {
     // Starry Stars (restricted to top 28% sky canopy)

@@ -286,6 +286,25 @@ body {
   --fog-opacity: 0.8;
 }
 
+/* Typhoon Rain Day */
+#dynamic-backdrop.weather-typhoon-rain {
+  --sun-opacity: 0;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.98;
+  --fog-color: #333d42;
+}
+#dynamic-backdrop.state-day.weather-typhoon-rain {
+  --image-tint: #141b1f;
+  --image-tint-opacity: 0.82;
+  --fog-opacity: 0.88;
+}
+#dynamic-backdrop.state-night.weather-typhoon-rain {
+  --image-tint: linear-gradient(to bottom, #000000 0%, #030508 50%, #151d26 100%);
+  --image-tint-opacity: 0.96;
+  --fog-color: #030508;
+  --fog-opacity: 0.85;
+}
+
 /* Snowy Day */
 #dynamic-backdrop.weather-snowy {
   --sun-opacity: 0;
@@ -448,6 +467,68 @@ body {
   }
   100% {
     transform: translate3d(-10px, 105vh, 0);
+  }
+}
+
+/* Typhoon steep angle rain styling and animation */
+.raindrop.typhoon-drop {
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.7);
+  transform: rotate(30deg);
+  animation-name: rainfall-typhoon;
+}
+
+@keyframes rainfall-typhoon {
+  0% { transform: translate3d(0, -120px, 0) rotate(30deg); }
+  100% { transform: translate3d(-58vh, 105vh, 0) rotate(30deg); }
+}
+
+/* Horizontal wind gust lines for typhoon warnings */
+.wind-gust {
+  position: absolute;
+  background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  animation: gust-sweep linear infinite;
+}
+
+@keyframes gust-sweep {
+  0% { transform: translate3d(-10vw, 0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate3d(120vw, 15vh, 0); opacity: 0; }
+}
+
+/* Falling leaf styling and gentle 2D drift animation */
+.falling-leaf {
+  position: absolute;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.18), transparent 60%), var(--leaf-color, #4a7c59);
+  border-radius: 2px 95% 2px 95%;
+  pointer-events: none;
+  z-index: 1;
+  animation: leaf-fall linear infinite;
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Central leaf vein structure (crease highlight & shadow) */
+.falling-leaf::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent 46%, rgba(255, 255, 255, 0.22) 47%, rgba(0, 0, 0, 0.12) 49%, rgba(0, 0, 0, 0.12) 51%, transparent 53%);
+  border-radius: inherit;
+}
+
+@keyframes leaf-fall {
+  0% {
+    transform: translate3d(0, -30px, 0) rotate(var(--leaf-angle-start, 0deg));
+  }
+  100% {
+    transform: translate3d(var(--leaf-drift-x, -20vw), 105vh, 0) rotate(var(--leaf-angle-end, 180deg));
   }
 }
 
