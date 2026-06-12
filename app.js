@@ -3252,7 +3252,8 @@ function applyDynamicBackdropTheme(iconType) {
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
       drop.className = 'raindrop';
-      drop.style.left = `${Math.random() * 100}%`;
+      const r = Math.random();
+      drop.style.left = `calc(${r * 100}% + ${r * 30}vh)`;
       drop.style.top = `${Math.random() * -80}px`;
       drop.style.height = `${Math.random() * 30 + 45}px`;
       drop.style.animationDuration = `${Math.random() * 0.4 + 0.4}s`;
