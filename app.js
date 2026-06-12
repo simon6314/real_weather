@@ -4,14 +4,14 @@
   style.textContent = `
     @media (max-width: 768px) {
       .details-drawer {
-        background: rgba(8, 11, 17, 0.6) !important; /* Smoked glass transparent background */
-        backdrop-filter: blur(20px) !important;
-        -webkit-backdrop-filter: blur(20px) !important;
+        background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity */
+        backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
+        -webkit-backdrop-filter: blur(12px) !important;
       }
       .drawer-overlay.active {
-        background: rgba(3, 5, 10, 0.4) !important;
-        backdrop-filter: blur(4px) !important;
-        -webkit-backdrop-filter: blur(4px) !important;
+        background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking */
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
       }
       .weekly-item:hover {
         transform: none !important; /* Disable scale scale-up on mobile touch */
@@ -292,6 +292,12 @@ function initWeatherRefresh() {
       refreshLocationAndWeather(false);
     }
   });
+
+  // Periodic background auto-refresh every 10 minutes (600,000 ms)
+  setInterval(() => {
+    console.log('Periodic auto-refresh running...');
+    refreshLocationAndWeather(false);
+  }, 600000);
 }
 
 // Header Navigation Tabs
@@ -1496,6 +1502,9 @@ async function loadWeatherDashboard() {
     // Render views
     renderMainLocationWeather();
     renderAddedRegionsList();
+    
+    // Auto-update the detailed drawer if it is currently open (checks cache freshness, non-force)
+    updateActiveDrawerIfOpen(false);
     return;
   }
   
@@ -1541,19 +1550,19 @@ async function loadWeatherDashboard() {
     renderMainLocationWeather();
     renderAddedRegionsList();
     
-    // Auto-update the detailed drawer if it is currently open
-    updateActiveDrawerIfOpen();
+    // Auto-update the detailed drawer if it is currently open (force update because main data is fresh)
+    updateActiveDrawerIfOpen(true);
   }
 }
 
-async function updateActiveDrawerIfOpen() {
+async function updateActiveDrawerIfOpen(force = true) {
   const drawer = document.getElementById('details-drawer');
   if (drawer && drawer.classList.contains('active') && AppState.activeRegionDetailed) {
     const activeId = AppState.activeRegionDetailed;
-    console.log(`Detailed drawer is active for ${activeId}. Fetching fresh region data for drawer update...`);
+    console.log(`Detailed drawer is active for ${activeId}. Fetching region data (force: ${force}) for drawer update...`);
     
-    // Force a fresh fetch of the township forecast
-    await loadWeatherForRegion(activeId, true);
+    // Load weather data for active region with the specified force flag
+    await loadWeatherForRegion(activeId, force);
     
     const data = AppState.allCountiesWeatherData[activeId];
     if (data && !data.error && data.current) {
@@ -2259,8 +2268,11 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         const timeVal = new Date(formattedTimeStr);
         
-        // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
-        if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
+        // Filter out past intervals older than the previous hour to keep the timeline aligned
+        const prevHourDate = new Date();
+        prevHourDate.setMinutes(0, 0, 0);
+        prevHourDate.setHours(prevHourDate.getHours() - 1);
+        if (timeVal.getTime() < prevHourDate.getTime()) {
           continue;
         }
         
@@ -2350,6 +2362,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           icon = 'night';
         }
         hourlyList.push({
+          timeVal: timeVal.getTime(),
           time: twHour + ':00',
           displayTime: formatHourlyLabel(timeVal),
           temp: temp,
@@ -2754,6 +2767,7 @@ function triggerSimulationMode(reasonMsg) {
       }
       
       hourlyList.push({
+        timeVal: forecastDate.getTime(),
         time: `${forecastHour}:00`,
         displayTime: formatHourlyLabel(forecastDate),
         temp: hTemp,
@@ -3233,8 +3247,8 @@ function applyDynamicBackdropTheme(iconType) {
   particlesContainer.innerHTML = ''; // Wipe
   
   if (iconType === 'rainy' || iconType === 'thunderstorm') {
-    // Rain Particles
-    const dropCount = 95;
+    // Rain Particles - Quantity reduced by 1/3 (from 95 to 63)
+    const dropCount = 63;
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
       drop.className = 'raindrop';
@@ -3453,8 +3467,24 @@ function drawHourlySvgChart(hourlyData) {
   
   if (!hourlyData || hourlyData.length === 0) return;
   
+  // Dynamically filter out past data points older than the previous hour to keep the timeline aligned
+  const prevHourDate = new Date();
+  prevHourDate.setMinutes(0, 0, 0);
+  prevHourDate.setHours(prevHourDate.getHours() - 1);
+  const prevHourTime = prevHourDate.getTime();
+  
+  let filteredHourly = hourlyData.filter(d => {
+    if (d.timeVal) {
+      return d.timeVal >= prevHourTime;
+    }
+    return true; // Fallback for backward compatibility
+  });
+  if (filteredHourly.length === 0) {
+    filteredHourly = hourlyData; // Fallback to avoid empty chart
+  }
+  
   // Subset to first 12 intervals (36 Hours) for stunning resolution
-  const data = hourlyData.slice(0, 12);
+  const data = filteredHourly.slice(0, 12);
   const size = data.length;
   
   // Chart dimensions (adjusted for larger mobile typography and animations)
@@ -4577,8 +4607,11 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       }
       const timeVal = new Date(formattedTimeStr);
       
-      // Filter out past intervals (older than 2.5 hours ago) to keep the timeline aligned with the current hour
-      if (timeVal.getTime() < new Date().getTime() - 2.5 * 60 * 60 * 1000) {
+      // Filter out past intervals older than the previous hour to keep the timeline aligned
+      const prevHourDate = new Date();
+      prevHourDate.setMinutes(0, 0, 0);
+      prevHourDate.setHours(prevHourDate.getHours() - 1);
+      if (timeVal.getTime() < prevHourDate.getTime()) {
         continue;
       }
       
@@ -4592,7 +4625,15 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         if (rhTime) {
           const rhItem = rhTime.find(item => {
             const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
-            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+            if (!tStr) return false;
+            let formattedTStr = tStr;
+            if (typeof tStr === 'string') {
+              formattedTStr = tStr.trim().replace(' ', 'T');
+              if (!formattedTStr.includes('+') && !formattedTStr.includes('Z')) {
+                formattedTStr += '+08:00';
+              }
+            }
+            return new Date(formattedTStr).getTime() === timeVal.getTime();
           });
           const rhValArr = rhItem ? (rhItem.ElementValue || rhItem.elementValue) : null;
           if (rhValArr) {
@@ -4607,7 +4648,15 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         if (wsTime) {
           const wsItem = wsTime.find(item => {
             const tStr = item.DataTime || item.dataTime || item.StartTime || item.startTime;
-            return tStr && new Date(tStr).getTime() === timeVal.getTime();
+            if (!tStr) return false;
+            let formattedTStr = tStr;
+            if (typeof tStr === 'string') {
+              formattedTStr = tStr.trim().replace(' ', 'T');
+              if (!formattedTStr.includes('+') && !formattedTStr.includes('Z')) {
+                formattedTStr += '+08:00';
+              }
+            }
+            return new Date(formattedTStr).getTime() === timeVal.getTime();
           });
           const wsValArr = wsItem ? (wsItem.ElementValue || wsItem.elementValue) : null;
           if (wsValArr) {
@@ -4679,7 +4728,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
                 formattedEndStr += '+08:00';
               }
             }
-            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 6 * 3600000);
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 3 * 3600000);
             return timeVal >= start && timeVal < end;
           });
           const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
@@ -4695,6 +4744,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         icon = 'night';
       }
       hourlyList.push({
+        timeVal: timeVal.getTime(),
         time: twHour + ':00',
         displayTime: formatHourlyLabel(timeVal),
         temp: temp,

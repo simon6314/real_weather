@@ -349,13 +349,13 @@ body {
 /* Particle raindrop styling */
 .raindrop {
   position: absolute;
-  background: linear-gradient(transparent, rgba(255, 255, 255, 0.85));
-  width: 1.8px; /* Slim and elegant raindrop width for a premium and delicate feel */
-  opacity: 0.85;
+  background: linear-gradient(transparent, rgba(255, 255, 255, 0.4));
+  width: 1px; /* Slimmer line for delicate feel */
+  opacity: 0.65;
   animation: rainfall linear infinite;
   transform: rotate(15deg);
-  /* Softened dual shadow filters to maintain contrast across all background tones without looking bold */
-  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.5)) drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.3));
+  /* Removed heavy drop-shadow filters to make lines sharp and clean */
+  filter: none;
 }
 
 @keyframes rainfall {
@@ -1297,14 +1297,14 @@ body {
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
   .details-drawer {
     width: 100%;
-    background: rgba(8, 11, 17, 0.6) !important; /* Premium smoked glass background */
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
+    background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity for transparency */
+    backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
+    -webkit-backdrop-filter: blur(12px) !important;
   }
   .drawer-overlay.active {
-    background: rgba(3, 5, 10, 0.4) !important; /* Glassmorphism blurred overlay */
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
+    background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking dark layers */
+    backdrop-filter: none !important;             /* Remove overlay blur on mobile to prevent double-stacking blurs */
+    -webkit-backdrop-filter: none !important;
   }
 }
 
