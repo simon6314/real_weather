@@ -349,18 +349,17 @@ body {
 /* Particle raindrop styling */
 .raindrop {
   position: absolute;
-  background: linear-gradient(transparent, rgba(255, 255, 255, 0.4));
+  background: rgba(255, 255, 255, 0.45); /* Sharp solid line segment */
   width: 1px; /* Slimmer line for delicate feel */
-  opacity: 0.65;
+  opacity: 0.7;
   animation: rainfall linear infinite;
   transform: rotate(15deg);
-  /* Removed heavy drop-shadow filters to make lines sharp and clean */
   filter: none;
 }
 
 @keyframes rainfall {
-  0% { transform: translateY(-120px) rotate(15deg); }
-  100% { transform: translateY(105vh) rotate(15deg); }
+  0% { transform: translate3d(0, -120px, 0) rotate(15deg); }
+  100% { transform: translate3d(-30vh, 105vh, 0) rotate(15deg); }
 }
 
 /* Twinkling star particle */
