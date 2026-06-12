@@ -21,7 +21,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=95">
+  <link rel="stylesheet" href="style.css?v=98">
 </head>
 <body>
 
@@ -64,6 +64,16 @@
           <stop offset="100%" stop-color="var(--fog-color)" stop-opacity="0" />
         </linearGradient>
 
+        <!-- Premium Multi-stage Lightning Glow Filter -->
+        <filter id="lightning-glow" x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur stdDeviation="6" result="blur1" />
+          <feGaussianBlur stdDeviation="16" result="blur2" />
+          <feMerge>
+            <feMergeNode in="blur2" />
+            <feMergeNode in="blur1" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
 
       <!-- Sun -->
@@ -77,6 +87,9 @@
         <path d="M 150 180 Q 180 150 220 160 Q 250 130 290 150 Q 330 140 350 170 Q 370 180 370 200 L 150 200 Z" fill="rgba(255,255,255,0.2)" class="cloud-drift-1" />
         <path d="M 750 120 Q 780 90 820 100 Q 850 70 890 90 Q 930 80 950 110 Q 970 120 970 140 L 750 140 Z" fill="rgba(255,255,255,0.15)" class="cloud-drift-2" />
       </g>
+
+      <!-- Procedural Sky Lightning Bolt -->
+      <path id="scene-lightning" class="sky-lightning-bolt" d="" />
 
       <!-- Volumetric Fog Overlay (covers both bank and creek) -->
       <rect width="100%" height="100%" fill="url(#fog-grad-overlay)" />
@@ -653,6 +666,21 @@
         </g>
       </g>
 
+      <!-- SNOWY -->
+      <g id="svg-snowy">
+        <!-- Cloud -->
+        <path d="M18 36c-4.4 0-8-3.6-8-8 0-4 3-7.3 7-7.9 1-4.5 5-8.1 9.8-8.1 4 0 7.5 2.5 9 6C37 18 39.5 20 40 22.7c2.3.7 4 2.8 4 5.3 0 3.3-2.7 6-6 6H18z" fill="url(#grad-cloud-front)" />
+        <!-- Snowflakes -->
+        <g class="anim-snow">
+          <!-- Snowflake 1 -->
+          <path d="M 20 42 L 20 48 M 17 45 L 23 45 M 18 43 L 22 47 M 18 47 L 22 43" stroke="#FFF" stroke-width="1.2" stroke-linecap="round" class="snow-1" />
+          <!-- Snowflake 2 -->
+          <path d="M 28 42 L 28 48 M 25 45 L 31 45 M 26 43 L 30 47 M 26 47 L 30 43" stroke="#FFF" stroke-width="1.2" stroke-linecap="round" class="snow-2" />
+          <!-- Snowflake 3 -->
+          <path d="M 36 42 L 36 48 M 33 45 L 39 45 M 34 43 L 38 47 M 34 47 L 38 43" stroke="#FFF" stroke-width="1.2" stroke-linecap="round" class="snow-3" />
+        </g>
+      </g>
+
       <!-- THUNDERSTORM -->
       <g id="svg-thunderstorm">
         <!-- Dark Cloud -->
@@ -748,6 +776,6 @@
   </svg>
 
   <!-- JavaScript Application -->
-  <script src="app.js?v=95"></script>
+  <script src="app.js?v=98"></script>
 </body>
 </html>

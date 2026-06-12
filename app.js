@@ -28,6 +28,12 @@
     #details-drawer {
       --lightning-anim: none !important;
       --lightning-opacity: 1 !important;
+      --snow-anim-1: none !important;
+      --snow-anim-2: none !important;
+      --snow-anim-3: none !important;
+      --snow-opacity-1: 0.9 !important;
+      --snow-opacity-2: 0.9 !important;
+      --snow-opacity-3: 0.9 !important;
     }
   `;
   document.head.appendChild(style);
@@ -141,8 +147,8 @@ const AppState = {
   radarPan: { x: 0, y: 0 },
   isDraggingRadar: false,
   dragStart: { x: 0, y: 0 },
-  drawerMap: null,                // Leaflet map instance inside details drawer
-  strongWindCapTowns: []          // CAP parsed townships under active wind warning
+  strongWindCapTowns: [],         // CAP parsed townships under active wind warning
+  lightningTimeout: null          // Timeout handler for procedural background lightning
 };
 
 // Ensure API Key is initialized in local storage if not present
@@ -2082,7 +2088,7 @@ function mapObsWeatherToIcon(obsWeather) {
   if (/大雨|暴雨|豪雨|大豪雨/.test(w)) return 'rainy';
   if (/雨|霧雨|毛毛雨|陣雨/.test(w)) return 'rainy';
   // Snow / hail
-  if (/雪|冰雹/.test(w)) return 'rainy';
+  if (/雪|冰雹/.test(w)) return 'snowy';
   // Fog / mist / dust
   if (/霧|靄|煙/.test(w)) return 'cloudy';
   // Overcast
@@ -2589,6 +2595,9 @@ function getChartIconSvg(iconName, x, y, size = 20) {
   } else if (iconName === 'thunderstorm') {
     innerRef = '#svg-thunderstorm';
     viewClass = 'thunderstorm';
+  } else if (iconName === 'snowy') {
+    innerRef = '#svg-snowy';
+    viewClass = 'snowy';
   } else if (iconName === 'windy') {
     innerRef = '#svg-windy';
     viewClass = 'windy';
@@ -2627,6 +2636,7 @@ function mapWxToIcon(wxVal) {
   if (code <= 14) return 'rainy';
   if (code <= 18) return 'thunderstorm';
   if (code <= 22) return 'rainy';
+  if (code === 23 || code === 37 || code === 42) return 'snowy';
   if (code <= 28) return 'windy';
   return 'cloudy';
 }
@@ -3224,6 +3234,72 @@ function updateAstronomyPositions() {
 }
 
 
+// Procedurally generate realistic branching SVG lightning path
+function generateLightningPath(startX, startY, endY) {
+  let path = `M ${startX} ${startY}`;
+  let currentX = startX;
+  let currentY = startY;
+  const segments = 10;
+  const stepY = (endY - startY) / segments;
+  
+  for (let i = 0; i < segments; i++) {
+    currentY += stepY;
+    const displaceX = (Math.random() - 0.5) * 46; // Zig-zag displacement
+    currentX += displaceX;
+    path += ` L ${currentX} ${currentY}`;
+    
+    // 15% chance to spawn a smaller branching bolt
+    if (Math.random() < 0.15 && i < segments - 2) {
+      let bx = currentX;
+      let by = currentY;
+      let branchPath = ` M ${bx} ${by}`;
+      const branchSegments = segments - i - 1;
+      const bStepY = stepY * 0.65;
+      for (let j = 0; j < branchSegments; j++) {
+        by += bStepY;
+        bx += (Math.random() - 0.5) * 36 + 8 * (Math.random() > 0.5 ? 1 : -1); // Bias branch sideways
+        branchPath += ` L ${bx} ${by}`;
+      }
+      path += branchPath;
+    }
+  }
+  return path;
+}
+
+// Handle randomized trigger loop for background sky lightning
+function triggerRandomLightning() {
+  const backdrop = document.getElementById('dynamic-backdrop');
+  if (!backdrop || !backdrop.classList.contains('weather-thunder')) return;
+  
+  const lightningEl = document.getElementById('scene-lightning');
+  if (lightningEl) {
+    // Center the lightning horizontally on mobile to keep it visible on narrow viewports
+    const isMobile = window.innerWidth <= 768;
+    const startX = isMobile 
+      ? Math.floor(Math.random() * 200) + 620   // Mobile: x is between 620 and 820 (perfectly centered around 720)
+      : Math.floor(Math.random() * 850) + 250;  // Desktop: x is between 250 and 1100
+    const startY = 40;
+    const endY = 450 + Math.random() * 150;
+    const dPath = generateLightningPath(startX, startY, endY);
+    lightningEl.setAttribute('d', dPath);
+    
+    // Reset keyframe animation
+    backdrop.classList.remove('lightning-flash-active');
+    lightningEl.classList.remove('lightning-strike-active');
+    
+    void backdrop.offsetWidth; // Trigger layout reflow
+    void lightningEl.offsetWidth;
+    
+    // Trigger double-flicker strike!
+    backdrop.classList.add('lightning-flash-active');
+    lightningEl.classList.add('lightning-strike-active');
+  }
+  
+  // Random strike interval between 5 to 11 seconds
+  const nextStrikeDelay = Math.random() * 6000 + 5000;
+  AppState.lightningTimeout = setTimeout(triggerRandomLightning, nextStrikeDelay);
+}
+
 // Map active icon to background styles and trigger custom screen particles!
 function applyDynamicBackdropTheme(iconType) {
   const backdrop = document.getElementById('dynamic-backdrop');
@@ -3237,12 +3313,30 @@ function applyDynamicBackdropTheme(iconType) {
   else if (iconType === 'cloudy') weatherClass = 'weather-cloudy';
   else if (iconType === 'rainy') weatherClass = 'weather-rainy';
   else if (iconType === 'thunderstorm') weatherClass = 'weather-thunder';
+  else if (iconType === 'snowy') weatherClass = 'weather-snowy';
   else if (iconType === 'windy') weatherClass = 'weather-windy';
   else if (iconType === 'night') {
     weatherClass = 'weather-sunny'; // Clear night is clear weather
   }
   
   backdrop.classList.add(weatherClass);
+
+  // Clear previous lightning timer and active classes if any
+  if (AppState.lightningTimeout) {
+    clearTimeout(AppState.lightningTimeout);
+    AppState.lightningTimeout = null;
+  }
+  const lightningEl = document.getElementById('scene-lightning');
+  if (lightningEl) {
+    lightningEl.classList.remove('lightning-strike-active');
+    lightningEl.setAttribute('d', '');
+  }
+  backdrop.classList.remove('lightning-flash-active');
+
+  // Trigger procedural lightning timer if thunderstorm is active
+  if (iconType === 'thunderstorm') {
+    triggerRandomLightning();
+  }
 
   // Position Sun & Moon immediately
   updateAstronomyPositions();
@@ -3252,8 +3346,8 @@ function applyDynamicBackdropTheme(iconType) {
   particlesContainer.innerHTML = ''; // Wipe
   
   if (iconType === 'rainy' || iconType === 'thunderstorm') {
-    // Rain Particles - Quantity reduced by 1/3 (from 95 to 63)
-    const dropCount = 63;
+    // Rain Particles - heavier rain for thunderstorm
+    const dropCount = iconType === 'thunderstorm' ? 120 : 63;
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
       drop.className = 'raindrop';
@@ -3264,6 +3358,22 @@ function applyDynamicBackdropTheme(iconType) {
       drop.style.animationDuration = `${Math.random() * 0.4 + 0.4}s`;
       drop.style.animationDelay = `${Math.random() * 1.5}s`;
       particlesContainer.appendChild(drop);
+    }
+  } else if (iconType === 'snowy') {
+    // Snowy Particles - 45 soft drifting snowflakes
+    const snowCount = 45;
+    for (let i = 0; i < snowCount; i++) {
+      const flake = document.createElement('div');
+      flake.className = 'snowflake';
+      flake.style.left = `${Math.random() * 100}%`;
+      flake.style.top = `${Math.random() * -30}px`;
+      const size = Math.random() * 5 + 3;
+      flake.style.width = `${size}px`;
+      flake.style.height = `${size}px`;
+      flake.style.animationDuration = `${Math.random() * 3 + 4}s`;
+      flake.style.animationDelay = `${Math.random() * 5}s`;
+      flake.style.opacity = (Math.random() * 0.4 + 0.4).toFixed(2);
+      particlesContainer.appendChild(flake);
     }
   } else if (isNight) {
     // Starry Stars (restricted to top 28% sky canopy)
@@ -5189,6 +5299,9 @@ function getAnimatedSvgCode(iconName, width = 64, height = 64) {
   } else if (iconName === 'thunderstorm') {
     innerRef = '#svg-thunderstorm';
     viewClass = 'thunderstorm';
+  } else if (iconName === 'snowy') {
+    innerRef = '#svg-snowy';
+    viewClass = 'snowy';
   } else if (iconName === 'windy') {
     innerRef = '#svg-windy';
     viewClass = 'windy';

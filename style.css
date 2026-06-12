@@ -286,6 +286,40 @@ body {
   --fog-opacity: 0.8;
 }
 
+/* Snowy Day */
+#dynamic-backdrop.weather-snowy {
+  --sun-opacity: 0;
+  --moon-opacity: 0;
+  --bg-clouds-opacity: 0.85;
+  --fog-color: #d2dbe5;
+}
+#dynamic-backdrop.state-day.weather-snowy {
+  --image-tint: #4b5866;
+  --image-tint-opacity: 0.58;
+  --fog-opacity: 0.75;
+}
+#dynamic-backdrop.state-night.weather-snowy {
+  --image-tint: linear-gradient(to bottom, #010204 0%, #0d121c 60%, #3a4556 100%);
+  --image-tint-opacity: 0.90;
+  --fog-color: #03060a;
+  --fog-opacity: 0.65;
+  --moon-color: #e0f7fa;
+  --moon-opacity: 0.08;
+}
+
+/* Sky lightning element styling */
+.sky-lightning-bolt {
+  fill: none;
+  stroke: #e0f7fa;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: url(#lightning-glow);
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: center top;
+}
+
 /* Dynamic screen-wide lightning flash overlay for thunderstorm backdrop */
 #dynamic-backdrop.weather-thunder::before {
   content: '';
@@ -299,12 +333,30 @@ body {
   z-index: 0; /* Placed behind the tint overlay, directly on top of the forest photo */
   pointer-events: none;
   mix-blend-mode: overlay;
-  animation: bg-lightning-flash 6s ease-out infinite;
 }
 
-@keyframes bg-lightning-flash {
-  0%, 92%, 94%, 96%, 100% { opacity: 0; }
-  93%, 95% { opacity: 0.35; }
+/* Active flash class on backdrop triggers the single-flash animation */
+#dynamic-backdrop.lightning-flash-active::before {
+  animation: bg-flash-once 0.6s ease-out forwards;
+}
+
+/* Active flash class on lightning path triggers its flicker animation */
+.sky-lightning-bolt.lightning-strike-active {
+  animation: bolt-flash-once 0.6s ease-out forwards;
+}
+
+@keyframes bg-flash-once {
+  0%, 100% { opacity: 0; }
+  10%, 25% { opacity: 0.72; }
+  15% { opacity: 0.18; }
+  20% { opacity: 0.58; }
+}
+
+@keyframes bolt-flash-once {
+  0%, 100% { opacity: 0; }
+  8%, 23% { opacity: 1; }
+  12% { opacity: 0.15; }
+  18% { opacity: 0.9; }
 }
 
 /* Windy Day */
@@ -374,6 +426,29 @@ body {
 @keyframes twinkling {
   0%, 100% { opacity: 0.55; transform: scale(0.85); } /* Keep stars visible even during the dim phase */
   50% { opacity: 1; transform: scale(1.25); }
+}
+
+/* Snowflake particle styling and animation */
+.snowflake {
+  position: absolute;
+  background: #FFF;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: 0 0 5px rgba(255,255,255,0.8);
+  animation: drift-fall linear infinite;
+}
+
+@keyframes drift-fall {
+  0% {
+    transform: translate3d(0, -20px, 0);
+  }
+  50% {
+    transform: translate3d(20px, 50vh, 0);
+  }
+  100% {
+    transform: translate3d(-10px, 105vh, 0);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1282,6 +1357,12 @@ body {
   -webkit-backdrop-filter: blur(20px) !important;
   --lightning-anim: none !important;
   --lightning-opacity: 1 !important;
+  --snow-anim-1: none !important;
+  --snow-anim-2: none !important;
+  --snow-anim-3: none !important;
+  --snow-opacity-1: 0.9 !important;
+  --snow-opacity-2: 0.9 !important;
+  --snow-opacity-3: 0.9 !important;
 }
 
 /* Eliminate expensive nested backdrop blurs on drawer child elements to optimize scrolling on mobile */
@@ -1878,7 +1959,10 @@ body {
 .anim-wind .wind-line-2,
 .anim-stars .star-1,
 .anim-stars .star-2,
-.anim-stars .star-3 {
+.anim-stars .star-3,
+.anim-snow .snow-1,
+.anim-snow .snow-2,
+.anim-snow .snow-3 {
   animation-play-state: var(--weather-anim-state, running) !important;
 }
 
@@ -1940,6 +2024,29 @@ body {
 @keyframes lightning-strike {
   0%, 85%, 90%, 95%, 100% { opacity: 0.2; }
   88%, 93%, 98% { opacity: 1; }
+}
+
+/* Snowy Animations */
+.anim-snow .snow-1 {
+  animation: var(--snow-anim-1, snowfall-s 1.8s linear infinite);
+  transform-origin: 20px 45px;
+  opacity: var(--snow-opacity-1, 1);
+}
+.anim-snow .snow-2 {
+  animation: var(--snow-anim-2, snowfall-s 1.8s linear infinite 0.6s);
+  transform-origin: 28px 45px;
+  opacity: var(--snow-opacity-2, 1);
+}
+.anim-snow .snow-3 {
+  animation: var(--snow-anim-3, snowfall-s 1.8s linear infinite 1.2s);
+  transform-origin: 36px 45px;
+  opacity: var(--snow-opacity-3, 1);
+}
+
+@keyframes snowfall-s {
+  0% { transform: translateY(-5px) rotate(0deg); opacity: 0; }
+  25% { opacity: 0.9; }
+  100% { transform: translateY(8px) rotate(180deg); opacity: 0; }
 }
 
 /* Windy Animations */
