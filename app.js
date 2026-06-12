@@ -2450,6 +2450,9 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           }
         }
         const dateVal = new Date(formattedDateStr);
+        if (isBeforeTodayTaiwan(dateVal)) {
+          continue;
+        }
         
         const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
         if (isNaN(minT1)) continue;
@@ -2492,7 +2495,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         
         weeklyList.push({
           date: getTaiwanMonthAndDate(dateVal),
-          dayOfWeek: formatWeeklyDayLabel(dateVal, i === 0),
+          dayOfWeek: formatWeeklyDayLabel(dateVal),
           tempMin: minT,
           tempMax: maxT,
           desc: wxVal,
@@ -2666,8 +2669,59 @@ function formatHourlyLabel(date) {
   return timeStr;
 }
 
-function formatWeeklyDayLabel(date, isToday) {
-  if (isToday) return '今天';
+function isTodayTaiwan(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    });
+    const nowParts = formatter.format(new Date()).split('/');
+    const dateParts = formatter.format(date).split('/');
+    return nowParts[0] === dateParts[0] && nowParts[1] === dateParts[1] && nowParts[2] === dateParts[2];
+  } catch (e) {
+    const now = new Date();
+    return date.getFullYear() === now.getFullYear() &&
+           date.getMonth() === now.getMonth() &&
+           date.getDate() === now.getDate();
+  }
+}
+
+function isBeforeTodayTaiwan(date) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    });
+    const nowParts = formatter.format(new Date()).split('/');
+    const dateParts = formatter.format(date).split('/');
+    
+    const nowY = parseInt(nowParts[2]);
+    const nowM = parseInt(nowParts[0]);
+    const nowD = parseInt(nowParts[1]);
+    
+    const dateY = parseInt(dateParts[2]);
+    const dateM = parseInt(dateParts[0]);
+    const dateD = parseInt(dateParts[1]);
+    
+    if (dateY < nowY) return true;
+    if (dateY > nowY) return false;
+    if (dateM < nowM) return true;
+    if (dateM > nowM) return false;
+    return dateD < nowD;
+  } catch (e) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return target.getTime() < today.getTime();
+  }
+}
+
+function formatWeeklyDayLabel(date) {
+  if (isTodayTaiwan(date)) return '今天';
   return getTaiwanDayOfWeek(date);
 }
 
@@ -3896,7 +3950,7 @@ function renderAppleWeeklyRangeBars(weeklyList) {
     }
     
     item.innerHTML = `
-      <span class="weekly-day">${day.dayOfWeek}</span>
+      <span class="weekly-day">${day.dayOfWeek} <span class="weekly-date" style="font-size: 11px; opacity: 0.6; font-weight: normal; margin-left: 6px;">${day.date}</span></span>
       <span class="weekly-pop">${day.rainProb > 0 ? day.rainProb + '%' : ''}</span>
       <div class="weekly-icon-wrapper">
         ${getAnimatedSvgCode(day.icon, 40, 40)}
@@ -5084,6 +5138,9 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         }
       }
       const dateVal = new Date(formattedDateStr);
+      if (isBeforeTodayTaiwan(dateVal)) {
+        continue;
+      }
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
       const minT1 = parseFloat(getValueFromCwaArray(valArr));
@@ -5150,7 +5207,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       
       weeklyList.push({
         date: getTaiwanMonthAndDate(dateVal),
-        dayOfWeek: formatWeeklyDayLabel(dateVal, i === 0),
+        dayOfWeek: formatWeeklyDayLabel(dateVal),
         tempMin: minT,
         tempMax: maxT,
         desc: wxVal,
