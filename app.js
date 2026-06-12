@@ -4,6 +4,11 @@
   style.textContent = `
     @media (max-width: 768px) {
       .details-drawer {
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .details-drawer::before {
         background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity */
         backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
         -webkit-backdrop-filter: blur(12px) !important;

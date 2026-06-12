@@ -1521,9 +1521,9 @@ body {
   display: flex;
   flex-direction: column;
   will-change: transform;
-  background: rgba(8, 11, 17, 0.46) !important; /* Premium smoked glass with high transparency (46%) */
-  backdrop-filter: blur(20px) !important;      /* Dynamic strong frosted glass blur for high-end feel */
-  -webkit-backdrop-filter: blur(20px) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   --lightning-anim: none !important;
   --lightning-opacity: 1 !important;
   --snow-anim-1: none !important;
@@ -1532,6 +1532,21 @@ body {
   --snow-opacity-1: 0.9 !important;
   --snow-opacity-2: 0.9 !important;
   --snow-opacity-3: 0.9 !important;
+}
+
+/* Static pseudo-element background to prevent WebKit scroll repaint dropouts */
+.details-drawer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  background: rgba(8, 11, 17, 0.46) !important; /* Premium smoked glass with high transparency (46%) */
+  backdrop-filter: blur(20px) !important;      /* Dynamic strong frosted glass blur for high-end feel */
+  -webkit-backdrop-filter: blur(20px) !important;
+  pointer-events: none;
 }
 
 /* Eliminate expensive nested backdrop blurs on drawer child elements to optimize scrolling on mobile */
@@ -1548,6 +1563,11 @@ body {
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
   .details-drawer {
     width: 100%;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .details-drawer::before {
     background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity for transparency */
     backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
     -webkit-backdrop-filter: blur(12px) !important;
@@ -1613,11 +1633,18 @@ body {
 .drawer-body {
   padding: 32px;
   overflow-y: auto;
-  /* Removed -webkit-overflow-scrolling to fix WebKit scroll rendering dropouts */
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  will-change: scroll-position;
+}
+
+/* Optimize WebKit rendering on scroll by promoting components to separate GPU layers */
+.drawer-header,
+.drawer-section {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
 }
 
 .drawer-section {
