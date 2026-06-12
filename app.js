@@ -23,11 +23,11 @@
       #details-drawer {
         --weather-anim-state: paused !important;
       }
-      /* Make lightning permanently bright and glowing on mobile details drawer */
-      #details-drawer .anim-lightning {
-        animation: none !important;
-        opacity: 1 !important;
-      }
+    }
+    /* Make lightning permanently bright, glowing and static on details drawer (both desktop & mobile) */
+    #details-drawer {
+      --lightning-anim: none !important;
+      --lightning-opacity: 1 !important;
     }
   `;
   document.head.appendChild(style);

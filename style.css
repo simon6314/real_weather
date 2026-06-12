@@ -1280,6 +1280,8 @@ body {
   background: rgba(8, 11, 17, 0.46) !important; /* Premium smoked glass with high transparency (46%) */
   backdrop-filter: blur(20px) !important;      /* Dynamic strong frosted glass blur for high-end feel */
   -webkit-backdrop-filter: blur(20px) !important;
+  --lightning-anim: none !important;
+  --lightning-opacity: 1 !important;
 }
 
 /* Eliminate expensive nested backdrop blurs on drawer child elements to optimize scrolling on mobile */
@@ -1931,7 +1933,8 @@ body {
 
 /* Thunderstorm Animations */
 .anim-lightning {
-  animation: lightning-strike 3s ease-out infinite;
+  animation: var(--lightning-anim, lightning-strike 3s ease-out infinite);
+  opacity: var(--lightning-opacity, 1);
 }
 
 @keyframes lightning-strike {
