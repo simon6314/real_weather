@@ -3741,7 +3741,11 @@ function drawHourlySvgChart(hourlyData) {
   const points = validData.map((d, i) => {
     const x = paddingX + (i * (svgWidth - paddingX * 2) / (size - 1));
     const y = svgHeight - paddingY - ((d.temp - minTemp) / tempDiff) * (svgHeight - paddingY * 2);
-    return { x, y, temp: d.temp, time: d.displayTime, icon: d.icon, rainProb: d.rainProb };
+    
+    // Format on the fly to bypass stale cache issues and ensure correct relative day prefixes
+    const formattedTime = d.timeVal ? formatHourlyLabel(new Date(d.timeVal)) : d.displayTime;
+    
+    return { x, y, temp: d.temp, time: formattedTime, icon: d.icon, rainProb: d.rainProb };
   });
 
   const getTempColor = getAbsoluteTempColor;
