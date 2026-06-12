@@ -16,9 +16,6 @@
       .weekly-item:hover {
         transform: none !important; /* Disable scale scale-up on mobile touch */
       }
-      body.drawer-open .weather-particles {
-        display: none !important; /* Completely hide background animations when drawer is open */
-      }
       /* Disable weather icon animations only inside the details drawer on mobile to prevent scroll lag */
       #details-drawer {
         --weather-anim-state: paused !important;
@@ -34,6 +31,13 @@
       --snow-opacity-1: 0.9 !important;
       --snow-opacity-2: 0.9 !important;
       --snow-opacity-3: 0.9 !important;
+    }
+    /* Stop all background animations (clouds, etc.) and hide particle systems when drawer is open */
+    body.drawer-open #dynamic-backdrop * {
+      animation-play-state: paused !important;
+    }
+    body.drawer-open .weather-particles {
+      display: none !important;
     }
   `;
   document.head.appendChild(style);
@@ -3304,6 +3308,12 @@ function generateLightningPath(startX, startY, endY) {
 function triggerRandomLightning() {
   const backdrop = document.getElementById('dynamic-backdrop');
   if (!backdrop || !backdrop.classList.contains('weather-thunder')) return;
+  
+  if (document.body.classList.contains('drawer-open')) {
+    // If drawer is open, check again in 2 seconds instead of doing heavy SVG generation
+    AppState.lightningTimeout = setTimeout(triggerRandomLightning, 2000);
+    return;
+  }
   
   const lightningEl = document.getElementById('scene-lightning');
   if (lightningEl) {
