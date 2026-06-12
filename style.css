@@ -1566,7 +1566,7 @@ body {
 }
 
 .svg-chart-wrapper {
-  width: 680px;
+  width: 2400px;
   height: 200px;
   position: relative;
   /* Removed fade-in animation to prevent GPU composition rasterization dropouts on mobile Chrome */

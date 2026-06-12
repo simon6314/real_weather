@@ -2615,9 +2615,43 @@ function getChartIconSvg(iconName, x, y, size = 20) {
 
 function formatHourlyLabel(date) {
   const hour = getTaiwanHour(date);
-  if (hour === 0) return '半夜';
-  if (hour === 12) return '中午';
-  return `${hour}:00`;
+  let timeStr = '';
+  if (hour === 0) timeStr = '半夜';
+  else if (hour === 12) timeStr = '中午';
+  else timeStr = `${hour}:00`;
+
+  try {
+    const getTWDateString = (d) => {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      });
+      return formatter.format(d);
+    };
+    
+    const now = new Date();
+    const todayStr = getTWDateString(now);
+    
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = getTWDateString(tomorrow);
+    
+    const dayAfter = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const dayAfterStr = getTWDateString(dayAfter);
+    
+    const targetStr = getTWDateString(date);
+    
+    if (targetStr === tomorrowStr) {
+      return `明 ${timeStr}`;
+    } else if (targetStr === dayAfterStr) {
+      return `後 ${timeStr}`;
+    }
+  } catch (e) {
+    console.error("Error formatting day indicator:", e);
+  }
+  
+  return timeStr;
 }
 
 function formatWeeklyDayLabel(date, isToday) {
@@ -2755,12 +2789,12 @@ function triggerSimulationMode(reasonMsg) {
       weekly: []
     };
     
-    // 2. Generate smooth 72 Hours hourly sequence (spaced by 3h)
+    // 2. Generate smooth 36 Hours hourly sequence (spaced by 1h)
     const hourlyList = [];
-    for (let h = 0; h < 24; h++) {
-      const forecastHour = (currentHour + h * 3) % 24;
+    for (let h = 0; h < 36; h++) {
+      const forecastHour = (currentHour + h) % 24;
       const forecastDate = new Date();
-      forecastDate.setHours(currentHour + h * 3);
+      forecastDate.setHours(currentHour + h);
       
       const forecastDiurnal = Math.sin((forecastHour - 9) * Math.PI / 12) * 4;
       const hTemp = parseFloat((baseTemp + forecastDiurnal + (Math.random() * 0.8 - 0.4)).toFixed(1));
@@ -3678,12 +3712,12 @@ function drawHourlySvgChart(hourlyData) {
     filteredHourly = hourlyData; // Fallback to avoid empty chart
   }
   
-  // Subset to first 12 intervals (36 Hours) for stunning resolution
-  const data = filteredHourly.slice(0, 12);
+  // Subset to first 36 intervals (36 Hours) for stunning resolution
+  const data = filteredHourly.slice(0, 36);
   const size = data.length;
   
   // Chart dimensions (adjusted for larger mobile typography and animations)
-  const svgWidth = 680;
+  const svgWidth = 2400;
   const svgHeight = 200;
   const paddingX = 40;
   const paddingY = 40;
@@ -3719,7 +3753,7 @@ function drawHourlySvgChart(hourlyData) {
   
   // Start building SVG string
   let svgCode = `
-    <svg width="680" height="200" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${svgWidth}" height="200" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <!-- Dynamic Temperature Gradient based on absolute values -->
         <linearGradient id="temp-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -3736,7 +3770,7 @@ function drawHourlySvgChart(hourlyData) {
         </linearGradient>
         
         <!-- Premium dark drop shadow filter for high contrast path rendering (preventing collapse on flat 0-height lines via userSpaceOnUse) -->
-        <filter id="chart-line-shadow" filterUnits="userSpaceOnUse" x="0" y="0" width="680" height="200">
+        <filter id="chart-line-shadow" filterUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="200">
           <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
         </filter>
       </defs>
@@ -3926,7 +3960,7 @@ function openDrawerForecast(identifier) {
   
   // Dynamic Redirection for County Overview cards:
   // If the user clicks a county (like '新北市', '臺中市'), automatically redirect to its capital/central township 
-  // (like '新北市板橋區', '臺中市西區') to display a beautiful, fully populated 72-hour detailed forecast chart.
+  // (like '新北市板橋區', '臺中市西區') to display a beautiful, fully populated 36-hour detailed forecast chart.
   if (parsed.type === 'county') {
     const capital = COUNTY_CAPITALS[parsed.county];
     if (capital) {
@@ -3963,7 +3997,7 @@ function openDrawerForecast(identifier) {
             document.getElementById('svg-chart-container').innerHTML = `
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); gap: 8px;">
                 <span style="font-size: 24px;">📡</span>
-                <p>無法取得即時 72 小時逐時預報資料</p>
+                <p>無法取得即時 36 小時逐時預報資料</p>
                 <button class="primary-ctrl" onclick="retryDrawerLoad('${capitalId}')" style="margin-top: 8px;">重新載入</button>
               </div>
             `;
@@ -3998,7 +4032,7 @@ function openDrawerForecast(identifier) {
     document.getElementById('svg-chart-container').innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); gap: 8px;">
         <span style="font-size: 24px;">📡</span>
-        <p>無法取得即時 72 小時逐時預報資料</p>
+        <p>無法取得即時 36 小時逐時預報資料</p>
         <button class="primary-ctrl" onclick="retryDrawerLoad('${identifier}')" style="margin-top: 8px;">重新載入</button>
       </div>
     `;
@@ -5151,10 +5185,10 @@ function simulateRegionWeather(id) {
     weekly: []
   };
   
-  for (let h = 0; h < 24; h++) {
-    const forecastHour = (currentHour + h * 3) % 24;
+  for (let h = 0; h < 36; h++) {
+    const forecastHour = (currentHour + h) % 24;
     const forecastDate = new Date();
-    forecastDate.setHours(currentHour + h * 3);
+    forecastDate.setHours(currentHour + h);
     const offset = Math.sin((forecastHour - 9) * Math.PI / 12) * 4;
     
     let hIcon = rainProbBase > 40 ? 'rainy' : 'sunny-cloudy';
