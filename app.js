@@ -32,9 +32,12 @@
       --snow-opacity-2: 0.9 !important;
       --snow-opacity-3: 0.9 !important;
     }
-    /* Stop all background animations (clouds, etc.) and hide particle systems when drawer is open */
-    body.drawer-open #dynamic-backdrop * {
-      animation-play-state: paused !important;
+    /* Stop all background animations (clouds, particles, lightning) when drawer is open */
+    body.drawer-open #dynamic-backdrop,
+    body.drawer-open #dynamic-backdrop *,
+    body.drawer-open #dynamic-backdrop::before,
+    body.drawer-open #dynamic-backdrop::after {
+      animation: none !important;
     }
     body.drawer-open .weather-particles {
       display: none !important;
