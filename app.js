@@ -9,9 +9,9 @@
         -webkit-backdrop-filter: none !important;
       }
       .details-drawer::before {
-        background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity */
-        backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
-        -webkit-backdrop-filter: blur(12px) !important;
+        background: var(--glass-bg) !important;       /* Beautiful dynamic glass background */
+        backdrop-filter: blur(16px) !important;       /* Frosted glass blur for premium aesthetics */
+        -webkit-backdrop-filter: blur(16px) !important;
       }
       .drawer-overlay.active {
         background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking */

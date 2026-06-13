@@ -15,28 +15,7 @@
   --text-primary: #ffffff;
   --text-secondary: #f1f5f9;
   --text-muted: #cbd5e1;
-  
-  --glass-bg: rgba(255, 255, 255, 0.01);   /* Ultra transparent clear glass */
-  --glass-bg-hover: rgba(255, 255, 255, 0.03);
-  --glass-bg-active: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.015);
-  --glass-border-hover: rgba(255, 255, 255, 0.05);
-}
 
-/* Sibling combinators to adjust card opacity dynamically based on Day/Night backdrop state */
-#dynamic-backdrop.state-day ~ #app-container {
-  --glass-bg: rgba(0, 0, 0, 0.28);          /* Smoked dark glass for perfect text contrast in bright daylight */
-  --glass-border: rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(0, 0, 0, 0.35);
-}
-
-#dynamic-backdrop.state-night ~ #app-container {
-  --glass-bg: rgba(255, 255, 255, 0.01);    /* Highly transparent glass in dark night */
-  --glass-border: rgba(255, 255, 255, 0.015);
-  --glass-bg-hover: rgba(255, 255, 255, 0.03);
-  --glass-shadow: rgba(0, 0, 0, 0.4);
-  --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  
   /* Neon Accents (Vibrant HSL) */
   --color-accent: hsl(200, 100%, 55%);       /* Neon Blue */
   --color-accent-glow: hsla(200, 100%, 55%, 0.4);
@@ -56,6 +35,130 @@
   /* Animation Timing */
   --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-bounce: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Original Glassmorphic Colors (Default / Night) */
+  --glass-bg: rgba(255, 255, 255, 0.01);
+  --glass-bg-hover: rgba(255, 255, 255, 0.03);
+  --glass-bg-active: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.015);
+  --glass-border-hover: rgba(255, 255, 255, 0.05);
+  --glass-shadow: rgba(0, 0, 0, 0.4);
+  --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  
+  /* Original Nested Card Variables */
+  --card-item-bg: rgba(0, 0, 0, 0.04);
+  --card-item-border: rgba(255, 255, 255, 0.02);
+  --card-item-hover-bg: rgba(255, 255, 255, 0.02);
+  --card-item-hover-border: rgba(255, 255, 255, 0.08);
+
+  --weekly-item-bg: rgba(0, 0, 0, 0.15);
+  --weekly-item-border: rgba(255, 255, 255, 0.01);
+  --weekly-item-hover-bg: rgba(255, 255, 255, 0.02);
+  --weekly-item-hover-border: rgba(255, 255, 255, 0.08);
+
+  --hourly-card-bg: rgba(0, 0, 0, 0.2);
+  --hourly-card-border: rgba(255, 255, 255, 0.02);
+
+  --typhoon-stats-bg: rgba(0, 0, 0, 0.35);
+  --typhoon-stats-border: rgba(255, 255, 255, 0.04);
+
+  --external-link-bg: rgba(255, 255, 255, 0.03);
+  --external-link-border: var(--glass-border);
+  --external-link-hover-bg: rgba(255, 255, 255, 0.08);
+  --external-link-hover-border: var(--color-accent);
+
+  --rain-stat-bg: rgba(255, 255, 255, 0.03);
+  --rain-stat-border: rgba(255, 255, 255, 0.05);
+  --rain-stat-hover-bg: rgba(255, 255, 255, 0.06);
+  --rain-stat-hover-border: var(--glass-border-hover);
+}
+
+/* Sibling combinators to adjust card opacity dynamically based on Day/Night backdrop state */
+#dynamic-backdrop.state-day ~ #app-container,
+#dynamic-backdrop.state-day ~ #details-drawer,
+#dynamic-backdrop.state-day ~ #details-drawer-overlay {
+  --glass-bg: rgba(0, 0, 0, 0.28);          /* Smoked dark glass for perfect text contrast in bright daylight */
+  --glass-border: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(0, 0, 0, 0.35);
+}
+
+#dynamic-backdrop.state-night ~ #app-container,
+#dynamic-backdrop.state-night ~ #details-drawer,
+#dynamic-backdrop.state-night ~ #details-drawer-overlay {
+  --glass-bg: rgba(255, 255, 255, 0.01);    /* Highly transparent glass in dark night */
+  --glass-border: rgba(255, 255, 255, 0.015);
+  --glass-bg-hover: rgba(255, 255, 255, 0.03);
+  --glass-shadow: rgba(0, 0, 0, 0.4);
+  --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-hover: rgba(255, 255, 255, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    
+    --card-item-bg: rgba(255, 255, 255, 0.015);
+    --card-item-border: rgba(255, 255, 255, 0.02);
+    --card-item-hover-bg: rgba(255, 255, 255, 0.04);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+
+    --weekly-item-bg: var(--card-item-bg);
+    --weekly-item-border: var(--card-item-border);
+    --weekly-item-hover-bg: var(--card-item-hover-bg);
+    --weekly-item-hover-border: var(--card-item-hover-border);
+
+    --hourly-card-bg: var(--card-item-bg);
+    --hourly-card-border: var(--card-item-border);
+
+    --typhoon-stats-bg: var(--card-item-bg);
+    --typhoon-stats-border: var(--card-item-border);
+
+    --external-link-bg: var(--card-item-bg);
+    --external-link-border: var(--card-item-border);
+    --external-link-hover-bg: var(--card-item-hover-bg);
+    --external-link-hover-border: var(--card-item-hover-border);
+
+    --rain-stat-bg: var(--card-item-bg);
+    --rain-stat-border: var(--card-item-border);
+    --rain-stat-hover-bg: var(--card-item-hover-bg);
+    --rain-stat-hover-border: var(--card-item-hover-border);
+  }
+
+  #dynamic-backdrop.state-day ~ #app-container,
+  #dynamic-backdrop.state-day ~ #details-drawer,
+  #dynamic-backdrop.state-day ~ #details-drawer-overlay {
+    --glass-bg: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.08) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.12) 100%);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(255, 255, 255, 0.18);
+    --glass-shadow: rgba(0, 0, 0, 0.2);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    
+    --card-item-bg: rgba(0, 0, 0, 0.06);
+    --card-item-border: rgba(255, 255, 255, 0.04);
+    --card-item-hover-bg: rgba(0, 0, 0, 0.10);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+  }
+
+  #dynamic-backdrop.state-night ~ #app-container,
+  #dynamic-backdrop.state-night ~ #details-drawer,
+  #dynamic-backdrop.state-night ~ #details-drawer-overlay {
+    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-hover: rgba(255, 255, 255, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    
+    --card-item-bg: rgba(255, 255, 255, 0.015);
+    --card-item-border: rgba(255, 255, 255, 0.02);
+    --card-item-hover-bg: rgba(255, 255, 255, 0.04);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -626,7 +729,7 @@ body {
 .glass-panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(2px);              /* Reduced blur to let details show clearly */
+  backdrop-filter: blur(2px);              /* Reduced blur to let details show clearly by default */
   -webkit-backdrop-filter: blur(2px);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-glow-shadow);
@@ -636,6 +739,7 @@ body {
 .glass-panel:hover {
   border-color: var(--glass-border-hover);
 }
+
 
 /* --------------------------------------------------------------------------
    5. Layout & App Grid
@@ -939,8 +1043,8 @@ body {
 }
 
 .stat-card {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: var(--card-item-bg);
+  border: 1px solid var(--card-item-border);
   padding: 18px;
   border-radius: var(--radius-md);
   display: flex;
@@ -951,8 +1055,8 @@ body {
 
 .stat-card:hover {
   transform: translateY(-4px) scale(1.02);
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--card-item-hover-bg);
+  border-color: var(--card-item-hover-border);
 }
 
 .stat-icon {
@@ -1118,8 +1222,8 @@ body {
 
 /* Beautiful Animated Card for Region list */
 .region-card {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: var(--card-item-bg);
+  border: 1px solid var(--card-item-border);
   padding: 16px 20px;
   border-radius: var(--radius-md);
   display: flex;
@@ -1145,8 +1249,8 @@ body {
 
 .region-card:hover {
   transform: translateX(4px) scale(1.01);
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--card-item-hover-bg);
+  border-color: var(--card-item-hover-border);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -1543,7 +1647,7 @@ body {
   right: 0;
   bottom: 0;
   z-index: -1;
-  background: rgba(8, 11, 17, 0.46) !important; /* Premium smoked glass with high transparency (46%) */
+  background: var(--glass-bg) !important;       /* Beautiful dynamic glass background */
   backdrop-filter: blur(20px) !important;      /* Dynamic strong frosted glass blur for high-end feel */
   -webkit-backdrop-filter: blur(20px) !important;
   pointer-events: none;
@@ -1553,7 +1657,8 @@ body {
 .details-drawer .glass-panel {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--card-item-bg) !important;
+  border: 1px solid var(--card-item-border) !important;
 }
 
 .details-drawer.active {
@@ -1561,16 +1666,87 @@ body {
 }
 
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
+  /* Define premium translucent glassmorphism variables on mobile */
+  #app-container,
+  #details-drawer,
+  #details-drawer-overlay {
+    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-hover: rgba(255, 255, 255, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    
+    --card-item-bg: rgba(255, 255, 255, 0.015);
+    --card-item-border: rgba(255, 255, 255, 0.02);
+    --card-item-hover-bg: rgba(255, 255, 255, 0.04);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+
+    --weekly-item-bg: var(--card-item-bg);
+    --weekly-item-border: var(--card-item-border);
+    --weekly-item-hover-bg: var(--card-item-hover-bg);
+    --weekly-item-hover-border: var(--card-item-hover-border);
+
+    --hourly-card-bg: var(--card-item-bg);
+    --hourly-card-border: var(--card-item-border);
+
+    --typhoon-stats-bg: var(--card-item-bg);
+    --typhoon-stats-border: var(--card-item-border);
+
+    --external-link-bg: var(--card-item-bg);
+    --external-link-border: var(--card-item-border);
+    --external-link-hover-bg: var(--card-item-hover-bg);
+    --external-link-hover-border: var(--card-item-hover-border);
+
+    --rain-stat-bg: var(--card-item-bg);
+    --rain-stat-border: var(--card-item-border);
+    --rain-stat-hover-bg: var(--card-item-hover-bg);
+    --rain-stat-hover-border: var(--card-item-hover-border);
+  }
+
+  #dynamic-backdrop.state-day ~ #app-container,
+  #dynamic-backdrop.state-day ~ #details-drawer,
+  #dynamic-backdrop.state-day ~ #details-drawer-overlay {
+    --glass-bg: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.08) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.12) 100%);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(255, 255, 255, 0.18);
+    --glass-shadow: rgba(0, 0, 0, 0.2);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    
+    --card-item-bg: rgba(0, 0, 0, 0.06);
+    --card-item-border: rgba(255, 255, 255, 0.04);
+    --card-item-hover-bg: rgba(0, 0, 0, 0.10);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+  }
+
+  #dynamic-backdrop.state-night ~ #app-container,
+  #dynamic-backdrop.state-night ~ #details-drawer,
+  #dynamic-backdrop.state-night ~ #details-drawer-overlay {
+    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-hover: rgba(255, 255, 255, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    
+    --card-item-bg: rgba(255, 255, 255, 0.015);
+    --card-item-border: rgba(255, 255, 255, 0.02);
+    --card-item-hover-bg: rgba(255, 255, 255, 0.04);
+    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+  }
+
   /* Apply fast hardware-accelerated blur filter on mobile to keep them looking soft and fluffy without CPU lag */
   #bg-clouds path {
     filter: url(#mobile-cloud-filter) !important;
   }
 
-  /* Disable expensive glassmorphism backdrop-filters on standard cards to prevent repaint lag on scrolling/animations */
+  /* Optimize and enable glassmorphism on mobile for premium look without lag */
   .glass-panel {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: rgba(10, 15, 30, 0.8) !important; /* Static translucent background for contrast */
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
   }
 
   .details-drawer {
@@ -1580,9 +1756,15 @@ body {
     -webkit-backdrop-filter: none !important;
   }
   .details-drawer::before {
-    background: rgba(8, 11, 17, 0.82) !important; /* Smoked glass transparent background - slightly more opaque for readability without heavy blur */
-    backdrop-filter: blur(4px) !important;       /* Reduced blur from 12px to 4px to optimize rendering performance */
-    -webkit-backdrop-filter: blur(4px) !important;
+    background: var(--glass-bg) !important;       /* Beautiful dynamic glass background */
+    backdrop-filter: blur(16px) !important;       /* High quality blur */
+    -webkit-backdrop-filter: blur(16px) !important;
+  }
+  .details-drawer .glass-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--card-item-bg) !important;
+    border: 1px solid var(--card-item-border) !important;
   }
   .drawer-overlay.active {
     background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking dark layers */
@@ -1771,8 +1953,8 @@ body {
 }
 
 .hourly-card {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255,255,255,0.02);
+  background: var(--hourly-card-bg);
+  border: 1px solid var(--hourly-card-border);
   padding: 12px;
   border-radius: var(--radius-sm);
   display: flex;
@@ -1818,8 +2000,8 @@ body {
   display: grid;
   grid-template-columns: 80px 45px 50px 1fr 80px;
   align-items: center;
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255,255,255,0.01);
+  background: var(--weekly-item-bg);
+  border: 1px solid var(--weekly-item-border);
   padding: 10px 16px;
   border-radius: var(--radius-md);
   gap: 10px;
@@ -1827,7 +2009,8 @@ body {
 }
 
 .weekly-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--weekly-item-hover-bg);
+  border-color: var(--weekly-item-hover-border);
   transform: scale(1.02);
 }
 
@@ -2840,8 +3023,8 @@ body {
 
 /* Typhoon Stats Card */
 .typhoon-stats-card {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--typhoon-stats-bg);
+  border: 1px solid var(--typhoon-stats-border);
   border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
@@ -3150,8 +3333,8 @@ body {
 .external-link-btn {
   flex: 1;
   text-align: center;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--glass-border);
+  background: var(--external-link-bg);
+  border: 1px solid var(--external-link-border);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 12px;
@@ -3168,8 +3351,8 @@ body {
 }
 
 .external-link-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--color-accent);
+  background: var(--external-link-hover-bg);
+  border-color: var(--external-link-hover-border);
   color: #FFF;
   box-shadow: 0 0 8px var(--color-accent-glow);
   transform: translateY(-1px);
@@ -3417,8 +3600,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--rain-stat-bg);
+  border: 1px solid var(--rain-stat-border);
   border-radius: var(--radius-sm, 8px);
   padding: 12px 8px;
   text-align: center;
@@ -3426,8 +3609,8 @@ body {
 }
 
 .rain-stat-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--glass-border-hover);
+  background: var(--rain-stat-hover-bg);
+  border-color: var(--rain-stat-hover-border);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
