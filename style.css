@@ -1561,9 +1561,9 @@ body {
 }
 
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
-  /* Disable expensive SVG displacement cloud filters on mobile to prevent main-thread layout lag */
+  /* Apply fast hardware-accelerated blur filter on mobile to keep them looking soft and fluffy without CPU lag */
   #bg-clouds path {
-    filter: none !important;
+    filter: url(#mobile-cloud-filter) !important;
   }
 
   /* Disable expensive glassmorphism backdrop-filters on standard cards to prevent repaint lag on scrolling/animations */
