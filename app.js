@@ -3442,9 +3442,14 @@ function applyDynamicBackdropTheme(iconType) {
   const particlesContainer = document.getElementById('weather-particles');
   particlesContainer.innerHTML = ''; // Wipe
   
+  // Intelligent mobile scaling: Reduce animated particle DOM count by ~65% on mobile viewports
+  const isMobile = window.innerWidth <= 768;
+  
   if (iconType === 'rainy' || iconType === 'thunderstorm') {
-    // Rain Particles - heavier rain for thunderstorm, and torrential rain for typhoon warning (180 drops)
-    const dropCount = hasTyphoonWarning ? 180 : (iconType === 'thunderstorm' ? 120 : 63);
+    // Rain Particles - heavier rain for thunderstorm, and torrential rain for typhoon warning
+    const maxDrops = hasTyphoonWarning ? 180 : (iconType === 'thunderstorm' ? 120 : 63);
+    const dropCount = isMobile ? Math.round(maxDrops * 0.35) : maxDrops;
+    
     for (let i = 0; i < dropCount; i++) {
       const drop = document.createElement('div');
       drop.className = hasTyphoonWarning ? 'raindrop typhoon-drop' : 'raindrop';
@@ -3461,7 +3466,7 @@ function applyDynamicBackdropTheme(iconType) {
     
     // Spawn horizontal wind gusts for typhoon gale simulations
     if (hasTyphoonWarning) {
-      const gustCount = 8;
+      const gustCount = isMobile ? 3 : 8;
       for (let i = 0; i < gustCount; i++) {
         const gust = document.createElement('div');
         gust.className = 'wind-gust';
@@ -3476,7 +3481,7 @@ function applyDynamicBackdropTheme(iconType) {
     }
   } else if (iconType === 'snowy') {
     // Snowy Particles - 45 soft drifting snowflakes
-    const snowCount = 45;
+    const snowCount = isMobile ? 15 : 45;
     for (let i = 0; i < snowCount; i++) {
       const flake = document.createElement('div');
       flake.className = 'snowflake';
@@ -3499,7 +3504,9 @@ function applyDynamicBackdropTheme(iconType) {
     }
     
     if (windGrade > 1) {
-      const leafCount = Math.min(20, Math.round(windGrade * 2.5));
+      const maxLeaves = Math.min(20, Math.round(windGrade * 2.5));
+      const leafCount = isMobile ? Math.min(6, Math.round(windGrade * 0.8)) : maxLeaves;
+      
       const leafColors = [
         '#4a7c59', // Muted forest green
         '#3c6e47', // Deep pine green
@@ -3543,9 +3550,11 @@ function applyDynamicBackdropTheme(iconType) {
   } else if (isNight) {
     // Starry Stars (restricted to top 28% sky canopy)
     // Reduce star count if it is cloudy or windy (highly realistic!)
-    let starCount = 45;
-    if (iconType === 'cloudy') starCount = 18;        // Increased from 8 to 18 so some stars can peek through the cloudy night sky
-    else if (iconType === 'windy') starCount = 20;     // Hazy sky, fewer stars visible
+    let maxStars = 45;
+    if (iconType === 'cloudy') maxStars = 18;        // Increased from 8 to 18 so some stars can peek through the cloudy night sky
+    else if (iconType === 'windy') maxStars = 20;     // Hazy sky, fewer stars visible
+    
+    const starCount = isMobile ? Math.round(maxStars * 0.4) : maxStars;
     
     for (let i = 0; i < starCount; i++) {
       const star = document.createElement('div');

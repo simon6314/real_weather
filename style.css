@@ -115,7 +115,7 @@ body {
   z-index: -1;
   overflow: hidden;
   background-color: var(--bg-app); /* Fallback dark color on backdrop instead of body */
-  background-image: url('forest_stream_bg.png');
+  background-image: url('forest_stream_bg.webp');
   background-size: cover;
   background-position: center bottom;
   /* Only transition background-image and opacity to prevent height/width transition loops when browser chrome collapses on scroll */
@@ -1561,6 +1561,18 @@ body {
 }
 
 @media (max-width: 768px) {                 /* Expanded from 600px to 768px to cover iPads/tablets and wide mobile views */
+  /* Disable expensive SVG displacement cloud filters on mobile to prevent main-thread layout lag */
+  #bg-clouds path {
+    filter: none !important;
+  }
+
+  /* Disable expensive glassmorphism backdrop-filters on standard cards to prevent repaint lag on scrolling/animations */
+  .glass-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(10, 15, 30, 0.8) !important; /* Static translucent background for contrast */
+  }
+
   .details-drawer {
     width: 100%;
     background: transparent !important;
@@ -1568,9 +1580,9 @@ body {
     -webkit-backdrop-filter: none !important;
   }
   .details-drawer::before {
-    background: rgba(8, 11, 17, 0.3) !important; /* Smoked glass transparent background - reduced opacity for transparency */
-    backdrop-filter: blur(12px) !important;       /* Reduced blur for better backdrop visibility */
-    -webkit-backdrop-filter: blur(12px) !important;
+    background: rgba(8, 11, 17, 0.82) !important; /* Smoked glass transparent background - slightly more opaque for readability without heavy blur */
+    backdrop-filter: blur(4px) !important;       /* Reduced blur from 12px to 4px to optimize rendering performance */
+    -webkit-backdrop-filter: blur(4px) !important;
   }
   .drawer-overlay.active {
     background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking dark layers */
