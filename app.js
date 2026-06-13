@@ -2449,8 +2449,8 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
             formattedDateStr += '+08:00';
           }
         }
-        const dateVal = new Date(formattedDateStr);
-        if (isBeforeTodayTaiwan(dateVal)) {
+                const dateVal = new Date(formattedDateStr);
+        if (isBeforeTodayTaiwan(formattedDateStr)) {
           continue;
         }
         
@@ -2494,8 +2494,8 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         
         weeklyList.push({
-          date: getTaiwanMonthAndDate(dateVal),
-          dayOfWeek: formatWeeklyDayLabel(dateVal),
+          date: getTaiwanMonthAndDate(formattedDateStr),
+          dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
           tempMin: minT,
           tempMax: maxT,
           desc: wxVal,
@@ -2520,75 +2520,95 @@ function normalizeCountyName(name) {
   return name.replace('台', '臺');
 }
 
-function getTaiwanHour(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Taipei',
-      hour: 'numeric',
-      hour12: false
-    });
-    return parseInt(formatter.format(date));
-  } catch (e) {
-    return date.getHours();
+function parseToTaiwanDateObj(val) {
+  if (!val) return null;
+  
+  if (typeof val === 'string') {
+    const cleanStr = val.trim().replace(' ', 'T');
+    const match = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(?:\d{2}))?/);
+    if (match) {
+      return {
+        year: parseInt(match[1], 10),
+        month: parseInt(match[2], 10),
+        day: parseInt(match[3], 10),
+        hour: match[4] ? parseInt(match[4], 10) : 0,
+        minute: match[5] ? parseInt(match[5], 10) : 0
+      };
+    }
+    val = new Date(val);
   }
+  
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(val);
+      const getVal = (type) => parseInt(parts.find(p => p.type === type).value, 10);
+      return {
+        year: getVal('year'),
+        month: getVal('month'),
+        day: getVal('day'),
+        hour: getVal('hour'),
+        minute: getVal('minute')
+      };
+    } catch (e) {
+      return {
+        year: val.getFullYear(),
+        month: val.getMonth() + 1,
+        day: val.getDate(),
+        hour: val.getHours(),
+        minute: val.getMinutes()
+      };
+    }
+  }
+  
+  return null;
+}
+
+function getTaiwanToday() {
+  return parseToTaiwanDateObj(new Date());
+}
+
+function getTaiwanHour(date) {
+  const parsed = parseToTaiwanDateObj(date);
+  return parsed ? parsed.hour : 0;
 }
 
 function getTaiwanMonthAndDate(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Taipei',
-      month: 'numeric',
-      day: 'numeric'
-    });
-    return formatter.format(date);
-  } catch (e) {
-    return `${date.getMonth()+1}/${date.getDate()}`;
-  }
+  const parsed = parseToTaiwanDateObj(date);
+  return parsed ? `${parsed.month}/${parsed.day}` : '';
 }
 
 function getTaiwanDayOfWeek(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('zh-TW', {
-      timeZone: 'Asia/Taipei',
-      weekday: 'short'
-    });
-    return formatter.format(date);
-  } catch (e) {
-    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-    return days[date.getDay()];
-  }
+  const parsed = parseToTaiwanDateObj(date);
+  if (!parsed) return '';
+  const dateObj = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
+  const dayIndex = dateObj.getUTCDay();
+  const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+  return days[dayIndex];
 }
 
 function getTaiwanDateTimeParts(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Taipei',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    const parts = formatter.formatToParts(date);
-    const getVal = (type) => parts.find(p => p.type === type).value;
-    return {
-      year: getVal('year'),
-      month: getVal('month'),
-      day: getVal('day'),
-      hour: getVal('hour'),
-      minute: getVal('minute')
-    };
-  } catch (e) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return {
-      year: String(date.getFullYear()),
-      month: pad(date.getMonth() + 1),
-      day: pad(date.getDate()),
-      hour: pad(date.getHours()),
-      minute: pad(date.getMinutes())
-    };
+  const parsed = parseToTaiwanDateObj(date);
+  if (!parsed) {
+    return { year: '1970', month: '01', day: '01', hour: '00', minute: '00' };
   }
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    year: String(parsed.year),
+    month: pad(parsed.month),
+    day: pad(parsed.day),
+    hour: pad(parsed.hour),
+    minute: pad(parsed.minute)
+  };
 }
 
 function getChartIconSvg(iconName, x, y, size = 20) {
@@ -2629,37 +2649,24 @@ function getChartIconSvg(iconName, x, y, size = 20) {
 }
 
 function formatHourlyLabel(date) {
-  const hour = getTaiwanHour(date);
+  const target = parseToTaiwanDateObj(date);
+  if (!target) return '';
+  
+  const hour = target.hour;
   let timeStr = '';
   if (hour === 0) timeStr = '半夜';
   else if (hour === 12) timeStr = '中午';
   else timeStr = `${hour}:00`;
 
   try {
-    const getTWDateString = (d) => {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric'
-      });
-      return formatter.format(d);
-    };
+    const today = getTaiwanToday();
+    const utcTarget = Date.UTC(target.year, target.month - 1, target.day);
+    const utcToday = Date.UTC(today.year, today.month - 1, today.day);
+    const diffDays = Math.round((utcTarget - utcToday) / (24 * 60 * 60 * 1000));
     
-    const now = new Date();
-    const todayStr = getTWDateString(now);
-    
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const tomorrowStr = getTWDateString(tomorrow);
-    
-    const dayAfter = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    const dayAfterStr = getTWDateString(dayAfter);
-    
-    const targetStr = getTWDateString(date);
-    
-    if (targetStr === tomorrowStr) {
+    if (diffDays === 1) {
       return `明 ${timeStr}`;
-    } else if (targetStr === dayAfterStr) {
+    } else if (diffDays === 2) {
       return `後 ${timeStr}`;
     }
   } catch (e) {
@@ -2670,59 +2677,28 @@ function formatHourlyLabel(date) {
 }
 
 function isTodayTaiwan(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Taipei',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric'
-    });
-    const nowParts = formatter.format(new Date()).split('/');
-    const dateParts = formatter.format(date).split('/');
-    return nowParts[0] === dateParts[0] && nowParts[1] === dateParts[1] && nowParts[2] === dateParts[2];
-  } catch (e) {
-    const now = new Date();
-    return date.getFullYear() === now.getFullYear() &&
-           date.getMonth() === now.getMonth() &&
-           date.getDate() === now.getDate();
-  }
+  const target = parseToTaiwanDateObj(date);
+  const today = getTaiwanToday();
+  if (!target || !today) return false;
+  return target.year === today.year && target.month === today.month && target.day === today.day;
 }
 
 function isBeforeTodayTaiwan(date) {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Taipei',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric'
-    });
-    const nowParts = formatter.format(new Date()).split('/');
-    const dateParts = formatter.format(date).split('/');
-    
-    const nowY = parseInt(nowParts[2]);
-    const nowM = parseInt(nowParts[0]);
-    const nowD = parseInt(nowParts[1]);
-    
-    const dateY = parseInt(dateParts[2]);
-    const dateM = parseInt(dateParts[0]);
-    const dateD = parseInt(dateParts[1]);
-    
-    if (dateY < nowY) return true;
-    if (dateY > nowY) return false;
-    if (dateM < nowM) return true;
-    if (dateM > nowM) return false;
-    return dateD < nowD;
-  } catch (e) {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    return target.getTime() < today.getTime();
-  }
+  const target = parseToTaiwanDateObj(date);
+  const today = getTaiwanToday();
+  if (!target || !today) return false;
+  
+  if (target.year < today.year) return true;
+  if (target.year > today.year) return false;
+  if (target.month < today.month) return true;
+  if (target.month > today.month) return false;
+  return target.day < today.day;
 }
 
 function formatWeeklyDayLabel(date) {
-  if (isTodayTaiwan(date)) return '今天';
-  return getTaiwanDayOfWeek(date);
+  const dayStr = getTaiwanDayOfWeek(date);
+  if (isTodayTaiwan(date)) return `${dayStr} (今天)`;
+  return dayStr;
 }
 
 // Map Central Weather Administration's "Wx Parameter Value" to our dynamic icons
@@ -2903,7 +2879,7 @@ function triggerSimulationMode(reasonMsg) {
       const dayDate = new Date();
       dayDate.setDate(now.getDate() + d);
       
-      const dayName = d === 0 ? '今天' : weekdays[dayDate.getDay()];
+      const dayName = d === 0 ? `${weekdays[dayDate.getDay()]} (今天)` : weekdays[dayDate.getDay()];
       const dayMin = parseFloat((minT + Math.sin(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
       const dayMax = parseFloat((maxT + Math.cos(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
       
@@ -5063,7 +5039,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       hourlyList.push({
         timeVal: timeVal.getTime(),
         time: twHour + ':00',
-        displayTime: formatHourlyLabel(timeVal),
+        displayTime: formatHourlyLabel(formattedTimeStr),
         temp: temp,
         humidity: humidity,
         windGrade: wind,
@@ -5138,7 +5114,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         }
       }
       const dateVal = new Date(formattedDateStr);
-      if (isBeforeTodayTaiwan(dateVal)) {
+      if (isBeforeTodayTaiwan(formattedDateStr)) {
         continue;
       }
       
@@ -5206,8 +5182,8 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       }
       
       weeklyList.push({
-        date: getTaiwanMonthAndDate(dateVal),
-        dayOfWeek: formatWeeklyDayLabel(dateVal),
+        date: getTaiwanMonthAndDate(formattedDateStr),
+        dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
         tempMin: minT,
         tempMax: maxT,
         desc: wxVal,
@@ -5307,7 +5283,7 @@ function simulateRegionWeather(id) {
     dayDate.setDate(now.getDate() + d);
     simulated.weekly.push({
       date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
-      dayOfWeek: d === 0 ? '今天' : weekdays[dayDate.getDay()],
+      dayOfWeek: d === 0 ? `${weekdays[dayDate.getDay()]} (今天)` : weekdays[dayDate.getDay()],
       tempMin: parseFloat((minT + Math.sin(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
       tempMax: parseFloat((maxT + Math.cos(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
       desc: '多雲時晴',
