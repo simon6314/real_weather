@@ -376,8 +376,9 @@ function initNavigation() {
 function validateAndCleanAllCaches() {
   console.log('Validating cache integrity in localStorage...');
   
-  // Clean up legacy caches from prior versions (V13, V12, V11, V10, V9, V8, V7, V2) to reclaim space and force immediate updates!
+  // Clean up legacy caches from prior versions (V14, V13, V12, V11, V10, V9, V8, V7, V2) to reclaim space and force immediate updates!
   const legacyKeys = [
+    'cwa_weather_cache_v14', 'cwa_weather_cache_time_v14',
     'cwa_weather_cache_v11', 'cwa_weather_cache_time_v11',
     'cwa_weather_cache_v10', 'cwa_weather_cache_time_v10',
     'cwa_weather_cache_v9', 'cwa_weather_cache_time_v9',
@@ -397,11 +398,12 @@ function validateAndCleanAllCaches() {
   ];
   legacyKeys.forEach(k => localStorage.removeItem(k));
   
-  // Wipe legacy township caches (including V10, V9, V8, V7)
+  // Wipe legacy township caches (including V12, V10, V9, V8, V7)
   const legacyTownshipKeys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && (key.startsWith('cwa_town_cache_v10_') || key.startsWith('cwa_town_cache_time_v10_') ||
+    if (key && (key.startsWith('cwa_town_cache_v12_') || key.startsWith('cwa_town_cache_time_v12_') ||
+                key.startsWith('cwa_town_cache_v10_') || key.startsWith('cwa_town_cache_time_v10_') ||
                 key.startsWith('cwa_town_cache_v9_') || key.startsWith('cwa_town_cache_time_v9_') ||
                 key.startsWith('cwa_town_cache_v8_') || key.startsWith('cwa_town_cache_time_v8_') ||
                 key.startsWith('cwa_town_cache_v7_') || key.startsWith('cwa_town_cache_time_v7_'))) {
@@ -411,8 +413,8 @@ function validateAndCleanAllCaches() {
   legacyTownshipKeys.forEach(k => localStorage.removeItem(k));
   
   // 1. Validate county cache
-  const countyCacheKey = 'cwa_weather_cache_v14';
-  const countyTimeKey = 'cwa_weather_cache_time_v14';
+  const countyCacheKey = 'cwa_weather_cache_v15';
+  const countyTimeKey = 'cwa_weather_cache_time_v15';
   const countyCache = localStorage.getItem(countyCacheKey);
   if (countyCache) {
     try {
@@ -440,7 +442,7 @@ function validateAndCleanAllCaches() {
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('cwa_town_cache_v12_') && !key.includes('_time_')) {
+    if (key && key.startsWith('cwa_town_cache_v13_') && !key.includes('_time_')) {
       const townCache = localStorage.getItem(key);
       if (townCache) {
         try {
@@ -465,7 +467,7 @@ function validateAndCleanAllCaches() {
   keysToRemove.forEach(key => {
     console.warn(`Wiping invalid/corrupted township cache: ${key}`);
     localStorage.removeItem(key);
-    const timeKey = key.replace('cwa_town_cache_v12_', 'cwa_town_cache_time_v12_');
+    const timeKey = key.replace('cwa_town_cache_v13_', 'cwa_town_cache_time_v13_');
     localStorage.removeItem(timeKey);
   });
 }
@@ -724,6 +726,8 @@ function shouldBypassCache() {
 // Clear all CWA weather caches, township caches, and typhoon caches from localStorage
 function clearAllWeatherCaches() {
   console.log('Clearing all weather, township, and typhoon caches from localStorage...');
+  localStorage.removeItem('cwa_weather_cache_v15');
+  localStorage.removeItem('cwa_weather_cache_time_v15');
   localStorage.removeItem('cwa_weather_cache_v14');
   localStorage.removeItem('cwa_weather_cache_time_v14');
   localStorage.removeItem('cwa_weather_cache_v13');
@@ -1410,7 +1414,7 @@ function getCountyKeywords(county) {
 // 5. CWA API Fetching & LocalStorage Caching Client
 // --------------------------------------------------------------------------
 function loadWeatherDashboardCachedOnly() {
-  const cacheKey = 'cwa_weather_cache_v14';
+  const cacheKey = 'cwa_weather_cache_v15';
   const cachedDataStr = localStorage.getItem(cacheKey);
   if (cachedDataStr) {
     try {
@@ -1451,7 +1455,7 @@ function loadWeatherDashboardCachedOnly() {
         // Check if current location is a township and load its cache if available
         const parsed = parseIdentifier(AppState.currentLocationCounty);
         if (parsed.type === 'town') {
-          const townCacheKey = `cwa_town_cache_v12_${parsed.county}`;
+          const townCacheKey = `cwa_town_cache_v13_${parsed.county}`;
           const cachedTownStr = localStorage.getItem(townCacheKey);
           if (cachedTownStr) {
             try {
@@ -1488,8 +1492,8 @@ async function loadWeatherDashboard() {
   updateDataBadge('載入資料中...', 'loading');
   
   // Stale-While-Revalidate check
-  const cacheKey = 'cwa_weather_cache_v14';
-  const cacheTimeKey = 'cwa_weather_cache_time_v14';
+  const cacheKey = 'cwa_weather_cache_v15';
+  const cacheTimeKey = 'cwa_weather_cache_time_v15';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -1628,8 +1632,8 @@ async function fetchAllWeatherData() {
     return false; // Requires API key or Cloudflare proxy
   }
   
-  const cacheKey = 'cwa_weather_cache_v14';
-  const cacheTimeKey = 'cwa_weather_cache_time_v14';
+  const cacheKey = 'cwa_weather_cache_v15';
+  const cacheTimeKey = 'cwa_weather_cache_time_v15';
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
@@ -4630,7 +4634,7 @@ async function loadWeatherForRegion(id, force = false) {
   
   // Dynamic fetch for township
   // SWR: Let's check if we have expired cache in localStorage first, so we render it immediately
-  const townCacheKey = `cwa_town_cache_v12_${parsed.county}`;
+  const townCacheKey = `cwa_town_cache_v13_${parsed.county}`;
   const cachedTownStr = localStorage.getItem(townCacheKey);
   let hasLoadedCachedTown = false;
   if (!force && cachedTownStr) {
@@ -4679,8 +4683,8 @@ async function fetchCwaTownshipData(countyName, force = false) {
   const apis = COUNTY_TOWN_APIS[countyName];
   if (!apis) return false;
   
-  const cacheKey = `cwa_town_cache_v12_${countyName}`;
-  const cacheTimeKey = `cwa_town_cache_time_v12_${countyName}`;
+  const cacheKey = `cwa_town_cache_v13_${countyName}`;
+  const cacheTimeKey = `cwa_town_cache_time_v13_${countyName}`;
   const cachedDataStr = localStorage.getItem(cacheKey);
   const cachedTimeStr = localStorage.getItem(cacheTimeKey);
   const now = new Date().getTime();
