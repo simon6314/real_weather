@@ -2454,11 +2454,28 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           }
         }
         
-        if (isBeforeTodayTaiwan(formattedDateStr)) {
+        const endTimeStr = timeItem.endTime;
+        let formattedEndTimeStr = endTimeStr;
+        if (typeof endTimeStr === 'string') {
+          formattedEndTimeStr = endTimeStr.trim().replace(' ', 'T');
+          if (!formattedEndTimeStr.includes('+') && !formattedEndTimeStr.includes('Z')) {
+            formattedEndTimeStr += '+08:00';
+          }
+        }
+        
+        // Skip past periods
+        if (formattedEndTimeStr && new Date() >= new Date(formattedEndTimeStr)) {
           continue;
         }
         
-        const parsedDate = parseToTaiwanDateObj(formattedDateStr);
+        let dateObj = new Date(formattedDateStr);
+        const parsedHour = getTaiwanHour(dateObj);
+        // Shift 00:00-06:00 early morning period back to represent the previous day's night period
+        if (parsedHour < 6) {
+          dateObj.setHours(dateObj.getHours() - 12);
+        }
+        
+        const parsedDate = parseToTaiwanDateObj(dateObj);
         if (!parsedDate) continue;
         
         const minTVal = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
@@ -2477,13 +2494,37 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         }
         
         let popVal = 0;
-        if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
-          popVal = parseInt(popEl.time[i].elementValue[0].value) || 0;
+        if (popEl && popEl.time) {
+          const timeVal = new Date(formattedDateStr);
+          const popMatch = popEl.time.find(p => {
+            const startStr = p.startTime || p.dataTime;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
+            const endStr = p.endTime;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 12 * 3600000);
+            return timeVal >= start && timeVal < end;
+          });
+          if (popMatch && popMatch.elementValue && popMatch.elementValue[0]) {
+            popVal = parseInt(popMatch.elementValue[0].value) || 0;
+          }
         }
         
         weeklyList.push({
-          date: getTaiwanMonthAndDate(formattedDateStr),
-          dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
+          date: getTaiwanMonthAndDate(dateObj),
+          dayOfWeek: formatWeeklyDayLabel(dateObj),
           tempMin: minTVal,
           tempMax: maxTVal,
           desc: wxVal,
@@ -2871,7 +2912,8 @@ function triggerSimulationMode(reasonMsg) {
       dayDate.setDate(now.getDate() + d);
       
       const dayStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T06:00:00+08:00`;
-      if (!isBeforeTodayTaiwan(dayStr)) {
+      const dayEnd = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 18, 0, 0);
+      if (now < dayEnd) {
         let dayIcon = activeIcon;
         let dayDesc = conditionText;
         let dayRain = finalRainProb;
@@ -2898,7 +2940,8 @@ function triggerSimulationMode(reasonMsg) {
       }
       
       const nightStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T18:00:00+08:00`;
-      if (!isBeforeTodayTaiwan(nightStr)) {
+      const nightEnd = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate() + 1, 6, 0, 0);
+      if (now < nightEnd) {
         let nightIcon = activeIcon;
         let nightDesc = conditionText;
         let nightRain = finalRainProb;
@@ -5150,11 +5193,28 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         }
       }
       
-      if (isBeforeTodayTaiwan(formattedDateStr)) {
+      const endTimeStr = timeItem.EndTime || timeItem.endTime;
+      let formattedEndTimeStr = endTimeStr;
+      if (typeof endTimeStr === 'string') {
+        formattedEndTimeStr = endTimeStr.trim().replace(' ', 'T');
+        if (!formattedEndTimeStr.includes('+') && !formattedEndTimeStr.includes('Z')) {
+          formattedEndTimeStr += '+08:00';
+        }
+      }
+      
+      // Skip past periods
+      if (formattedEndTimeStr && new Date() >= new Date(formattedEndTimeStr)) {
         continue;
       }
       
-      const parsedDate = parseToTaiwanDateObj(formattedDateStr);
+      let dateObj = new Date(formattedDateStr);
+      const parsedHour = getTaiwanHour(dateObj);
+      // Shift 00:00-06:00 early morning period back to represent the previous day's night period
+      if (parsedHour < 6) {
+        dateObj.setHours(dateObj.getHours() - 12);
+      }
+      
+      const parsedDate = parseToTaiwanDateObj(dateObj);
       if (!parsedDate) continue;
       
       const valArr = timeItem.ElementValue || timeItem.elementValue;
@@ -5186,16 +5246,39 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       let popVal = 0;
       if (popEl) {
         const popTime = popEl.Time || popEl.time;
-        const popItem = popTime?.[i];
-        if (popItem) {
-          const popValArr = popItem.ElementValue || popItem.elementValue;
-          if (popValArr) popVal = parseInt(getValueFromCwaArray(popValArr)) || 0;
+        if (popTime) {
+          const timeVal = new Date(formattedDateStr);
+          const popMatch = popTime.find(p => {
+            const startStr = p.StartTime || p.startTime || p.DataTime || p.dataTime;
+            let formattedStartStr = startStr;
+            if (typeof startStr === 'string') {
+              formattedStartStr = startStr.trim().replace(' ', 'T');
+              if (!formattedStartStr.includes('+') && !formattedStartStr.includes('Z')) {
+                formattedStartStr += '+08:00';
+              }
+            }
+            const start = new Date(formattedStartStr);
+            const endStr = p.EndTime || p.endTime;
+            let formattedEndStr = endStr;
+            if (typeof endStr === 'string') {
+              formattedEndStr = endStr.trim().replace(' ', 'T');
+              if (!formattedEndStr.includes('+') && !formattedEndStr.includes('Z')) {
+                formattedEndStr += '+08:00';
+              }
+            }
+            const end = formattedEndStr ? new Date(formattedEndStr) : new Date(start.getTime() + 12 * 3600000);
+            return timeVal >= start && timeVal < end;
+          });
+          const popValArr = popMatch ? (popMatch.ElementValue || popMatch.elementValue) : null;
+          if (popValArr) {
+            popVal = parseInt(getValueFromCwaArray(popValArr)) || 0;
+          }
         }
       }
       
       weeklyList.push({
-        date: getTaiwanMonthAndDate(formattedDateStr),
-        dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
+        date: getTaiwanMonthAndDate(dateObj),
+        dayOfWeek: formatWeeklyDayLabel(dateObj),
         tempMin: minTVal,
         tempMax: maxTVal,
         desc: wxVal,
