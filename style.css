@@ -77,19 +77,23 @@
 #dynamic-backdrop.state-day ~ #app-container,
 #dynamic-backdrop.state-day ~ #details-drawer,
 #dynamic-backdrop.state-day ~ #details-drawer-overlay {
-  --glass-bg: rgba(0, 0, 0, 0.28);          /* Smoked dark glass for perfect text contrast in bright daylight */
+  --glass-bg: rgba(0, 0, 0, 0.08);          /* Highly transparent smoked glass */
   --glass-border: rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(0, 0, 0, 0.35);
+  --glass-bg-hover: rgba(0, 0, 0, 0.12);
+  --weekly-item-bg: rgba(0, 0, 0, 0.04);
+  --hourly-card-bg: rgba(0, 0, 0, 0.05);
 }
 
 #dynamic-backdrop.state-night ~ #app-container,
 #dynamic-backdrop.state-night ~ #details-drawer,
 #dynamic-backdrop.state-night ~ #details-drawer-overlay {
-  --glass-bg: rgba(255, 255, 255, 0.01);    /* Highly transparent glass in dark night */
+  --glass-bg: rgba(0, 0, 0, 0.03);          /* Very transparent dark night glass */
   --glass-border: rgba(255, 255, 255, 0.015);
-  --glass-bg-hover: rgba(255, 255, 255, 0.03);
+  --glass-bg-hover: rgba(0, 0, 0, 0.06);
   --glass-shadow: rgba(0, 0, 0, 0.4);
   --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --weekly-item-bg: rgba(255, 255, 255, 0.005);
+  --hourly-card-bg: rgba(255, 255, 255, 0.01);
 }
 
 @media (max-width: 768px) {
@@ -729,8 +733,8 @@ body {
 .glass-panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(2px);              /* Reduced blur to let details show clearly by default */
-  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(20px);              /* Increased blur to maintain perfect text legibility on high transparency */
+  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-glow-shadow);
   transition: var(--transition-smooth);
@@ -1707,33 +1711,33 @@ body {
   #dynamic-backdrop.state-day ~ #app-container,
   #dynamic-backdrop.state-day ~ #details-drawer,
   #dynamic-backdrop.state-day ~ #details-drawer-overlay {
-    --glass-bg: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.08) 100%);
-    --glass-bg-hover: linear-gradient(135deg, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.12) 100%);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-hover: rgba(255, 255, 255, 0.18);
-    --glass-shadow: rgba(0, 0, 0, 0.2);
-    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    --glass-bg: linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.03) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.06) 100%);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-hover: rgba(255, 255, 255, 0.14);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
     
-    --card-item-bg: rgba(0, 0, 0, 0.06);
-    --card-item-border: rgba(255, 255, 255, 0.04);
-    --card-item-hover-bg: rgba(0, 0, 0, 0.10);
-    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+    --card-item-bg: rgba(0, 0, 0, 0.03);
+    --card-item-border: rgba(255, 255, 255, 0.03);
+    --card-item-hover-bg: rgba(0, 0, 0, 0.06);
+    --card-item-hover-border: rgba(255, 255, 255, 0.06);
   }
 
   #dynamic-backdrop.state-night ~ #app-container,
   #dynamic-backdrop.state-night ~ #details-drawer,
   #dynamic-backdrop.state-night ~ #details-drawer-overlay {
-    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%);
-    --glass-border: rgba(255, 255, 255, 0.06);
-    --glass-border-hover: rgba(255, 255, 255, 0.16);
+    --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.005) 100%);
+    --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-border: rgba(255, 255, 255, 0.04);
+    --glass-border-hover: rgba(255, 255, 255, 0.12);
     --glass-shadow: rgba(0, 0, 0, 0.25);
     --glass-glow-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
     
-    --card-item-bg: rgba(255, 255, 255, 0.015);
-    --card-item-border: rgba(255, 255, 255, 0.02);
-    --card-item-hover-bg: rgba(255, 255, 255, 0.04);
-    --card-item-hover-border: rgba(255, 255, 255, 0.08);
+    --card-item-bg: rgba(255, 255, 255, 0.008);
+    --card-item-border: rgba(255, 255, 255, 0.015);
+    --card-item-hover-bg: rgba(255, 255, 255, 0.025);
+    --card-item-hover-border: rgba(255, 255, 255, 0.05);
   }
 
   /* Apply fast hardware-accelerated blur filter on mobile to keep them looking soft and fluffy without CPU lag */
