@@ -2684,7 +2684,7 @@ function formatWeeklyDayLabel(date) {
   if (!parsed) return '';
   const dayStr = getTaiwanDayOfWeek(date);
   const periodStr = parsed.hour === 6 ? '白天' : '晚上';
-  if (isTodayTaiwan(date)) return `${dayStr} (今天) ${periodStr}`;
+  if (isTodayTaiwan(date)) return `今天 ${periodStr}`;
   return `${dayStr} ${periodStr}`;
 }
 
