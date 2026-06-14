@@ -1998,7 +1998,7 @@ body {
 
 .weekly-item {
   display: grid;
-  grid-template-columns: 80px 45px 50px 1fr 80px;
+  grid-template-columns: 125px 45px 50px 1fr 80px;
   align-items: center;
   background: var(--weekly-item-bg);
   border: 1px solid var(--weekly-item-border);
@@ -2018,6 +2018,7 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: #FFF;
+  white-space: nowrap;
 }
 
 .weekly-pop {
@@ -2798,7 +2799,7 @@ body {
   }
   
   .weekly-item {
-    grid-template-columns: 60px 32px 42px 1fr 70px;
+    grid-template-columns: 110px 32px 42px 1fr 70px;
     padding: 8px 10px;
     gap: 6px;
     border-radius: var(--radius-sm);
@@ -2810,7 +2811,8 @@ body {
   }
   
   .weekly-day {
-    font-size: 15.5px;
+    font-size: 14.5px;
+    white-space: nowrap;
   }
   
   .weekly-pop {

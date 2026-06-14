@@ -2436,12 +2436,8 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
       const weeklyList = [];
       const len = (minTEl && minTEl.time) ? minTEl.time.length : 0;
       
-      // Weekly reports has morning/night subdivisions, we aggregate by day
-      // time array lists: day 1 morning, day 1 night, day 2 morning, day 2 night...
-      // We step by 2 to group days
-      for (let i = 0; i < len; i += 2) {
-        if (i >= len) break;
-        
+      // Weekly reports has morning/night subdivisions, we output each 12-hour period sequentially
+      for (let i = 0; i < len; i++) {
         const timeItem = minTEl.time[i];
         if (!timeItem) continue;
         
@@ -2453,29 +2449,21 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
             formattedDateStr += '+08:00';
           }
         }
-                const dateVal = new Date(formattedDateStr);
+        
         if (isBeforeTodayTaiwan(formattedDateStr)) {
           continue;
         }
         
-        const minT1 = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
-        if (isNaN(minT1)) continue;
+        const parsedDate = parseToTaiwanDateObj(formattedDateStr);
+        if (!parsedDate) continue;
         
-        let minT2 = minT1;
-        if (i+1 < len && minTEl.time[i+1] && minTEl.time[i+1].elementValue && minTEl.time[i+1].elementValue[0]) {
-          minT2 = parseInt(minTEl.time[i+1].elementValue[0].value) || minT1;
-        }
-        const minT = Math.min(minT1, minT2);
+        const minTVal = (timeItem.elementValue && timeItem.elementValue[0]) ? parseInt(timeItem.elementValue[0].value) : NaN;
+        if (isNaN(minTVal)) continue;
         
-        let maxT1 = minT;
+        let maxTVal = minTVal;
         if (maxTEl && maxTEl.time && maxTEl.time[i] && maxTEl.time[i].elementValue && maxTEl.time[i].elementValue[0]) {
-          maxT1 = parseInt(maxTEl.time[i].elementValue[0].value) || minT;
+          maxTVal = parseInt(maxTEl.time[i].elementValue[0].value) || minTVal;
         }
-        let maxT2 = maxT1;
-        if (i+1 < len && maxTEl && maxTEl.time && maxTEl.time[i+1] && maxTEl.time[i+1].elementValue && maxTEl.time[i+1].elementValue[0]) {
-          maxT2 = parseInt(maxTEl.time[i+1].elementValue[0].value) || maxT1;
-        }
-        const maxT = Math.max(maxT1, maxT2);
         
         let wxVal = '多雲';
         let wxIconVal = '2';
@@ -2484,27 +2472,19 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
           wxIconVal = wxEl.time[i].elementValue[1] ? wxEl.time[i].elementValue[1].value : '2';
         }
         
-        let pop = 0;
-        if (popEl && popEl.time) {
-          let pop1 = 0;
-          let pop2 = 0;
-          if (popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
-            pop1 = parseInt(popEl.time[i].elementValue[0].value) || 0;
-          }
-          if (i+1 < popEl.time.length && popEl.time[i+1] && popEl.time[i+1].elementValue && popEl.time[i+1].elementValue[0]) {
-            pop2 = parseInt(popEl.time[i+1].elementValue[0].value) || 0;
-          }
-          pop = Math.max(pop1, pop2);
+        let popVal = 0;
+        if (popEl && popEl.time && popEl.time[i] && popEl.time[i].elementValue && popEl.time[i].elementValue[0]) {
+          popVal = parseInt(popEl.time[i].elementValue[0].value) || 0;
         }
         
         weeklyList.push({
           date: getTaiwanMonthAndDate(formattedDateStr),
           dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
-          tempMin: minT,
-          tempMax: maxT,
+          tempMin: minTVal,
+          tempMax: maxTVal,
           desc: wxVal,
           icon: mapWxToIcon(wxIconVal),
-          rainProb: pop
+          rainProb: popVal
         });
       }
       
@@ -2700,9 +2680,12 @@ function isBeforeTodayTaiwan(date) {
 }
 
 function formatWeeklyDayLabel(date) {
+  const parsed = parseToTaiwanDateObj(date);
+  if (!parsed) return '';
   const dayStr = getTaiwanDayOfWeek(date);
-  if (isTodayTaiwan(date)) return `${dayStr} (今天)`;
-  return dayStr;
+  const periodStr = parsed.hour === 6 ? '白天' : '晚上';
+  if (isTodayTaiwan(date)) return `${dayStr} (今天) ${periodStr}`;
+  return `${dayStr} ${periodStr}`;
 }
 
 // Map Central Weather Administration's "Wx Parameter Value" to our dynamic icons
@@ -2875,42 +2858,71 @@ function triggerSimulationMode(reasonMsg) {
     }
     simulated[cName].hourly = hourlyList;
     
-    // 3. Generate natural 7 Days weekly forecast
+    // 3. Generate natural 7 Days weekly forecast in 12-hour periods
     const weeklyList = [];
-    const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    const pad = (n) => String(n).padStart(2, '0');
     
     for (let d = 0; d < 7; d++) {
       const dayDate = new Date();
       dayDate.setDate(now.getDate() + d);
       
-      const dayName = d === 0 ? `${weekdays[dayDate.getDay()]} (今天)` : weekdays[dayDate.getDay()];
-      const dayMin = parseFloat((minT + Math.sin(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
-      const dayMax = parseFloat((maxT + Math.cos(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1));
-      
-      let dayIcon = activeIcon;
-      let dayDesc = conditionText;
-      let dayRain = finalRainProb;
-      
-      // Add slight variety to week days
-      if (d === 2 || d === 5) {
-        dayIcon = 'rainy';
-        dayDesc = '短暫陣雨';
-        dayRain = Math.min(90, dayRain + 30);
-      } else if (d === 4) {
-        dayIcon = 'sunny';
-        dayDesc = '晴朗';
-        dayRain = Math.max(5, dayRain - 40);
+      const dayStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T06:00:00+08:00`;
+      if (!isBeforeTodayTaiwan(dayStr)) {
+        let dayIcon = activeIcon;
+        let dayDesc = conditionText;
+        let dayRain = finalRainProb;
+        
+        if (d === 2 || d === 5) {
+          dayIcon = 'rainy';
+          dayDesc = '短暫陣雨';
+          dayRain = Math.min(90, dayRain + 30);
+        } else if (d === 4) {
+          dayIcon = 'sunny';
+          dayDesc = '晴朗';
+          dayRain = Math.max(5, dayRain - 40);
+        }
+        
+        weeklyList.push({
+          date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
+          dayOfWeek: formatWeeklyDayLabel(dayStr),
+          tempMin: parseFloat((minT + Math.sin(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+          tempMax: parseFloat((maxT + Math.cos(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+          desc: dayDesc,
+          icon: dayIcon,
+          rainProb: dayRain
+        });
       }
       
-      weeklyList.push({
-        date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
-        dayOfWeek: dayName,
-        tempMin: dayMin,
-        tempMax: dayMax,
-        desc: dayDesc,
-        icon: dayIcon,
-        rainProb: dayRain
-      });
+      const nightStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T18:00:00+08:00`;
+      if (!isBeforeTodayTaiwan(nightStr)) {
+        let nightIcon = activeIcon;
+        let nightDesc = conditionText;
+        let nightRain = finalRainProb;
+        
+        if (d === 2 || d === 5) {
+          nightIcon = 'rainy';
+          nightDesc = '短暫陣雨';
+          nightRain = Math.min(90, nightRain + 30);
+        } else if (d === 4) {
+          nightIcon = 'sunny';
+          nightDesc = '晴朗';
+          nightRain = Math.max(5, nightRain - 40);
+        }
+        
+        if (nightIcon === 'sunny' || nightIcon === 'sunny-cloudy') {
+          nightIcon = 'night';
+        }
+        
+        weeklyList.push({
+          date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
+          dayOfWeek: formatWeeklyDayLabel(nightStr),
+          tempMin: parseFloat((minT - 1 + Math.sin(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+          tempMax: parseFloat((maxT - 1 + Math.cos(d) * 1.5 + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+          desc: nightDesc,
+          icon: nightIcon,
+          rainProb: nightRain
+        });
+      }
     }
     simulated[cName].weekly = weeklyList;
   }
@@ -4620,13 +4632,22 @@ async function loadWeatherForRegion(id, force = false) {
   if (!force) {
     // Validate that the region has valid weather data loaded in memory (not error, not NaN/undefined temperature)
     const existingData = AppState.allCountiesWeatherData[id];
+    
+    // Check if we have a valid and fresh cache time (10 minutes)
+    const parsedId = parseIdentifier(id);
+    const cacheTimeKey = `cwa_town_cache_time_v13_${parsedId.county}`;
+    const cachedTimeStr = localStorage.getItem(cacheTimeKey);
+    const now = new Date().getTime();
+    const isCacheFresh = cachedTimeStr && (now - parseInt(cachedTimeStr)) < 600000;
+    
     const isInMemoryValid = existingData && 
                             !existingData.error && 
                             existingData.current && 
                             existingData.current.temp !== undefined && 
                             existingData.current.temp !== null && 
                             !isNaN(existingData.current.temp) && 
-                            existingData.current.desc !== undefined;
+                            existingData.current.desc !== undefined &&
+                            isCacheFresh;
     
     if (isInMemoryValid) return; // Already loaded successfully and valid!
   }
@@ -5112,9 +5133,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
     const minTTime = minTEl ? (minTEl.Time || minTEl.time) : null;
     const len = minTTime ? minTTime.length : 0;
     
-    for (let i = 0; i < len; i += 2) {
-      if (i >= len) break;
-      
+    for (let i = 0; i < len; i++) {
       const timeItem = minTTime[i];
       if (!timeItem) continue;
       
@@ -5126,43 +5145,27 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
           formattedDateStr += '+08:00';
         }
       }
-      const dateVal = new Date(formattedDateStr);
+      
       if (isBeforeTodayTaiwan(formattedDateStr)) {
         continue;
       }
       
+      const parsedDate = parseToTaiwanDateObj(formattedDateStr);
+      if (!parsedDate) continue;
+      
       const valArr = timeItem.ElementValue || timeItem.elementValue;
-      const minT1 = parseFloat(getValueFromCwaArray(valArr));
-      if (isNaN(minT1)) continue;
+      const minTVal = parseFloat(getValueFromCwaArray(valArr));
+      if (isNaN(minTVal)) continue;
       
-      let minT2 = minT1;
-      if (i+1 < len && minTTime[i+1]) {
-        const nextValArr = minTTime[i+1].ElementValue || minTTime[i+1].elementValue;
-        if (nextValArr) {
-          minT2 = parseFloat(getValueFromCwaArray(nextValArr)) || minT1;
-        }
-      }
-      const minT = Math.min(minT1, minT2);
-      
-      let maxT1 = minT;
+      let maxTVal = minTVal;
       if (maxTEl) {
         const maxTTime = maxTEl.Time || maxTEl.time;
         const maxTItem = maxTTime?.[i];
         const maxTValArr = maxTItem ? (maxTItem.ElementValue || maxTItem.elementValue) : null;
         if (maxTValArr) {
-          maxT1 = parseFloat(getValueFromCwaArray(maxTValArr)) || minT;
+          maxTVal = parseFloat(getValueFromCwaArray(maxTValArr)) || minTVal;
         }
       }
-      let maxT2 = maxT1;
-      if (i+1 < len && maxTEl) {
-        const maxTTime = maxTEl.Time || maxTEl.time;
-        const nextMaxTItem = maxTTime?.[i+1];
-        const nextMaxTValArr = nextMaxTItem ? (nextMaxTItem.ElementValue || nextMaxTItem.elementValue) : null;
-        if (nextMaxTValArr) {
-          maxT2 = parseFloat(getValueFromCwaArray(nextMaxTValArr)) || maxT1;
-        }
-      }
-      const maxT = Math.max(maxT1, maxT2);
       
       let wxVal = '多雲';
       let wxIconVal = '2';
@@ -5176,32 +5179,24 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
         }
       }
       
-      let pop = 0;
+      let popVal = 0;
       if (popEl) {
         const popTime = popEl.Time || popEl.time;
-        const popItem1 = popTime?.[i];
-        const popItem2 = popTime?.[i+1];
-        let pop1 = 0;
-        let pop2 = 0;
-        if (popItem1) {
-          const popValArr = popItem1.ElementValue || popItem1.elementValue;
-          if (popValArr) pop1 = parseInt(getValueFromCwaArray(popValArr)) || 0;
+        const popItem = popTime?.[i];
+        if (popItem) {
+          const popValArr = popItem.ElementValue || popItem.elementValue;
+          if (popValArr) popVal = parseInt(getValueFromCwaArray(popValArr)) || 0;
         }
-        if (popItem2) {
-          const popValArr = popItem2.ElementValue || popItem2.elementValue;
-          if (popValArr) pop2 = parseInt(getValueFromCwaArray(popValArr)) || 0;
-        }
-        pop = Math.max(pop1, pop2);
       }
       
       weeklyList.push({
         date: getTaiwanMonthAndDate(formattedDateStr),
         dayOfWeek: formatWeeklyDayLabel(formattedDateStr),
-        tempMin: minT,
-        tempMax: maxT,
+        tempMin: minTVal,
+        tempMax: maxTVal,
         desc: wxVal,
         icon: mapWxToIcon(wxIconVal),
-        rainProb: pop
+        rainProb: popVal
       });
     }
     
@@ -5290,19 +5285,36 @@ function simulateRegionWeather(id) {
     });
   }
   
-  const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+  const pad = (n) => String(n).padStart(2, '0');
   for (let d = 0; d < 7; d++) {
     const dayDate = new Date();
     dayDate.setDate(now.getDate() + d);
-    simulated.weekly.push({
-      date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
-      dayOfWeek: d === 0 ? `${weekdays[dayDate.getDay()]} (今天)` : weekdays[dayDate.getDay()],
-      tempMin: parseFloat((minT + Math.sin(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-      tempMax: parseFloat((maxT + Math.cos(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
-      desc: '多雲時晴',
-      icon: 'sunny-cloudy',
-      rainProb: 15
-    });
+    
+    const dayStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T06:00:00+08:00`;
+    if (!isBeforeTodayTaiwan(dayStr)) {
+      simulated.weekly.push({
+        date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
+        dayOfWeek: formatWeeklyDayLabel(dayStr),
+        tempMin: parseFloat((minT + Math.sin(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        tempMax: parseFloat((maxT + Math.cos(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        desc: '多雲時晴',
+        icon: 'sunny-cloudy',
+        rainProb: 15
+      });
+    }
+
+    const nightStr = `${dayDate.getFullYear()}-${pad(dayDate.getMonth()+1)}-${pad(dayDate.getDate())}T18:00:00+08:00`;
+    if (!isBeforeTodayTaiwan(nightStr)) {
+      simulated.weekly.push({
+        date: `${dayDate.getMonth()+1}/${dayDate.getDate()}`,
+        dayOfWeek: formatWeeklyDayLabel(nightStr),
+        tempMin: parseFloat((minT - 1 + Math.sin(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        tempMax: parseFloat((maxT - 1 + Math.cos(d) + (Math.random() * 0.4 - 0.2)).toFixed(1)),
+        desc: '多雲時晴',
+        icon: 'night',
+        rainProb: 15
+      });
+    }
   }
   
   AppState.allCountiesWeatherData[id] = simulated;
