@@ -37,7 +37,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- CSS Styling -->
-  <link rel="stylesheet" href="style.css?v=20260615_1215">
+  <link rel="stylesheet" href="style.css?v=20260615_1740">
 </head>
 <body>
 
@@ -93,7 +93,7 @@
 
         <!-- Realistic Fluffy Cloud Filter -->
         <filter id="realistic-cloud-filter" x="-50%" y="-50%" width="200%" height="200%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="4" result="noise" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" result="noise" />
           <feDisplacementMap in="SourceGraphic" in2="noise" scale="55" xChannelSelector="R" yChannelSelector="G" result="displaced" />
           <feGaussianBlur in="displaced" stdDeviation="8" />
         </filter>
@@ -818,6 +818,6 @@
   </svg>
 
   <!-- JavaScript Application -->
-  <script src="app.js?v=20260615_1215"></script>
+  <script src="app.js?v=20260615_1740"></script>
 </body>
 </html>

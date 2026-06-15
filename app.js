@@ -10,8 +10,8 @@
       }
       .details-drawer::before {
         background: var(--glass-bg) !important;       /* Beautiful dynamic glass background */
-        backdrop-filter: blur(16px) !important;       /* Frosted glass blur for premium aesthetics */
-        -webkit-backdrop-filter: blur(16px) !important;
+        backdrop-filter: blur(12px) !important;       /* Frosted glass blur for premium aesthetics */
+        -webkit-backdrop-filter: blur(12px) !important;
       }
       .drawer-overlay.active {
         background: transparent !important;           /* Remove overlay background on mobile to prevent double-stacking */
@@ -4493,6 +4493,8 @@ function loadRadarImage(force = false) {
 let radarPlayInterval = null;
 let radarHistoryFrames = [];
 let radarCurrentFrameIndex = 0;
+let isRadarPreloading = false;
+let radarPreloadTimeout = null;
 
 // Dynamic local time calculator for CWA historical radar images (CWA servers store files in local Taiwan time)
 function getRadarHistoryUrls() {
@@ -4541,19 +4543,52 @@ function toggleRadarPlay() {
   const playIcon = document.getElementById('radar-play-icon');
   const radarImg = document.getElementById('radar-img');
   const timestampEl = document.getElementById('radar-timestamp');
+  const wrapper = document.getElementById('radar-wrapper');
+  const loader = document.getElementById('radar-loader');
+  const loadingText = loader ? loader.querySelector('.loading-text') : null;
   
-  if (radarPlayInterval) {
-    // Stop Animation
-    clearInterval(radarPlayInterval);
-    radarPlayInterval = null;
+  if (radarPlayInterval || isRadarPreloading) {
+    // Stop Animation or Cancel Preloading
+    if (radarPlayInterval) {
+      clearInterval(radarPlayInterval);
+      radarPlayInterval = null;
+    }
+    if (radarPreloadTimeout) {
+      clearTimeout(radarPreloadTimeout);
+      radarPreloadTimeout = null;
+    }
+    isRadarPreloading = false;
+    
     playIcon.textContent = '▶️';
     playBtn.title = '播放過去 1 小時動畫';
+    
+    // Remove preloaded frame elements
+    const frameImgs = wrapper.querySelectorAll('.radar-frame-img');
+    frameImgs.forEach(el => el.remove());
+    
+    // Show main radar image
+    radarImg.style.display = 'block';
+    
+    // Hide loader overlay and restore text
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => { loader.style.display = 'none'; }, 400);
+      if (loadingText) loadingText.textContent = '雷達信號掃描中...';
+    }
     
     // Restore latest real-time image
     loadRadarImage(true);
   } else {
-    // Start Animation
+    // Start Preloading Animation
+    isRadarPreloading = true;
     updateDataBadge('載入動畫中...', 'loading');
+    
+    // Show loading spinner on the canvas
+    if (loader) {
+      if (loadingText) loadingText.textContent = '動畫圖資載入中...';
+      loader.style.display = 'flex';
+      loader.style.opacity = '1';
+    }
     
     // Generate history URLs
     radarHistoryFrames = getRadarHistoryUrls();
@@ -4561,41 +4596,60 @@ function toggleRadarPlay() {
     
     if (radarHistoryFrames.length === 0) {
       updateDataBadge('無法取得動畫圖資', 'error');
+      isRadarPreloading = false;
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => { loader.style.display = 'none'; }, 400);
+      }
       return;
     }
     
     playIcon.textContent = '⏸️';
     playBtn.title = '暫停播放';
     
-    // Preload images to prevent flickering
+    // Clear any existing frame images
+    const existingFrames = wrapper.querySelectorAll('.radar-frame-img');
+    existingFrames.forEach(el => el.remove());
+    
+    // Preload images as DOM elements to prevent flickering
     let loadCount = 0;
     
-    radarHistoryFrames.forEach((frame) => {
-      const img = new Image();
-      img.src = frame.url;
-      img.onload = () => {
-        loadCount++;
-        if (loadCount === radarHistoryFrames.length) {
-          updateDataBadge('即時氣象署資料', 'live');
-          startPlaybackLoop();
+    const onFrameLoaded = () => {
+      if (!isRadarPreloading) return;
+      loadCount++;
+      if (loadCount === radarHistoryFrames.length) {
+        if (radarPreloadTimeout) {
+          clearTimeout(radarPreloadTimeout);
+          radarPreloadTimeout = null;
         }
-      };
-      img.onerror = () => {
-        loadCount++;
-        if (loadCount === radarHistoryFrames.length) {
-          updateDataBadge('即時氣象署資料', 'live');
-          startPlaybackLoop();
-        }
-      };
-    });
-    
-    // Fallback trigger if loading takes too long
-    setTimeout(() => {
-      if (!radarPlayInterval) {
+        isRadarPreloading = false;
         updateDataBadge('即時氣象署資料', 'live');
         startPlaybackLoop();
       }
-    }, 2500);
+    };
+    
+    radarHistoryFrames.forEach((frame, idx) => {
+      const img = document.createElement('img');
+      img.id = `radar-frame-${idx}`;
+      img.className = 'radar-frame-img';
+      img.src = frame.url;
+      img.alt = `雷達回波圖 ${frame.label}`;
+      img.referrerPolicy = 'no-referrer';
+      img.style.display = 'none'; // hidden by default
+      wrapper.appendChild(img);
+      
+      img.onload = onFrameLoaded;
+      img.onerror = onFrameLoaded; // count as loaded even if failed to continue loop
+    });
+    
+    // Fallback trigger if loading takes too long
+    radarPreloadTimeout = setTimeout(() => {
+      if (isRadarPreloading) {
+        isRadarPreloading = false;
+        updateDataBadge('即時氣象署資料', 'live');
+        startPlaybackLoop();
+      }
+    }, 4000); // 4 seconds fallback
   }
 }
 
@@ -4604,12 +4658,30 @@ function startPlaybackLoop() {
   
   const radarImg = document.getElementById('radar-img');
   const timestampEl = document.getElementById('radar-timestamp');
+  const wrapper = document.getElementById('radar-wrapper');
+  const loader = document.getElementById('radar-loader');
+  
+  // Hide loading spinner
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => { loader.style.display = 'none'; }, 400);
+  }
+  
+  // Hide main static image
+  radarImg.style.display = 'none';
   
   const playFrame = () => {
-    const frame = radarHistoryFrames[radarCurrentFrameIndex];
-    radarImg.src = frame.url;
+    // Hide all frame images
+    const frameImgs = wrapper.querySelectorAll('.radar-frame-img');
+    frameImgs.forEach(el => el.style.display = 'none');
     
-    // Display local Taiwan time directly
+    // Show active frame image
+    const activeFrameImg = document.getElementById(`radar-frame-${radarCurrentFrameIndex}`);
+    if (activeFrameImg) {
+      activeFrameImg.style.display = 'block';
+    }
+    
+    const frame = radarHistoryFrames[radarCurrentFrameIndex];
     timestampEl.textContent = `播放中：${frame.label}`;
     
     radarCurrentFrameIndex = (radarCurrentFrameIndex + 1) % radarHistoryFrames.length;
