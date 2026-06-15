@@ -2472,7 +2472,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         const parsedHour = getTaiwanHour(dateObj);
         // Shift 00:00-06:00 early morning period back to represent the previous day's night period
         if (parsedHour < 6) {
-          dateObj.setHours(dateObj.getHours() - 12);
+          dateObj.setHours(dateObj.getHours() - 6);
         }
         
         const parsedDate = parseToTaiwanDateObj(dateObj);
@@ -2728,7 +2728,7 @@ function formatWeeklyDayLabel(date) {
   const parsed = parseToTaiwanDateObj(date);
   if (!parsed) return '';
   const dayStr = getTaiwanDayOfWeek(date);
-  const periodStr = parsed.hour === 6 ? '白天' : '晚上';
+  const periodStr = (parsed.hour === 6 || parsed.hour === 12) ? '白天' : '晚上';
   if (isTodayTaiwan(date)) return `今天 ${periodStr}`;
   return `${dayStr} ${periodStr}`;
 }
@@ -5211,7 +5211,7 @@ function parseTownshipCwaResponse(countyName, data3, data7) {
       const parsedHour = getTaiwanHour(dateObj);
       // Shift 00:00-06:00 early morning period back to represent the previous day's night period
       if (parsedHour < 6) {
-        dateObj.setHours(dateObj.getHours() - 12);
+        dateObj.setHours(dateObj.getHours() - 6);
       }
       
       const parsedDate = parseToTaiwanDateObj(dateObj);
