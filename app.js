@@ -318,6 +318,10 @@ function initWeatherRefresh() {
 
   // Periodic background auto-refresh every 10 minutes (600,000 ms)
   setInterval(() => {
+    if (document.visibilityState === 'hidden') {
+      console.log('網頁目前在背景，為了省電自動跳過本次定時定位。');
+      return; 
+    }
     console.log('Periodic auto-refresh running...');
     refreshLocationAndWeather(false);
   }, 600000);
