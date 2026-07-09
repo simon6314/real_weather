@@ -332,9 +332,11 @@ function initNavigation() {
   const weatherTabBtn = document.getElementById('btn-tab-weather');
   const radarTabBtn = document.getElementById('btn-tab-radar');
   const typhoonTabBtn = document.getElementById('btn-tab-typhoon');
+  const warningTabBtn = document.getElementById('btn-tab-warning');
   const weatherPane = document.getElementById('tab-content-weather');
   const radarPane = document.getElementById('tab-content-radar');
   const typhoonPane = document.getElementById('tab-content-typhoon');
+  const warningPane = document.getElementById('tab-content-warning');
   
   const switchTab = (tab) => {
     AppState.activeTab = tab;
@@ -348,11 +350,13 @@ function initNavigation() {
     weatherTabBtn.classList.remove('active');
     radarTabBtn.classList.remove('active');
     if (typhoonTabBtn) typhoonTabBtn.classList.remove('active');
+    if (warningTabBtn) warningTabBtn.classList.remove('active');
     
     // Reset active class on all panes
     weatherPane.classList.remove('active');
     radarPane.classList.remove('active');
     if (typhoonPane) typhoonPane.classList.remove('active');
+    if (warningPane) warningPane.classList.remove('active');
     
     if (tab === 'weather') {
       weatherTabBtn.classList.add('active');
@@ -365,12 +369,17 @@ function initNavigation() {
       if (typhoonTabBtn) typhoonTabBtn.classList.add('active');
       if (typhoonPane) typhoonPane.classList.add('active');
       initTyphoonTracker();
+    } else if (tab === 'warning') {
+      if (warningTabBtn) warningTabBtn.classList.add('active');
+      if (warningPane) warningPane.classList.add('active');
+      renderTyphoonWarningDetails();
     }
   };
   
   weatherTabBtn.addEventListener('click', () => switchTab('weather'));
   radarTabBtn.addEventListener('click', () => switchTab('radar'));
   if (typhoonTabBtn) typhoonTabBtn.addEventListener('click', () => switchTab('typhoon'));
+  if (warningTabBtn) warningTabBtn.addEventListener('click', () => switchTab('warning'));
 }
 
 // --------------------------------------------------------------------------
@@ -820,6 +829,7 @@ async function fetchActiveAlerts() {
       } else {
         AppState.strongWindCapTowns = [];
       }
+      updateTyphoonWarningDot();
       return;
     } catch (e) {
       console.warn('Failed parsing alerts cache. Refreshing CWA API.', e);
@@ -1062,6 +1072,7 @@ async function fetchActiveAlerts() {
     localStorage.setItem(cacheKey, JSON.stringify(finalAlerts));
     localStorage.setItem(cacheTimeKey, now.toString());
     console.log('Fetched, deduplicated, and cached alerts successfully:', finalAlerts);
+    updateTyphoonWarningDot();
 
     // 3. Process CAP Strong Wind Warning (W-C0033-006)
     if (capXmlText && capXmlText.includes('<alert')) {
@@ -6416,4 +6427,585 @@ function parseCwaTyphoonResponse(data) {
 
 // Bind to window to allow DOM elements or event listeners to access
 window.initTyphoonTracker = initTyphoonTracker;
+
+// ──────────────────────────────────────────────────────────────────────────
+// 15. Typhoon Warning & Comparison Dashboard
+// ──────────────────────────────────────────────────────────────────────────
+function updateTyphoonWarningDot() {
+  const activeAlerts = AppState.activeAlerts || [];
+  const hasTyphoon = activeAlerts.some(a => 
+    a.title.includes('颱風') || (a.phenomena && a.phenomena.includes('颱風'))
+  );
+  const dot = document.getElementById('warning-tab-dot');
+  if (dot) {
+    dot.style.display = hasTyphoon ? 'inline-block' : 'none';
+  }
+}
+
+function getCountyActualWindAndRain(countyName) {
+  const normCounty = countyName.replace('台', '臺');
+  
+  const countyStations = (AppState.observations || []).filter(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    return obsCounty === normCounty;
+  });
+  
+  const countyRainStations = (AppState.rainfallObservations || []).filter(obs => {
+    const obsCounty = (obs.GeoInfo?.CountyName || obs.geoInfo?.countyName || '').replace('台', '臺');
+    return obsCounty === normCounty;
+  });
+  
+  let maxWindSpeed = 0;
+  let maxWindStation = '';
+  let maxGustSpeed = 0;
+  let maxGustStation = '';
+  
+  countyStations.forEach(obs => {
+    const wsVal = getObsElementValue(obs, 'WindSpeed');
+    const ws = parseFloat(wsVal);
+    const sName = obs.StationName || obs.stationName || '未知站';
+    
+    if (!isNaN(ws) && ws >= 0 && wsVal !== -99 && wsVal !== '-99') {
+      if (ws > maxWindSpeed) {
+        maxWindSpeed = ws;
+        maxWindStation = sName;
+      }
+    }
+    
+    let gustVal = getObsElementValue(obs, 'MaximumWindGustSpeed') || 
+                  getObsElementValue(obs, 'MaxWindGustSpeed') || 
+                  getObsElementValue(obs, 'GustSpeed') ||
+                  getObsElementValue(obs, 'MaximumWindGustSpeed10Min') ||
+                  getObsElementValue(obs, 'MaxWindGustSpeed10Min');
+                  
+    let gust = parseFloat(gustVal);
+    if (isNaN(gust) || gustVal === -99 || gustVal === '-99') {
+      if (!isNaN(ws) && ws > 0) {
+        gust = ws * 1.35;
+      }
+    }
+    
+    if (!isNaN(gust) && gust >= 0) {
+      if (gust > maxGustSpeed) {
+        maxGustSpeed = gust;
+        maxGustStation = sName;
+      }
+    }
+  });
+  
+  let maxRainDaily = 0;
+  let maxRainStation = '';
+  
+  countyRainStations.forEach(obs => {
+    const rfEl = obs.RainfallElement || obs.rainfallElement;
+    if (rfEl) {
+      const getVal = (item) => {
+        const val = item ? (item.Precipitation !== undefined ? item.Precipitation : (item.precipitation !== undefined ? item.precipitation : item.value)) : null;
+        const num = parseFloat(val);
+        return (!isNaN(num) && num >= 0 && val !== -99 && val !== '-99') ? num : 0.0;
+      };
+      
+      const num = getVal(rfEl.Now) || getVal(rfEl.Past24Hr);
+      const sName = obs.StationName || obs.stationName || '未知站';
+      if (num > maxRainDaily) {
+        maxRainDaily = num;
+        maxRainStation = sName;
+      }
+    }
+  });
+  
+  countyStations.forEach(obs => {
+    const rainVal = getObsElementValue(obs, 'DailyAccumulation') || 
+                    getObsElementValue(obs, 'Precipitation') || 
+                    getObsElementValue(obs, 'Rainfall') ||
+                    getObsElementValue(obs, 'PrecipitationDaily');
+    const num = parseFloat(rainVal);
+    const sName = obs.StationName || obs.stationName || '未知站';
+    if (!isNaN(num) && num > maxRainDaily && rainVal !== -99 && rainVal !== '-99') {
+      maxRainDaily = num;
+      maxRainStation = sName;
+    }
+  });
+  
+  return {
+    maxWindSpeed: maxWindSpeed,
+    maxWindStation: maxWindStation || '無觀測資料',
+    maxGustSpeed: maxGustSpeed,
+    maxGustStation: maxGustStation || maxWindStation || '無觀測資料',
+    maxRainDaily: maxRainDaily,
+    maxRainStation: maxRainStation || '無觀測資料'
+  };
+}
+
+function formatWarningBulletinText(text) {
+  if (!text) return '';
+  
+  let formatted = text.replace(/台/g, '臺');
+  
+  formatted = formatted
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  // Highlight headers like "一、"
+  const headerRegex = /([一二三四五六七八九十百]+[、：].*?)(?=\n|$)/g;
+  formatted = formatted.replace(headerRegex, '<span class="highlight-header">$1</span>');
+  
+  // Highlight critical keywords
+  const criticalKeywords = [
+    '停班停課', '土石流', '超大豪雨', '大豪雨', '豪雨特報', '大雨特報', 
+    '大潮', '最大陣風', '淹水', '警報發布', '陸上警戒', '海上警戒', '警戒區',
+    '淹水警戒', '強風特報', '海水倒灌'
+  ];
+  
+  criticalKeywords.forEach(kw => {
+    const kwRegex = new RegExp(kw, 'g');
+    formatted = formatted.replace(kwRegex, `<span class="highlight-critical">${kw}</span>`);
+  });
+  
+  // Highlight timestamps
+  const timeRegex = /(\d+日\d+時\d+分|\d+日\d+時)/g;
+  formatted = formatted.replace(timeRegex, '<span class="highlight-time">$1</span>');
+  
+  return formatted;
+}
+
+function parseTyphoonWindForecastFromText(bulletinText, countyName) {
+  if (!bulletinText) return null;
+  
+  const cleanCounty = countyName.replace('縣', '').replace('市', ''); // e.g. "宜蘭", "臺北"
+  
+  const patterns = [
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}平均風\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*級?[，、]?[^\\n]{0,20}陣風\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*級', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}陣風\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*級?[，、]?[^\\n]{0,20}平均風\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*級', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}風力[：\\s]*(\\d+[-至~轉]\\d+|\\d+)\\s*級', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}最大陣風[：\\s]*(\\d+[-至~轉]\\d+|\\d+)\\s*級', 'i')
+  ];
+  
+  for (const regex of patterns) {
+    const match = bulletinText.match(regex);
+    if (match) {
+      if (regex.source.includes('平均風') && regex.source.indexOf('平均風') < regex.source.indexOf('陣風')) {
+        return {
+          averageWind: match[1],
+          gustWind: match[2]
+        };
+      } else if (regex.source.includes('陣風') && regex.source.indexOf('陣風') < regex.source.indexOf('平均風')) {
+        return {
+          averageWind: match[2],
+          gustWind: match[1]
+        };
+      } else {
+        return {
+          gustWind: match[1]
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function parseTyphoonRainForecastFromText(bulletinText, countyName) {
+  if (!bulletinText) return null;
+  
+  const cleanCounty = countyName.replace('縣', '').replace('市', ''); // e.g. "宜蘭", "臺北"
+  
+  const patterns = [
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}山區\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)[^\\n]{0,30}平地\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,30}平地\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)[^\\n]{0,30}山區\\s*(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,15}山區[^\\n]{0,15}(?:累積雨量|總雨量|雨量)[^\\n]{0,15}(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)', 'i'),
+    new RegExp(cleanCounty + '(?:縣|市|地區)?[^\\n]{0,15}(?:平地|地區)?[^\\n]{0,15}(?:累積雨量|總雨量|雨量)[^\\n]{0,15}(\\d+[-至~轉]\\d+|\\d+)\\s*(?:毫米|mm)', 'i')
+  ];
+  
+  for (const regex of patterns) {
+    const match = bulletinText.match(regex);
+    if (match) {
+      if (regex.source.includes('山區') && regex.source.indexOf('山區') < regex.source.indexOf('平地')) {
+        return {
+          mountainRain: match[1],
+          plainRain: match[2]
+        };
+      } else if (regex.source.includes('平地') && regex.source.indexOf('平地') < regex.source.indexOf('山區')) {
+        return {
+          mountainRain: match[2],
+          plainRain: match[1]
+        };
+      } else if (regex.source.includes('山區')) {
+        return {
+          mountainRain: match[1]
+        };
+      } else {
+        return {
+          plainRain: match[1]
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function parseThreeStageTyphoonForecast(bulletinText, countyName) {
+  if (!bulletinText) return null;
+  
+  const cleanCounty = countyName.replace('縣', '').replace('市', ''); // e.g. "宜蘭", "臺北"
+  
+  // Find all time periods like "9日14時至10日2時" or "10日2時至10日14時"
+  const periodRegex = /(\d+日\d+時[至~]\d+日\d+時|\d+日\d+時[至~]\d+時|\d+日\d+分[至~]\d+日\d+分|\d+日\d+分[至~]\d+分)/g;
+  
+  const periods = [];
+  let match;
+  while ((match = periodRegex.exec(bulletinText)) !== null) {
+    periods.push({
+      timeRange: match[1],
+      index: match.index,
+      length: match[1].length
+    });
+  }
+  
+  if (periods.length === 0) return null;
+  
+  const segments = [];
+  for (let i = 0; i < periods.length; i++) {
+    const start = periods[i].index + periods[i].length;
+    const end = (i + 1 < periods.length) ? periods[i + 1].index : bulletinText.length;
+    segments.push({
+      timeRange: periods[i].timeRange,
+      text: bulletinText.substring(start, end)
+    });
+  }
+  
+  const stages = [];
+  segments.forEach(seg => {
+    const windInfo = parseTyphoonWindForecastFromText(seg.text, cleanCounty);
+    const rainInfo = parseTyphoonRainForecastFromText(seg.text, cleanCounty);
+    
+    if (windInfo || rainInfo) {
+      stages.push({
+        timeRange: seg.timeRange,
+        wind: windInfo,
+        rain: rainInfo
+      });
+    }
+  });
+  
+  return stages.length > 0 ? stages : null;
+}
+
+function updateComparisonPanel() {
+  const selector = document.getElementById('warning-county-selector');
+  if (!selector) return;
+  
+  const countyName = selector.value;
+  if (!countyName) return;
+  
+  const actual = getCountyActualWindAndRain(countyName);
+  
+  const actualWindEl = document.getElementById('actual-wind-value');
+  const actualRainEl = document.getElementById('actual-rain-value');
+  
+  if (actualWindEl) {
+    if (actual.maxGustSpeed > 0 || actual.maxWindSpeed > 0) {
+      const gustGrade = getBeaufortScale(actual.maxGustSpeed);
+      actualWindEl.innerHTML = `${gustGrade} 級風 <br><small>最大陣風: ${actual.maxGustSpeed.toFixed(1)} m/s<br>[測站: ${actual.maxGustStation}]</small>`;
+    } else {
+      actualWindEl.innerHTML = `無風速觀測 <br><small>當前無即時風力觀測數據</small>`;
+    }
+  }
+  
+  if (actualRainEl) {
+    if (actual.maxRainDaily > 0) {
+      actualRainEl.innerHTML = `${actual.maxRainDaily.toFixed(1)} mm <br><small>本日最大雨量<br>[測站: ${actual.maxRainStation}]</small>`;
+    } else {
+      actualRainEl.innerHTML = `0.0 mm <br><small>各測站今日無降雨記錄</small>`;
+    }
+  }
+  
+  const standardLayout = document.getElementById('expected-standard-layout');
+  const stagesLayout = document.getElementById('expected-stages-layout');
+  const stagesTimeline = document.getElementById('expected-stages-timeline');
+  const expectedWindEl = document.getElementById('expected-wind-value');
+  const expectedRainEl = document.getElementById('expected-rain-value');
+  
+  // 1. Try to extract forecasts from land/sea warning bulletins first
+  let alertForecastWind = null;
+  let alertForecastRain = null;
+  let alertThreeStages = null;
+  
+  const activeAlerts = AppState.activeAlerts || [];
+  const typhoonAlerts = activeAlerts.filter(a => 
+    a.title.includes('颱風') || (a.phenomena && a.phenomena.includes('颱風'))
+  );
+  
+  if (typhoonAlerts.length > 0) {
+    const alertText = typhoonAlerts[0].contentText || '';
+    alertThreeStages = parseThreeStageTyphoonForecast(alertText, countyName);
+    if (!alertThreeStages) {
+      alertForecastWind = parseTyphoonWindForecastFromText(alertText, countyName);
+      alertForecastRain = parseTyphoonRainForecastFromText(alertText, countyName);
+    }
+  }
+  
+  // 2. Render layout based on stage availability
+  if (alertThreeStages && alertThreeStages.length > 0) {
+    if (standardLayout) standardLayout.style.display = 'none';
+    if (stagesLayout) {
+      stagesLayout.style.display = 'flex';
+      if (stagesTimeline) {
+        stagesTimeline.innerHTML = alertThreeStages.map(stage => {
+          let detailHtml = '';
+          if (stage.wind) {
+            if (stage.wind.averageWind && stage.wind.gustWind) {
+              detailHtml += `💨 平均風 ${stage.wind.averageWind} 級 / 陣風 ${stage.wind.gustWind} 級<br>`;
+            } else if (stage.wind.gustWind) {
+              detailHtml += `💨 陣風 ${stage.wind.gustWind} 級<br>`;
+            } else {
+              detailHtml += `💨 風力 ${stage.wind.averageWind} 級<br>`;
+            }
+          }
+          if (stage.rain) {
+            if (stage.rain.mountainRain && stage.rain.plainRain) {
+              detailHtml += `☔ 山區: ${stage.rain.mountainRain} mm / 平地: ${stage.rain.plainRain} mm`;
+            } else if (stage.rain.mountainRain) {
+              detailHtml += `☔ 山區: ${stage.rain.mountainRain} mm`;
+            } else if (stage.rain.plainRain) {
+              detailHtml += `☔ 平地: ${stage.rain.plainRain} mm`;
+            }
+          }
+          if (!detailHtml) detailHtml = '無明確預報風雨數據';
+          
+          return `
+            <div class="timeline-item" style="border-left: 2px solid #38BDF8; padding-left: 12px; position: relative;">
+              <div class="timeline-dot" style="width: 8px; height: 8px; background: #38BDF8; border-radius: 50%; position: absolute; left: -5px; top: 5px; box-shadow: 0 0 6px #38BDF8;"></div>
+              <div class="timeline-time" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">${stage.timeRange}</div>
+              <div class="timeline-detail" style="font-size: 13px; color: #FFF; font-weight: 700; margin-top: 2px; line-height: 1.4;">${detailHtml}</div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  } else {
+    // Show standard single layout
+    if (stagesLayout) stagesLayout.style.display = 'none';
+    if (standardLayout) standardLayout.style.display = 'block';
+    
+    // Render forecast wind
+    if (expectedWindEl) {
+      if (alertForecastWind) {
+        if (alertForecastWind.averageWind && alertForecastWind.gustWind) {
+          expectedWindEl.innerHTML = `平均風 ${alertForecastWind.averageWind} 級<br>陣風 ${alertForecastWind.gustWind} 級 <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">[警報單]</span>`;
+        } else if (alertForecastWind.gustWind) {
+          expectedWindEl.innerHTML = `陣風 ${alertForecastWind.gustWind} 級 <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">[警報單]</span>`;
+        } else {
+          expectedWindEl.innerHTML = `平均風 ${alertForecastWind.averageWind} 級 <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">[警報單]</span>`;
+        }
+      } else {
+        const countyForecast = AppState.allCountiesWeatherData[countyName];
+        if (countyForecast && countyForecast.current) {
+          const cur = countyForecast.current;
+          expectedWindEl.innerHTML = `${cur.windGrade} 級風 (${windGradeToMs(cur.windGrade).toFixed(0)}-${windGradeToMs(cur.windGrade + 1).toFixed(0)} m/s)`;
+        } else {
+          expectedWindEl.textContent = '-- m/s';
+        }
+      }
+    }
+    
+    // Render forecast rain
+    if (expectedRainEl) {
+      if (alertForecastRain) {
+        let rainText = '';
+        if (alertForecastRain.mountainRain && alertForecastRain.plainRain) {
+          rainText = `山區: ${alertForecastRain.mountainRain} mm<br>平地: ${alertForecastRain.plainRain} mm`;
+        } else if (alertForecastRain.mountainRain) {
+          rainText = `山區: ${alertForecastRain.mountainRain} mm`;
+        } else if (alertForecastRain.plainRain) {
+          rainText = `平地: ${alertForecastRain.plainRain} mm`;
+        }
+        expectedRainEl.innerHTML = `${rainText} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">[警報單]</span>`;
+      } else {
+        const countyForecast = AppState.allCountiesWeatherData[countyName];
+        if (countyForecast && countyForecast.current) {
+          const cur = countyForecast.current;
+          expectedRainEl.textContent = `${cur.rainProb}% - ${cur.desc}`;
+        } else {
+          expectedRainEl.textContent = '-- %';
+        }
+      }
+    }
+  }
+}
+
+function populateWarningCountySelector(highlightCounties = []) {
+  const selector = document.getElementById('warning-county-selector');
+  if (!selector) return;
+  
+  const currentSel = selector.value;
+  selector.innerHTML = '';
+  
+  const sortedCounties = [...TAIWAN_COUNTIES].sort((a, b) => {
+    const aWarn = highlightCounties.some(c => c.includes(a.name) || a.name.includes(c));
+    const bWarn = highlightCounties.some(c => c.includes(b.name) || b.name.includes(c));
+    if (aWarn && !bWarn) return -1;
+    if (!aWarn && bWarn) return 1;
+    return 0;
+  });
+  
+  sortedCounties.forEach(c => {
+    const isWarned = highlightCounties.some(county => county.includes(c.name) || c.name.includes(county));
+    const label = isWarned ? `🔴 ${c.name} (警報區)` : c.name;
+    const option = document.createElement('option');
+    option.value = c.name;
+    option.textContent = label;
+    selector.appendChild(option);
+  });
+  
+  const currentLoc = parseIdentifier(AppState.currentLocationCounty);
+  const userCounty = currentLoc.county;
+  
+  if (currentSel && TAIWAN_COUNTIES.some(c => c.name === currentSel)) {
+    selector.value = currentSel;
+  } else if (TAIWAN_COUNTIES.some(c => c.name === userCounty)) {
+    selector.value = userCounty;
+  } else {
+    selector.value = TAIWAN_COUNTIES[0].name;
+  }
+  
+  selector.onchange = () => {
+    updateComparisonPanel();
+  };
+  
+  updateComparisonPanel();
+}
+
+function renderTyphoonWarningDetails() {
+  const activeAlerts = AppState.activeAlerts || [];
+  const typhoonAlerts = activeAlerts.filter(a => 
+    a.title.includes('颱風') || (a.phenomena && a.phenomena.includes('颱風'))
+  );
+  
+  const contentEl = document.getElementById('warning-bulletin-content');
+  const titleEl = document.getElementById('warning-bulletin-title');
+  const metaEl = document.getElementById('warning-meta-info');
+  const landContainer = document.getElementById('land-warning-badges');
+  const seaContainer = document.getElementById('sea-warning-badges');
+  const alertBanner = document.getElementById('local-warning-alert');
+  const copyBtn = document.getElementById('btn-copy-bulletin');
+  
+  if (typhoonAlerts.length === 0) {
+    if (titleEl) titleEl.textContent = '中央氣象署 颱風警報';
+    if (metaEl) metaEl.innerHTML = '<span class="bulletin-meta-badge">🛡️ 安全狀態</span>';
+    if (contentEl) {
+      contentEl.innerHTML = `<div style="text-align: center; padding: 40px 10px; color: var(--text-muted);">
+        <p style="font-size: 48px; margin-bottom: 16px;">🛡️</p>
+        <h3 style="color: #FFF; margin-bottom: 8px;">目前無發布中的颱風警報</h3>
+        <p>西北太平洋海域目前沒有發布海上或陸上颱風警報。</p>
+      </div>`;
+    }
+    if (landContainer) landContainer.innerHTML = '<span class="empty-badge">無陸上警戒區</span>';
+    if (seaContainer) seaContainer.innerHTML = '<span class="empty-badge">無海上警戒區</span>';
+    if (alertBanner) alertBanner.style.display = 'none';
+    
+    const trackMapSection = document.getElementById('typhoon-track-map-section');
+    if (trackMapSection) trackMapSection.style.display = 'none';
+    
+    populateWarningCountySelector();
+    return;
+  }
+  
+  const alert = typhoonAlerts[0];
+  
+  if (titleEl) titleEl.textContent = alert.title;
+  if (metaEl) {
+    metaEl.innerHTML = `
+      <span class="bulletin-meta-badge danger">🔴 警報發布中</span>
+      <span class="bulletin-meta-badge">🕒 發布時間：${formatAlertTime(alert.startTime)}</span>
+      <span class="bulletin-meta-badge">⌛ 有效時間：${formatAlertTime(alert.endTime)}</span>
+    `;
+  }
+  
+  if (contentEl) {
+    contentEl.innerHTML = formatWarningBulletinText(alert.contentText || '');
+  }
+  
+  let landAreas = [];
+  let seaAreas = [];
+  
+  (alert.affectedAreas || []).forEach(area => {
+    const cleanArea = area.trim();
+    if (cleanArea.endsWith('海面') || cleanArea.endsWith('海峽') || cleanArea.includes('巴士') || cleanArea.includes('東沙')) {
+      seaAreas.push(cleanArea);
+    } else {
+      landAreas.push(cleanArea);
+    }
+  });
+  
+  if (landContainer) {
+    if (landAreas.length > 0) {
+      landContainer.innerHTML = landAreas.map(county => 
+        `<span class="warning-county-badge land">${county}</span>`
+      ).join('');
+    } else {
+      landContainer.innerHTML = '<span class="empty-badge">無陸上警戒區</span>';
+    }
+  }
+  
+  if (seaContainer) {
+    if (seaAreas.length > 0) {
+      seaContainer.innerHTML = seaAreas.map(sea => 
+        `<span class="warning-county-badge sea">${sea}</span>`
+      ).join('');
+    } else {
+      seaContainer.innerHTML = '<span class="empty-badge">無海上警戒區</span>';
+    }
+  }
+  
+  if (alertBanner) {
+    const currentLoc = parseIdentifier(AppState.currentLocationCounty);
+    const countyName = currentLoc.county;
+    const isLocalUnderLandWarning = landAreas.some(c => c.includes(countyName) || countyName.includes(c));
+    
+    if (isLocalUnderLandWarning) {
+      alertBanner.style.display = 'block';
+      alertBanner.innerHTML = `
+        <h4>⚠️ 防颱警報：您所在的 ${countyName} 位於陸上警戒區內</h4>
+        <p>請特別注意強風豪雨，隨時鎖定氣象署最新公告與各地方政府的停班停課資訊，做好防颱準備！</p>
+      `;
+    } else {
+      const isLocalUnderSeaWarning = seaAreas.some(s => s.includes(countyName) || countyName.includes(s));
+      if (isLocalUnderSeaWarning) {
+        alertBanner.style.display = 'block';
+        alertBanner.innerHTML = `
+          <h4>⚠️ 警示：您所在的 ${countyName} 鄰近海域已發布海上颱風警報</h4>
+          <p>海面風浪極大，請絕對避免前往海邊、沙灘、河口或從事水上活動！</p>
+        `;
+      } else {
+        alertBanner.style.display = 'none';
+      }
+    }
+  }
+  
+  populateWarningCountySelector(landAreas);
+  
+  const trackMapSection = document.getElementById('typhoon-track-map-section');
+  const trackImg = document.getElementById('warning-track-img');
+  if (trackMapSection && trackImg) {
+    trackMapSection.style.display = 'block';
+    trackImg.src = `https://www.cwa.gov.tw/Data/typhoon/TY_WARN/B20.png?t=${Date.now()}`;
+  }
+  
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(alert.contentText || '').then(() => {
+        const oldText = copyBtn.textContent;
+        copyBtn.textContent = '✅ 已複製！';
+        setTimeout(() => { copyBtn.textContent = oldText; }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text:', err);
+      });
+    };
+  }
+}
+
+window.renderTyphoonWarningDetails = renderTyphoonWarningDetails;
+window.updateTyphoonWarningDot = updateTyphoonWarningDot;
+
 

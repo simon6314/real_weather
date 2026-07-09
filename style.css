@@ -3855,4 +3855,298 @@ body {
   animation: spinner-rot 0.8s linear infinite;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   15. Typhoon Warning Panel & Comparison Dashboard Styles
+   ────────────────────────────────────────────────────────────────────────── */
+.warning-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.0fr;
+  gap: 24px;
+  min-height: calc(100vh - 220px);
+}
+
+@media (max-width: 968px) {
+  .warning-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.warning-bulletin-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.warning-side-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.bulletin-meta-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.bulletin-meta-badge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.bulletin-meta-badge.danger {
+  border-color: #EF4444;
+  color: #F87171;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.bulletin-scroller {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 520px;
+  flex-grow: 1;
+}
+
+.bulletin-pre {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', var(--font-primary), monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #E2E8F0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Bulletins Custom Keyword Highlighting */
+.highlight-header {
+  color: #FBBF24;
+  font-weight: 700;
+  font-size: 15px;
+  display: inline-block;
+  margin-top: 8px;
+  border-bottom: 1.5px solid rgba(251, 191, 36, 0.3);
+  padding-bottom: 2px;
+}
+
+.highlight-critical {
+  color: #F87171;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
+}
+
+.highlight-time {
+  color: #38BDF8;
+  font-weight: 600;
+}
+
+/* Local Danger Warning Banner */
+.local-warning-banner {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.25) 100%);
+  border: 1.5px dashed #EF4444;
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  color: #FCA5A5;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+  animation: local-warning-glow 3s infinite ease-in-out;
+}
+
+@keyframes local-warning-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.6); }
+  50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.35); border-color: rgba(239, 68, 68, 1); }
+}
+
+.local-warning-banner h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFF;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Wind & Rain Comparison Section */
+.comparison-section {
+  padding: 20px;
+}
+
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.comparison-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #FFF;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comparison-card {
+  background: var(--card-item-bg);
+  border: 1px solid var(--card-item-border);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: var(--transition-smooth);
+}
+
+.comparison-card:hover {
+  transform: translateY(-2px);
+  background: var(--card-item-hover-bg);
+  border-color: var(--card-item-hover-border);
+}
+
+.comparison-card.expected {
+  border-left: 3px solid #38BDF8;
+}
+
+.comparison-card.actual {
+  border-left: 3px solid #EF4444;
+}
+
+.card-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+}
+
+.card-icon-title h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFF;
+}
+
+.comparison-value-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparison-value-item .label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comparison-value-item .value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #FFF;
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.3;
+}
+
+.comparison-value-item small {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Warning Badges Section */
+.warning-regions-section {
+  padding: 20px;
+}
+
+.warning-regions-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.badge-container:last-child {
+  margin-bottom: 0;
+}
+
+.empty-badge {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.warning-county-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: var(--transition-smooth);
+}
+
+.warning-county-badge.land {
+  color: #F87171;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.1);
+}
+
+.warning-county-badge.land:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+  transform: translateY(-1px);
+}
+
+.warning-county-badge.sea {
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.1);
+}
+
+.warning-county-badge.sea:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+  transform: translateY(-1px);
+}
+
+
 

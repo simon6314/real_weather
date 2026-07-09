@@ -171,6 +171,9 @@
           <button id="btn-tab-typhoon" class="tab-btn" data-tab="typhoon">
             <span class="tab-text">颱風動態</span>
           </button>
+          <button id="btn-tab-warning" class="tab-btn" data-tab="warning">
+            <span class="tab-text">颱風警報<span id="warning-tab-dot" class="pulse-dot" style="display: none; background-color: #EF4444; box-shadow: 0 0 8px #EF4444; margin-left: 4px; vertical-align: middle;"></span></span>
+          </button>
         </nav>
         
         <button id="btn-settings" class="action-btn" title="設定 CWA API 金鑰">
@@ -543,6 +546,124 @@
                   <a href="https://www.windy.com/-Hurricane-tracker/hurricanes?typhoon" target="_blank" class="external-link-btn" title="開新分頁前往 Windy 颱風全球追蹤器">
                     🌀 Windy 颱風追蹤器 🔗
                   </a>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+          
+        </div>
+      </section>
+      
+      <!-- TAB 4: TYPHOON WARNING DETAILS -->
+      <section id="tab-content-warning" class="tab-pane">
+        <div class="warning-grid">
+          
+          <!-- LEFT COLUMN: Official Warning Bulletin -->
+          <div class="warning-bulletin-panel glass-panel">
+            <div class="panel-header">
+              <div class="location-badge">
+                <svg class="badge-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+                <span id="warning-bulletin-title">中央氣象署 颱風警報單原文</span>
+              </div>
+              <button id="btn-copy-bulletin" class="action-btn" title="複製警報單全文" style="padding: 6px 14px; font-size: 12px; border-radius: 20px; font-weight: 600;">
+                📋 複製全文
+              </button>
+            </div>
+            <div class="panel-body">
+              <div class="bulletin-meta-info" id="warning-meta-info"></div>
+              <div class="bulletin-scroller">
+                <pre id="warning-bulletin-content" class="bulletin-pre">載入資料中...</pre>
+              </div>
+            </div>
+          </div>
+          
+          <!-- RIGHT COLUMN: Wind/Rain Comparison and Warning Areas -->
+          <div class="warning-side-panel glass-panel">
+            <div class="panel-header">
+              <h2>風雨觀測與警戒分析</h2>
+            </div>
+            
+            <div class="panel-body">
+              <!-- Local Danger Alert Banner -->
+              <div id="local-warning-alert" class="local-warning-banner" style="display: none;"></div>
+              
+              <!-- Wind/Rain Comparison Section -->
+              <div class="comparison-section glass-panel">
+                <div class="comparison-header">
+                  <h3>🌪️ 各縣市風雨數據對照</h3>
+                  <div class="search-wrapper" style="width: auto;">
+                    <select id="warning-county-selector" class="typhoon-select-dropdown">
+                      <!-- County options injected dynamically -->
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="comparison-grid">
+                  <!-- Expected/Forecast Card -->
+                  <div class="comparison-card expected">
+                    <div class="card-icon-title">
+                      <span class="icon">🔮</span>
+                      <h4>未來預估</h4>
+                    </div>
+                    <!-- Standard (Single Period) Layout -->
+                    <div id="expected-standard-layout">
+                      <div class="comparison-value-item">
+                        <span class="label">預估最大風速</span>
+                        <span class="value" id="expected-wind-value">-- m/s</span>
+                      </div>
+                      <div class="comparison-value-item" style="margin-top: 10px;">
+                        <span class="label">降雨預估與機率</span>
+                        <span class="value" id="expected-rain-value">-- %</span>
+                      </div>
+                    </div>
+                    <!-- Three-Stage Timeline Layout -->
+                    <div id="expected-stages-layout" style="display: none; flex-direction: column; gap: 10px;">
+                      <span class="label" style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">警報單分階段風雨預估</span>
+                      <div id="expected-stages-timeline" style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+                        <!-- Injected dynamically by JS -->
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Actual/Observed Card -->
+                  <div class="comparison-card actual">
+                    <div class="card-icon-title">
+                      <span class="icon">📡</span>
+                      <h4>實際實測</h4>
+                    </div>
+                    <div class="comparison-value-item">
+                      <span class="label">實測最強陣風</span>
+                      <span class="value" id="actual-wind-value">-- 級<br><small>--</small></span>
+                    </div>
+                    <div class="comparison-value-item">
+                      <span class="label">實測最大累積雨量</span>
+                      <span class="value" id="actual-rain-value">-- mm<br><small>--</small></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Typhoon Track Map Section -->
+              <div id="typhoon-track-map-section" class="warning-regions-section glass-panel" style="margin-top: 16px; display: none;">
+                <h3>🌀 氣象署路徑預測圖</h3>
+                <div style="text-align: center; margin-top: 10px; overflow: hidden; border-radius: var(--radius-md); background: rgba(0,0,0,0.2); padding: 8px;">
+                  <img id="warning-track-img" src="" alt="颱風警報路徑圖" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);" />
+                </div>
+              </div>
+
+              <!-- Warning Regions Badges -->
+              <div class="warning-regions-section glass-panel" style="margin-top: 16px;">
+                <h3>陸上警戒範圍</h3>
+                <div class="badge-container" id="land-warning-badges">
+                  <span class="empty-badge">無陸上警戒區</span>
+                </div>
+                
+                <h3 style="margin-top: 16px;">海上警戒範圍</h3>
+                <div class="badge-container" id="sea-warning-badges">
+                  <span class="empty-badge">無海上警戒區</span>
                 </div>
               </div>
               
