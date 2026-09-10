@@ -4318,7 +4318,7 @@ function openDrawerForecast(identifier) {
           });
           
           // Add Dark Matter CartoDB tiles
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_34ef_1_fa5141bab78ce3c4610048b1', {
             maxZoom: 18
           }).addTo(AppState.drawerMap);
           
@@ -5751,7 +5751,7 @@ function initTyphoonTracker() {
   }).setView([22.5, 123.5], 5.5);
 
   // Load CartoDB Dark Matter tile layer for gorgeous cyberpunk visual excellence
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_34ef_1_fa5141bab78ce3c4610048b1', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 20
