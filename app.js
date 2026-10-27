@@ -168,6 +168,33 @@ function escHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// 外部圖片（中央氣象署）載入失敗時自動重試；仍失敗則顯示提示，可點擊重新載入，而不是留下空白
+function loadImgWithRetry(img, url, failText) {
+  let attempts = 0;
+  const withBust = (n) => url + (url.includes('?') ? '&' : '?') + 'r=' + n + '&t=' + Date.now();
+  img.onload = () => {
+    img.style.display = '';
+    const old = img.parentElement && img.parentElement.querySelector(':scope > .img-fallback');
+    if (old) old.remove();
+  };
+  img.onerror = () => {
+    attempts++;
+    if (attempts <= 2) {
+      setTimeout(() => { img.src = withBust(attempts); }, 1000 * attempts);
+      return;
+    }
+    img.style.display = 'none';
+    if (img.parentElement && !img.parentElement.querySelector(':scope > .img-fallback')) {
+      const note = document.createElement('div');
+      note.className = 'img-fallback';
+      note.textContent = failText + '（點擊重新載入）';
+      note.onclick = () => { attempts = 0; note.remove(); img.style.display = ''; img.src = withBust(0); };
+      img.parentElement.appendChild(note);
+    }
+  };
+  img.src = url;
+}
+
 // Ensure API Key is initialized in local storage if not present
 if (!localStorage.getItem('cwa_api_key')) {
   localStorage.setItem('cwa_api_key', DEFAULT_API_KEY);
@@ -2555,6 +2582,7 @@ function integrateCwaDatasets(data36h, data72h, data7d) {
         weeklyList.push({
           date: getTaiwanMonthAndDate(dateObj),
           dayOfWeek: formatWeeklyDayLabel(dateObj),
+          period: (parsedHour === 6 || parsedHour === 12) ? '白天' : '晚上',
           tempMin: minTVal,
           tempMax: maxTVal,
           desc: wxVal,
@@ -3993,59 +4021,73 @@ function drawHourlySvgChart(hourlyData) {
 }
 
 // Render Apple Weather Style Range Bar items for 7-day forecast
+// 星期＋時段標籤；資料缺少標籤時，依日期與時段自動補上
+function weeklyDayText(day) {
+  if (day.dayOfWeek && String(day.dayOfWeek).trim()) return String(day.dayOfWeek).trim();
+  const weekdays = ['週日','週一','週二','週三','週四','週五','週六'];
+  const m = String(day.date || '').match(/(\d{1,2})\/(\d{1,2})/);
+  let wd = '';
+  if (m) {
+    const d = new Date(new Date().getFullYear(), parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+    wd = weekdays[d.getDay()];
+  }
+  return [wd, day.period || ''].filter(Boolean).join(' ');
+}
+
+// Render Apple Weather Style Range Bar items for 7-day forecast
 function renderAppleWeeklyRangeBars(weeklyList) {
   const container = document.getElementById('drawer-weekly-list');
   container.innerHTML = '';
-  
   if (!weeklyList || weeklyList.length === 0) return;
-  
-  // Find absolute min and max temp across the whole week to map boundaries
-  const allMins = weeklyList.map(d => d.tempMin);
-  const allMaxs = weeklyList.map(d => d.tempMax);
-  const absoluteMin = Math.min(...allMins);
-  const absoluteMax = Math.max(...allMaxs);
-  const absoluteRange = absoluteMax - absoluteMin;
-  
+
+  // 溫度缺值的項目仍會顯示（溫度以「—」表示），不讓一筆缺值影響整週的橫條
+  const hasTemps = d => Number.isFinite(Number(d.tempMin)) && Number.isFinite(Number(d.tempMax));
+  const withTemps = weeklyList.filter(hasTemps);
+  const absoluteMin = withTemps.length ? Math.min(...withTemps.map(d => Number(d.tempMin))) : 0;
+  const absoluteMax = withTemps.length ? Math.max(...withTemps.map(d => Number(d.tempMax))) : 1;
+  const absoluteRange = (absoluteMax - absoluteMin) || 1;
+
   weeklyList.forEach((day, index) => {
     const item = document.createElement('div');
     item.className = 'weekly-item';
-    
-    // Calculate percentage ratios for the horizontal Apple bar
-    const leftPercent = ((day.tempMin - absoluteMin) / absoluteRange) * 100;
-    const widthPercent = ((day.tempMax - day.tempMin) / absoluteRange) * 100;
-    
-    // Calculate absolute temperature gradient colors for the filled bar
-    const colorMin = getAbsoluteTempColor(day.tempMin);
-    const colorMax = getAbsoluteTempColor(day.tempMax);
-    
-    // If "Today", draw an additional absolute dot representing current temperature!
+
+    const ok = hasTemps(day);
+    const minV = ok ? Number(day.tempMin) : null;
+    const maxV = ok ? Number(day.tempMax) : null;
+    const leftPercent = ok ? ((minV - absoluteMin) / absoluteRange) * 100 : 0;
+    const widthPercent = ok ? ((maxV - minV) / absoluteRange) * 100 : 0;
+    const barStyle = ok
+      ? `left: ${leftPercent}%; width: ${widthPercent}%; background: linear-gradient(to right, ${getAbsoluteTempColor(minV)}, ${getAbsoluteTempColor(maxV)});`
+      : 'left: 0; width: 0;';
+
+    // If "Today", draw an additional dot representing current temperature
     let dotHtml = '';
-    if (index === 0) {
-      // Find relative spot of current temp
-      const currentTemp = AppState.allCountiesWeatherData[AppState.activeRegionDetailed].current.temp || day.tempMin;
-      const dotLeft = ((currentTemp - day.tempMin) / (day.tempMax - day.tempMin)) * 100;
+    if (ok && index === 0 && maxV > minV) {
+      const cur = AppState.allCountiesWeatherData?.[AppState.activeRegionDetailed]?.current?.temp;
+      const currentTemp = Number.isFinite(Number(cur)) ? Number(cur) : minV;
+      const dotLeft = ((currentTemp - minV) / (maxV - minV)) * 100;
       dotHtml = `<div class="weekly-range-bar-dot" style="left: ${Math.min(95, Math.max(5, dotLeft))}%"></div>`;
     }
-    
+
     item.innerHTML = `
-      <span class="weekly-day">${day.dayOfWeek} <span class="weekly-date" style="font-size: 11px; opacity: 0.6; font-weight: normal; margin-left: 6px;">${day.date}</span></span>
+      <span class="weekly-day">${escHtml(weeklyDayText(day))} <span class="weekly-date" style="font-size: 11px; opacity: 0.6; font-weight: normal; margin-left: 6px;">${escHtml(day.date)}</span></span>
       <span class="weekly-pop">${day.rainProb > 0 ? day.rainProb + '%' : ''}</span>
       <div class="weekly-icon-wrapper">
         ${getAnimatedSvgCode(day.icon, 40, 40)}
       </div>
       <div class="weekly-range-bar-container">
         <div class="weekly-range-bar-track">
-          <div class="weekly-range-bar-filled" style="left: ${leftPercent}%; width: ${widthPercent}%; background: linear-gradient(to right, ${colorMin}, ${colorMax});">
+          <div class="weekly-range-bar-filled" style="${barStyle}">
             ${dotHtml}
           </div>
         </div>
       </div>
       <div class="weekly-temp-labels">
-        <span class="weekly-min-temp">${Number(day.tempMin).toFixed(1)}°</span>
-        <span class="weekly-max-temp">${Number(day.tempMax).toFixed(1)}°</span>
+        <span class="weekly-min-temp">${ok ? minV.toFixed(1) + '°' : '—'}</span>
+        <span class="weekly-max-temp">${ok ? maxV.toFixed(1) + '°' : '—'}</span>
       </div>
     `;
-    
+
     container.appendChild(item);
   });
 }
@@ -4509,7 +4551,7 @@ function loadRadarImage(force = false) {
   loader.style.opacity = '1';
   
   const cacheBust = force ? `?t=${new Date().getTime()}` : '';
-  radarImg.src = `https://www.cwa.gov.tw/Data/radar/CV1_3600.png${cacheBust}`;
+  loadImgWithRetry(radarImg, `https://www.cwa.gov.tw/Data/radar/CV1_3600.png${cacheBust}`, '雷達回波圖暫時無法載入');
   
   // Format current CWA standard update intervals (typically 10 min) locked to Taiwan timezone
   const now = new Date();
@@ -7004,7 +7046,7 @@ function renderTyphoonWarningDetails() {
   const trackImg = document.getElementById('warning-track-img');
   if (trackMapSection && trackImg) {
     trackMapSection.style.display = 'block';
-    trackImg.src = `https://www.cwa.gov.tw/Data/typhoon/TY_WARN/B20.png?t=${Date.now()}`;
+    loadImgWithRetry(trackImg, `https://www.cwa.gov.tw/Data/typhoon/TY_WARN/B20.png?t=${Date.now()}`, '颱風路徑圖暫時無法載入');
   }
   
   if (copyBtn) {
