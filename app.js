@@ -149,7 +149,7 @@ const AppState = {
   
   currentLocationCounty: '臺北市中正區', // Default fallback
   currentWeather: {},            // Cached current weather for main display
-  addedRegions: JSON.parse(localStorage.getItem('cwa_added_regions')) || ['新北市', '臺中市', '高雄市'],
+  addedRegions: (() => { try { return JSON.parse(localStorage.getItem('cwa_added_regions')); } catch (e) { return null; } })() || ['新北市', '臺中市', '高雄市'],
   allCountiesWeatherData: {},    // Map of countyName -> parsed weather profile
   observations: [],              // Real-time automatic weather station observations
   rainfallObservations: [],      // Real-time rain gauge observations
@@ -162,6 +162,11 @@ const AppState = {
   strongWindCapTowns: [],         // CAP parsed townships under active wind warning
   lightningTimeout: null          // Timeout handler for procedural background lightning
 };
+
+// 跳脫 HTML 特殊字元，避免第三方（CWA）資料被當成標記插入頁面
+function escHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // Ensure API Key is initialized in local storage if not present
 if (!localStorage.getItem('cwa_api_key')) {
@@ -595,7 +600,17 @@ const COUNTY_CAPITALS = {
 };
 
 // Double-layered client-side reverse geocoding API fetcher
+// 同一位置（約 100 公尺內）只查詢一次，避免重複呼叫免費的地理編碼服務
+const _geoMemo = new Map();
 async function reverseGeocodeTownship(lat, lon) {
+  const key = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+  if (_geoMemo.has(key)) return _geoMemo.get(key);
+  const result = await _reverseGeocodeTownshipRaw(lat, lon);
+  if (result) _geoMemo.set(key, result);
+  return result;
+}
+
+async function _reverseGeocodeTownshipRaw(lat, lon) {
   // Layer 1: BigDataCloud (Fast, client-side friendly API, high limits under fair use)
   try {
     const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`);
@@ -3093,9 +3108,9 @@ function renderMainLocationWeather() {
   const descEl = document.getElementById('current-weather-desc');
   if (activeAlertsForHero.length > 0) {
     const badgeHtml = activeAlertsForHero.map(a => 
-      `<span class="card-alert-badge animate-pulse-neon">⚠️ ${a.title}</span>`
+      `<span class="card-alert-badge animate-pulse-neon">⚠️ ${escHtml(a.title)}</span>`
     ).join(' ');
-    descEl.innerHTML = `${cur.desc} ${badgeHtml}`;
+    descEl.innerHTML = `${escHtml(cur.desc)} ${badgeHtml}`;
   } else {
     descEl.textContent = cur.desc;
   }
@@ -3729,7 +3744,7 @@ function renderAddedRegionsList() {
     card.innerHTML = `
       <div class="region-card-left">
         <span class="region-card-name">${nameLabel}</span>
-        <span class="region-card-meta">${badgeLabel} &bull; ${cur.desc} &bull; 降雨 ${cur.rainProb}% &bull; ${rainText} ${regionAlertBadgeHtml}</span>
+        <span class="region-card-meta">${badgeLabel} &bull; ${escHtml(cur.desc)} &bull; 降雨 ${cur.rainProb}% &bull; ${rainText} ${regionAlertBadgeHtml}</span>
       </div>
       <div class="region-card-right">
         <div class="region-card-temp">${Number(cur.temp).toFixed(1)}°</div>
@@ -4273,9 +4288,9 @@ function openDrawerForecast(identifier) {
           
           let summaryHtml = '';
           if (relevantSentences.length > 0) {
-            summaryHtml = relevantSentences.map(s => `<li>${highlightText(s)}。</li>`).join('');
+            summaryHtml = relevantSentences.map(s => `<li>${highlightText(escHtml(s))}。</li>`).join('');
           } else {
-            summaryHtml = sentences.slice(0, 2).map(s => `<li>${highlightText(s)}。</li>`).join('');
+            summaryHtml = sentences.slice(0, 2).map(s => `<li>${highlightText(escHtml(s))}。</li>`).join('');
           }
           
           const alertBox = document.createElement('div');
@@ -4284,7 +4299,7 @@ function openDrawerForecast(identifier) {
             <div class="drawer-alert-header">
               <div class="drawer-alert-title">
                 <span class="alert-icon">⚠️</span>
-                <h4>${alert.title}</h4>
+                <h4>${escHtml(alert.title)}</h4>
               </div>
               <span class="drawer-alert-time">${formatAlertTime(alert.startTime)} ～ ${formatAlertTime(alert.endTime)}</span>
             </div>
