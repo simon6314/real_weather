@@ -4034,61 +4034,94 @@ function weeklyDayText(day) {
   return [wd, day.period || ''].filter(Boolean).join(' ');
 }
 
-// Render Apple Weather Style Range Bar items for 7-day forecast
+// 一週天氣：一天一列。同一天的白天與晚上合併，左邊日期、中間白天/晚上圖示與降雨機率、右邊當日最低到最高溫的橫條
 function renderAppleWeeklyRangeBars(weeklyList) {
   const container = document.getElementById('drawer-weekly-list');
   container.innerHTML = '';
   if (!weeklyList || weeklyList.length === 0) return;
 
-  // 溫度缺值的項目仍會顯示（溫度以「—」表示），不讓一筆缺值影響整週的橫條
-  const hasTemps = d => Number.isFinite(Number(d.tempMin)) && Number.isFinite(Number(d.tempMax));
-  const withTemps = weeklyList.filter(hasTemps);
-  const absoluteMin = withTemps.length ? Math.min(...withTemps.map(d => Number(d.tempMin))) : 0;
-  const absoluteMax = withTemps.length ? Math.max(...withTemps.map(d => Number(d.tempMax))) : 1;
+  const toNum = v => (v === null || v === undefined || v === '' ? NaN : Number(v));
+  const isNightEntry = e => /晚上|夜/.test(`${e.period || ''} ${e.dayOfWeek || ''}`);
+
+  // 依日期分組（保留原本順序）
+  const groupMap = new Map();
+  weeklyList.forEach(entry => {
+    const key = String(entry.date || '');
+    if (!groupMap.has(key)) groupMap.set(key, { date: key, label: '', day: null, night: null, entries: [] });
+    const g = groupMap.get(key);
+    g.entries.push(entry);
+    if (!g.label && entry.dayOfWeek) {
+      g.label = String(entry.dayOfWeek).replace(/\s*(白天|晚上)\s*$/, '').trim();
+    }
+    if (isNightEntry(entry)) {
+      if (!g.night) g.night = entry;
+    } else if (!g.day) {
+      g.day = entry;
+    }
+  });
+  const days = [...groupMap.values()];
+
+  // 每天的最低、最高溫（缺值的時段不影響其他時段）
+  const dayTemps = days.map(g => {
+    const mins = g.entries.map(e => toNum(e.tempMin)).filter(Number.isFinite);
+    const maxs = g.entries.map(e => toNum(e.tempMax)).filter(Number.isFinite);
+    return {
+      min: mins.length ? Math.min(...mins) : null,
+      max: maxs.length ? Math.max(...maxs) : null
+    };
+  });
+  const allMins = dayTemps.map(t => t.min).filter(v => v !== null);
+  const allMaxs = dayTemps.map(t => t.max).filter(v => v !== null);
+  const absoluteMin = allMins.length ? Math.min(...allMins) : 0;
+  const absoluteMax = allMaxs.length ? Math.max(...allMaxs) : 1;
   const absoluteRange = (absoluteMax - absoluteMin) || 1;
 
-  weeklyList.forEach((day, index) => {
-    const item = document.createElement('div');
-    item.className = 'weekly-item';
+  const cur = AppState.allCountiesWeatherData?.[AppState.activeRegionDetailed]?.current?.temp;
+  const currentTemp = Number.isFinite(Number(cur)) ? Number(cur) : null;
 
-    const ok = hasTemps(day);
-    const minV = ok ? Number(day.tempMin) : null;
-    const maxV = ok ? Number(day.tempMax) : null;
+  // 表頭
+  const head = document.createElement('div');
+  head.className = 'wk-head';
+  head.innerHTML = '<span>日期</span><span>白天</span><span>晚上</span><span>最低</span><span>溫度範圍</span><span>最高</span>';
+  container.appendChild(head);
+
+  const partHtml = e => e
+    ? `<div class="wk-part">${getAnimatedSvgCode(e.icon, 28, 28)}<span class="wk-pop">${toNum(e.rainProb) > 0 ? toNum(e.rainProb) + '%' : ''}</span></div>`
+    : '<div class="wk-part wk-empty">—</div>';
+
+  days.forEach((g, index) => {
+    const row = document.createElement('div');
+    row.className = 'weekly-item wk-row';
+
+    const t = dayTemps[index];
+    const ok = t.min !== null && t.max !== null;
+    const minV = ok ? t.min : null;
+    const maxV = ok ? t.max : null;
     const leftPercent = ok ? ((minV - absoluteMin) / absoluteRange) * 100 : 0;
-    const widthPercent = ok ? ((maxV - minV) / absoluteRange) * 100 : 0;
+    const widthPercent = ok ? Math.max(3, ((maxV - minV) / absoluteRange) * 100) : 0;
     const barStyle = ok
       ? `left: ${leftPercent}%; width: ${widthPercent}%; background: linear-gradient(to right, ${getAbsoluteTempColor(minV)}, ${getAbsoluteTempColor(maxV)});`
       : 'left: 0; width: 0;';
 
-    // If "Today", draw an additional dot representing current temperature
+    // 第一天標出目前溫度
     let dotHtml = '';
-    if (ok && index === 0 && maxV > minV) {
-      const cur = AppState.allCountiesWeatherData?.[AppState.activeRegionDetailed]?.current?.temp;
-      const currentTemp = Number.isFinite(Number(cur)) ? Number(cur) : minV;
+    if (ok && index === 0 && currentTemp !== null && maxV > minV) {
       const dotLeft = ((currentTemp - minV) / (maxV - minV)) * 100;
       dotHtml = `<div class="weekly-range-bar-dot" style="left: ${Math.min(95, Math.max(5, dotLeft))}%"></div>`;
     }
 
-    item.innerHTML = `
-      <span class="weekly-day">${escHtml(weeklyDayText(day))} <span class="weekly-date" style="font-size: 11px; opacity: 0.6; font-weight: normal; margin-left: 6px;">${escHtml(day.date)}</span></span>
-      <span class="weekly-pop">${day.rainProb > 0 ? day.rainProb + '%' : ''}</span>
-      <div class="weekly-icon-wrapper">
-        ${getAnimatedSvgCode(day.icon, 40, 40)}
+    const weekdayText = g.label || weeklyDayText({ date: g.date });
+    row.innerHTML = `
+      <div class="wk-day"><span class="wk-name">${escHtml(weekdayText)}</span><span class="wk-date">${escHtml(g.date)}</span></div>
+      ${partHtml(g.day)}
+      ${partHtml(g.night)}
+      <span class="wk-min">${ok ? Math.round(minV) + '°' : '—'}</span>
+      <div class="weekly-range-bar-track wk-track">
+        <div class="weekly-range-bar-filled" style="${barStyle}">${dotHtml}</div>
       </div>
-      <div class="weekly-range-bar-container">
-        <div class="weekly-range-bar-track">
-          <div class="weekly-range-bar-filled" style="${barStyle}">
-            ${dotHtml}
-          </div>
-        </div>
-      </div>
-      <div class="weekly-temp-labels">
-        <span class="weekly-min-temp">${ok ? minV.toFixed(1) + '°' : '—'}</span>
-        <span class="weekly-max-temp">${ok ? maxV.toFixed(1) + '°' : '—'}</span>
-      </div>
+      <span class="wk-max">${ok ? Math.round(maxV) + '°' : '—'}</span>
     `;
-
-    container.appendChild(item);
+    container.appendChild(row);
   });
 }
 

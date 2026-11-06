@@ -4150,3 +4150,121 @@ body {
 
 /* 圖片載入失敗的提示 */
 .img-fallback { margin: 8px 0; padding: 10px 12px; font-size: 13px; text-align: center; color: var(--text-muted, #94a3b8); border: 1px dashed rgba(255,255,255,0.18); border-radius: 8px; cursor: pointer; }
+
+/* --------------------------------------------------------------------------
+   一週天氣：一天一列（日期｜白天｜晚上｜最低 溫度範圍 最高）
+   -------------------------------------------------------------------------- */
+.wk-head,
+.weekly-item.wk-row {
+  display: grid;
+  grid-template-columns: 78px 50px 50px 34px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.wk-head {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 16px 2px;
+  text-align: center;
+}
+
+.wk-head span:first-child {
+  text-align: left;
+}
+
+.weekly-item.wk-row {
+  padding: 10px 16px;
+}
+
+.wk-day {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.wk-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wk-date {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.wk-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wk-part svg {
+  width: 28px;
+  height: 28px;
+}
+
+.wk-pop {
+  font-size: 11px;
+  color: #7EA5F0;
+  font-weight: 700;
+  min-height: 14px;
+}
+
+.wk-empty {
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.wk-min,
+.wk-max {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  text-align: center;
+}
+
+.wk-min {
+  color: var(--text-secondary);
+}
+
+.wk-max {
+  color: #FFF;
+}
+
+.wk-track {
+  height: 6px;
+}
+
+@media (max-width: 480px) {
+  .wk-head,
+  .weekly-item.wk-row {
+    grid-template-columns: 64px 42px 42px 30px 1fr 30px;
+    gap: 6px;
+  }
+
+  .weekly-item.wk-row {
+    padding: 8px 10px;
+  }
+
+  .wk-part svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .wk-min,
+  .wk-max {
+    font-size: 12px;
+  }
+
+  .wk-name {
+    font-size: 13px;
+  }
+}
