@@ -4273,7 +4273,7 @@ body {
 .county-pop-panel {
   padding: 14px;
   margin-top: 12px;
-  background: rgba(8, 14, 26, 0.6);
+  background: rgba(8, 14, 26, 0.6) !important;
 }
 
 .county-pop-title {
@@ -4311,3 +4311,9 @@ body {
 .county-pop-chip.high { background: rgba(255, 78, 80, 0.2); }
 .county-pop-chip.high strong { color: #ff4e50; }
 .county-pop-chip.na strong { opacity: 0.5; }
+.county-pop-chip.rain { background: rgba(0, 176, 255, 0.2); }
+.county-pop-chip.rain strong { color: #5fd3ff; }
+.county-pop-sub { margin-top: 16px; }
+.county-pop-grid.rain-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.county-pop-grid.rain-grid .county-pop-chip span { white-space: nowrap; }
+.county-pop-empty { margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); }

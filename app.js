@@ -7101,11 +7101,25 @@ window.updateTyphoonWarningDot = updateTyphoonWarningDot;
 
 
 
-// 雷達頁：列出各縣市目前的降雨機率（高 / 中 / 低 上色）
+// 雷達頁：正在下雨的縣市（依觀測雨量）＋ 各縣市降雨機率（預報）
 function renderRadarCountyPop() {
   const box = document.getElementById('radar-county-pop');
   if (!box) return;
   const level = p => (p >= 70 ? 'high' : (p >= 40 ? 'mid' : 'low'));
+  const num = v => (v === null || v === undefined || v === '' ? NaN : Number(v));
+
+  // 1. 正在下雨：過去 1 小時或 10 分鐘有觀測雨量
+  const raining = TAIWAN_COUNTIES
+    .map(c => ({ name: c.name, cur: AppState.allCountiesWeatherData?.[c.name]?.current }))
+    .filter(x => x.cur)
+    .map(x => ({ name: x.name, r1h: num(x.cur.rain1Hr) || 0, r10: num(x.cur.rain10Min) || 0 }))
+    .filter(x => x.r1h > 0 || x.r10 > 0)
+    .sort((a, b) => b.r1h - a.r1h || b.r10 - a.r10);
+  const rainingHtml = raining.length
+    ? `<div class="county-pop-grid rain-grid">${raining.map(x => `<div class="county-pop-chip rain"><span>${escHtml(x.name)}</span><strong>${x.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
+    : '<p class="county-pop-empty">目前沒有觀測到降雨</p>';
+
+  // 2. 降雨機率（預報）
   const chips = TAIWAN_COUNTIES.map(c => {
     const cur = AppState.allCountiesWeatherData?.[c.name]?.current;
     const v = cur ? Number(cur.rainProb) : NaN;
@@ -7113,7 +7127,12 @@ function renderRadarCountyPop() {
     const cls = p === null ? 'na' : level(p);
     return `<div class="county-pop-chip ${cls}"><span>${escHtml(c.name)}</span><strong>${p === null ? '—' : p + '%'}</strong></div>`;
   }).join('');
-  box.innerHTML = `<h3 class="county-pop-title">各縣市降雨機率</h3><div class="county-pop-grid">${chips}</div>`;
+
+  box.innerHTML = `
+    <h3 class="county-pop-title">正在下雨（過去 1 小時雨量）</h3>
+    ${rainingHtml}
+    <h3 class="county-pop-title county-pop-sub">各縣市降雨機率（預報）</h3>
+    <div class="county-pop-grid">${chips}</div>`;
 }
 
 async function loadRadarCountyPop() {
