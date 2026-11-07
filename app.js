@@ -7101,6 +7101,35 @@ window.updateTyphoonWarningDot = updateTyphoonWarningDot;
 
 
 
+// 雷達頁「正在下雨」的檢視：'town'（鄉鎮）或 'county'（縣市）
+let radarRainView = 'town';
+
+// 從雨量測站整理出各鄉鎮（或縣市）的雨量：取該區域測站中的最大值
+function collectRainByArea(view) {
+  const stations = AppState.rainfallObservations || [];
+  const getVal = item => {
+    const v = item ? (item.Precipitation !== undefined ? item.Precipitation : (item.precipitation !== undefined ? item.precipitation : item.value)) : null;
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  };
+  const map = new Map();
+  stations.forEach(st => {
+    const geo = st.GeoInfo || st.geoInfo || {};
+    const county = String(geo.CountyName || geo.countyName || '').replace('台', '臺');
+    const town = String(geo.TownName || geo.townName || '').replace('台', '臺');
+    if (!county) return;
+    const rf = st.RainfallElement || st.rainfallElement || {};
+    const r1h = getVal(rf.Past1hr);
+    const r10 = getVal(rf.Past10Min);
+    const key = view === 'town' && town ? county + town : county;
+    const prev = map.get(key) || { county, town: view === 'town' ? town : '', key, r1h: 0, r10: 0 };
+    prev.r1h = Math.max(prev.r1h, r1h);
+    prev.r10 = Math.max(prev.r10, r10);
+    map.set(key, prev);
+  });
+  return [...map.values()].filter(x => x.r1h > 0 || x.r10 > 0).sort((a, b) => b.r1h - a.r1h || b.r10 - a.r10);
+}
+
 // 雷達頁：自選地區（最前面）→ 正在下雨（依觀測雨量）→ 各縣市降雨機率（預報）
 function renderRadarCountyPop() {
   const box = document.getElementById('radar-county-pop');
@@ -7125,15 +7154,33 @@ function renderRadarCountyPop() {
     return `<div class="county-pop-chip fav ${cls}"><span>★ ${escHtml(labelOf(id))}${parseIdentifier(id).type === 'town' ? ` <small class="fav-sub">${escHtml(parseIdentifier(id).county)}</small>` : ''}</span><strong>${m.r1h.toFixed(1)} mm · ${m.pop === null ? '—' : m.pop + '%'}</strong></div>`;
   }).join('');
 
-  // 2. 正在下雨：過去 1 小時或 10 分鐘有觀測雨量，依雨量排序（不重複列自選地區）
-  const raining = TAIWAN_COUNTIES
-    .filter(c => !favNames.has(c.name))
-    .map(c => ({ name: c.name, m: metrics(readCur(c.name)) }))
-    .filter(x => x.m.r1h > 0 || x.m.r10 > 0)
-    .sort((a, b) => b.m.r1h - a.m.r1h || b.m.r10 - a.m.r10);
-  const rainingHtml = raining.length
-    ? `<div class="county-pop-grid rain-grid">${raining.map(x => `<div class="county-pop-chip rain"><span>${escHtml(x.name)}</span><strong>${x.m.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
-    : '<p class="county-pop-empty">目前沒有觀測到降雨</p>';
+  // 2. 正在下雨：依觀測雨量排序（不重複列自選地區）。優先用雨量測站（可到鄉鎮），沒有測站資料時退回縣市
+  const favKeys = new Set(favIds);
+  const countyFavs = new Set(favIds.filter(id => parseIdentifier(id).type === 'county'));
+  let rainingHtml;
+  const hasStations = (AppState.rainfallObservations || []).length > 0;
+  if (hasStations) {
+    // 排除已在自選地區的鄉鎮，以及整個縣市已被自選的區域
+    const list = collectRainByArea(radarRainView).filter(x =>
+      !countyFavs.has(x.county) && !(radarRainView === 'town' && favKeys.has(x.key))
+    );
+    rainingHtml = list.length
+      ? `<div class="county-pop-grid rain-grid">${list.map(x => `<div class="county-pop-chip rain"><span>${escHtml(radarRainView === 'town' ? x.town : x.county)}${radarRainView === 'town' ? ` <small class="fav-sub">${escHtml(x.county)}</small>` : ''}</span><strong>${x.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
+      : '<p class="county-pop-empty">目前沒有觀測到降雨</p>';
+  } else {
+    const raining = TAIWAN_COUNTIES
+      .filter(c => !countyFavs.has(c.name))
+      .map(c => ({ name: c.name, m: metrics(readCur(c.name)) }))
+      .filter(x => x.m.r1h > 0 || x.m.r10 > 0)
+      .sort((a, b) => b.m.r1h - a.m.r1h || b.m.r10 - a.m.r10);
+    rainingHtml = raining.length
+      ? `<div class="county-pop-grid rain-grid">${raining.map(x => `<div class="county-pop-chip rain"><span>${escHtml(x.name)}</span><strong>${x.m.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
+      : '<p class="county-pop-empty">目前沒有觀測到降雨</p>';
+  }
+  const toggle = `<div class="rain-view-toggle" role="group" aria-label="雨量檢視">
+      <button type="button" data-rain-view="town" class="${radarRainView === 'town' ? 'active' : ''}">鄉鎮</button>
+      <button type="button" data-rain-view="county" class="${radarRainView === 'county' ? 'active' : ''}">縣市</button>
+    </div>`;
 
   // 3. 各縣市降雨機率（預報）
   const chips = TAIWAN_COUNTIES.map(c => {
@@ -7145,11 +7192,23 @@ function renderRadarCountyPop() {
 
   box.innerHTML = `
     ${favIds.length ? `<h3 class="county-pop-title">我的自選地區</h3><div class="county-pop-grid rain-grid">${favHtml}</div>` : ''}
-    <h3 class="county-pop-title ${favIds.length ? 'county-pop-sub' : ''}">正在下雨（過去 1 小時雨量）</h3>
+    <div class="county-pop-head ${favIds.length ? 'county-pop-sub' : ''}"><h3 class="county-pop-title">正在下雨（過去 1 小時雨量）</h3>${toggle}</div>
     ${rainingHtml}
     <h3 class="county-pop-title county-pop-sub">各縣市降雨機率（預報）</h3>
     <div class="county-pop-grid">${chips}</div>`;
 }
+
+// 切換「鄉鎮 / 縣市」
+(function bindRadarRainToggle() {
+  const box = document.getElementById('radar-county-pop');
+  if (!box) return;
+  box.addEventListener('click', e => {
+    const btn = e.target.closest('[data-rain-view]');
+    if (!btn) return;
+    radarRainView = btn.dataset.rainView === 'county' ? 'county' : 'town';
+    renderRadarCountyPop();
+  });
+})();
 
 async function loadRadarCountyPop() {
   renderRadarCountyPop();
