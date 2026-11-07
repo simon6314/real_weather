@@ -4268,3 +4268,46 @@ body {
     font-size: 13px;
   }
 }
+
+/* 雷達頁：各縣市降雨機率 */
+.county-pop-panel {
+  padding: 14px;
+  margin-top: 12px;
+  background: rgba(8, 14, 26, 0.6);
+}
+
+.county-pop-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #FFF;
+}
+
+.county-pop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.county-pop-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #FFF;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.county-pop-chip strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+}
+
+.county-pop-chip.low strong { color: #7EA5F0; }
+.county-pop-chip.mid { background: rgba(255, 188, 0, 0.16); }
+.county-pop-chip.mid strong { color: #ffbc00; }
+.county-pop-chip.high { background: rgba(255, 78, 80, 0.2); }
+.county-pop-chip.high strong { color: #ff4e50; }
+.county-pop-chip.na strong { opacity: 0.5; }

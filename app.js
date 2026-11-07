@@ -397,6 +397,7 @@ function initNavigation() {
       radarTabBtn.classList.add('active');
       radarPane.classList.add('active');
       loadRadarImage();
+      loadRadarCountyPop();
     } else if (tab === 'typhoon') {
       if (typhoonTabBtn) typhoonTabBtn.classList.add('active');
       if (typhoonPane) typhoonPane.classList.add('active');
@@ -7099,3 +7100,31 @@ window.renderTyphoonWarningDetails = renderTyphoonWarningDetails;
 window.updateTyphoonWarningDot = updateTyphoonWarningDot;
 
 
+
+// 雷達頁：列出各縣市目前的降雨機率（高 / 中 / 低 上色）
+function renderRadarCountyPop() {
+  const box = document.getElementById('radar-county-pop');
+  if (!box) return;
+  const level = p => (p >= 70 ? 'high' : (p >= 40 ? 'mid' : 'low'));
+  const chips = TAIWAN_COUNTIES.map(c => {
+    const cur = AppState.allCountiesWeatherData?.[c.name]?.current;
+    const v = cur ? Number(cur.rainProb) : NaN;
+    const p = Number.isFinite(v) ? Math.round(v) : null;
+    const cls = p === null ? 'na' : level(p);
+    return `<div class="county-pop-chip ${cls}"><span>${escHtml(c.name)}</span><strong>${p === null ? '—' : p + '%'}</strong></div>`;
+  }).join('');
+  box.innerHTML = `<h3 class="county-pop-title">各縣市降雨機率</h3><div class="county-pop-grid">${chips}</div>`;
+}
+
+async function loadRadarCountyPop() {
+  renderRadarCountyPop();
+  const hasData = Object.values(AppState.allCountiesWeatherData || {}).some(d => d && d.current);
+  if (!hasData) {
+    try {
+      await fetchAllWeatherData();
+    } catch (e) {
+      console.warn('Radar county rain probability: fetch failed', e);
+    }
+    renderRadarCountyPop();
+  }
+}
