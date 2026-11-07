@@ -7101,35 +7101,51 @@ window.updateTyphoonWarningDot = updateTyphoonWarningDot;
 
 
 
-// 雷達頁：正在下雨的縣市（依觀測雨量）＋ 各縣市降雨機率（預報）
+// 雷達頁：自選地區（最前面）→ 正在下雨（依觀測雨量）→ 各縣市降雨機率（預報）
 function renderRadarCountyPop() {
   const box = document.getElementById('radar-county-pop');
   if (!box) return;
   const level = p => (p >= 70 ? 'high' : (p >= 40 ? 'mid' : 'low'));
   const num = v => (v === null || v === undefined || v === '' ? NaN : Number(v));
+  const readCur = id => AppState.allCountiesWeatherData?.[id]?.current;
+  const metrics = cur => ({
+    r1h: Number.isFinite(num(cur?.rain1Hr)) ? num(cur.rain1Hr) : 0,
+    r10: Number.isFinite(num(cur?.rain10Min)) ? num(cur.rain10Min) : 0,
+    pop: Number.isFinite(num(cur?.rainProb)) ? Math.round(num(cur.rainProb)) : null
+  });
+  const labelOf = id => { const p = parseIdentifier(id); return p.type === 'town' ? p.town : p.county; };
 
-  // 1. 正在下雨：過去 1 小時或 10 分鐘有觀測雨量
+  // 1. 自選地區：照首頁加入的順序
+  const favIds = (AppState.addedRegions || []).filter(Boolean);
+  const favNames = new Set(favIds.map(id => { const p = parseIdentifier(id); return p.county || id; }));
+  const favHtml = favIds.map(id => {
+    const cur = readCur(id);
+    const m = metrics(cur);
+    const cls = !cur || m.pop === null ? 'na' : level(m.pop);
+    return `<div class="county-pop-chip fav ${cls}"><span>★ ${escHtml(labelOf(id))}${parseIdentifier(id).type === 'town' ? ` <small class="fav-sub">${escHtml(parseIdentifier(id).county)}</small>` : ''}</span><strong>${m.r1h.toFixed(1)} mm · ${m.pop === null ? '—' : m.pop + '%'}</strong></div>`;
+  }).join('');
+
+  // 2. 正在下雨：過去 1 小時或 10 分鐘有觀測雨量，依雨量排序（不重複列自選地區）
   const raining = TAIWAN_COUNTIES
-    .map(c => ({ name: c.name, cur: AppState.allCountiesWeatherData?.[c.name]?.current }))
-    .filter(x => x.cur)
-    .map(x => ({ name: x.name, r1h: num(x.cur.rain1Hr) || 0, r10: num(x.cur.rain10Min) || 0 }))
-    .filter(x => x.r1h > 0 || x.r10 > 0)
-    .sort((a, b) => b.r1h - a.r1h || b.r10 - a.r10);
+    .filter(c => !favNames.has(c.name))
+    .map(c => ({ name: c.name, m: metrics(readCur(c.name)) }))
+    .filter(x => x.m.r1h > 0 || x.m.r10 > 0)
+    .sort((a, b) => b.m.r1h - a.m.r1h || b.m.r10 - a.m.r10);
   const rainingHtml = raining.length
-    ? `<div class="county-pop-grid rain-grid">${raining.map(x => `<div class="county-pop-chip rain"><span>${escHtml(x.name)}</span><strong>${x.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
+    ? `<div class="county-pop-grid rain-grid">${raining.map(x => `<div class="county-pop-chip rain"><span>${escHtml(x.name)}</span><strong>${x.m.r1h.toFixed(1)} mm</strong></div>`).join('')}</div>`
     : '<p class="county-pop-empty">目前沒有觀測到降雨</p>';
 
-  // 2. 降雨機率（預報）
+  // 3. 各縣市降雨機率（預報）
   const chips = TAIWAN_COUNTIES.map(c => {
-    const cur = AppState.allCountiesWeatherData?.[c.name]?.current;
-    const v = cur ? Number(cur.rainProb) : NaN;
-    const p = Number.isFinite(v) ? Math.round(v) : null;
+    const m = metrics(readCur(c.name));
+    const p = readCur(c.name) && Number.isFinite(num(readCur(c.name).rainProb)) ? m.pop : null;
     const cls = p === null ? 'na' : level(p);
     return `<div class="county-pop-chip ${cls}"><span>${escHtml(c.name)}</span><strong>${p === null ? '—' : p + '%'}</strong></div>`;
   }).join('');
 
   box.innerHTML = `
-    <h3 class="county-pop-title">正在下雨（過去 1 小時雨量）</h3>
+    ${favIds.length ? `<h3 class="county-pop-title">我的自選地區</h3><div class="county-pop-grid rain-grid">${favHtml}</div>` : ''}
+    <h3 class="county-pop-title ${favIds.length ? 'county-pop-sub' : ''}">正在下雨（過去 1 小時雨量）</h3>
     ${rainingHtml}
     <h3 class="county-pop-title county-pop-sub">各縣市降雨機率（預報）</h3>
     <div class="county-pop-grid">${chips}</div>`;
