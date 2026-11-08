@@ -7102,7 +7102,7 @@ window.updateTyphoonWarningDot = updateTyphoonWarningDot;
 
 
 // 雷達頁「正在下雨」的檢視：'town'（鄉鎮）或 'county'（縣市）
-let radarRainView = 'town';
+let radarRainView = 'county';
 // 雷達頁：目前點開、顯示各鄉鎮雨量的縣市（null 表示未展開）
 let radarSelectedCounty = null;
 
@@ -7221,7 +7221,7 @@ function renderRadarCountyPop() {
 
   box.innerHTML = `
     ${favIds.length ? `<h3 class="county-pop-title">我的自選地區</h3><div class="county-pop-grid rain-grid">${favHtml}</div>` : ''}
-    <div class="county-pop-head ${favIds.length ? 'county-pop-sub' : ''}"><h3 class="county-pop-title">正在下雨（過去 1 小時雨量）</h3>${toggle}</div>
+    <div class="county-pop-head ${favIds.length ? 'county-pop-sub' : ''}"><h3 class="county-pop-title">正在下雨（過去 1 小時雨量）</h3></div>
     ${rainingHtml}
     <h3 class="county-pop-title county-pop-sub">各縣市降雨機率（預報）</h3>
     <div class="county-pop-grid">${chips}</div>
