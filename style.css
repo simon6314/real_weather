@@ -4330,3 +4330,11 @@ body {
 .county-pop-chip strong { white-space: nowrap; }
 .county-pop-chip.fav { flex-direction: column; align-items: flex-start; gap: 4px; }
 .county-pop-chip.fav span { white-space: normal; }
+.county-pop-chip.clickable { cursor: pointer; }
+.county-pop-chip.clickable:active { transform: scale(0.98); }
+.county-pop-chip.raining { box-shadow: inset 0 0 0 2px rgba(95, 211, 255, 0.85); }
+.county-pop-chip.selected { box-shadow: inset 0 0 0 2px #ff4e50; }
+.county-pop-chip.town.dry { background: rgba(255, 255, 255, 0.04); }
+.county-pop-chip.town.dry strong { opacity: 0.55; }
+.county-town-panel { margin-top: 14px; padding-top: 4px; border-top: 1px dashed rgba(255, 255, 255, 0.18); }
+.county-town-close { font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); background: transparent; color: inherit; cursor: pointer; }
