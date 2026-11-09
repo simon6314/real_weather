@@ -7156,6 +7156,32 @@ function townshipRainList(county) {
     .sort((x, y) => (y.r1h ?? -1) - (x.r1h ?? -1) || x.name.localeCompare(y.name, 'zh-Hant'));
 }
 
+// 某個自選地區（縣市或鄉鎮）的觀測雨量：與「正在下雨」同一來源（該區域測站的最大值）；沒有測站就回傳 null
+function stationRainFor(id) {
+  const stations = AppState.rainfallObservations || [];
+  if (!stations.length) return null;
+  const p = parseIdentifier(id);
+  const county = String(p.county || '').replace('台', '臺');
+  const town = String(p.town || '').replace('台', '臺');
+  const getVal = item => {
+    const v = item ? (item.Precipitation !== undefined ? item.Precipitation : (item.precipitation !== undefined ? item.precipitation : item.value)) : null;
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  };
+  let r1h = null;
+  stations.forEach(st => {
+    const geo = st.GeoInfo || st.geoInfo || {};
+    const c = String(geo.CountyName || geo.countyName || '').replace('台', '臺');
+    const t = String(geo.TownName || geo.townName || '').replace('台', '臺');
+    if (c !== county) return;
+    if (p.type === 'town' && t !== town) return;
+    const rf = st.RainfallElement || st.rainfallElement || {};
+    const v = getVal(rf.Past1hr);
+    r1h = r1h === null ? v : Math.max(r1h, v);
+  });
+  return r1h;
+}
+
 // 雷達頁：自選地區（最前面）→ 正在下雨（依觀測雨量）→ 各縣市降雨機率（預報）
 function renderRadarCountyPop() {
   const box = document.getElementById('radar-county-pop');
@@ -7173,11 +7199,15 @@ function renderRadarCountyPop() {
   // 1. 自選地區：照首頁加入的順序
   const favIds = (AppState.addedRegions || []).filter(Boolean);
   const favNames = new Set(favIds.map(id => { const p = parseIdentifier(id); return p.county || id; }));
+  const hasStationData = (AppState.rainfallObservations || []).length > 0;
   const favHtml = favIds.map(id => {
     const cur = readCur(id);
     const m = metrics(cur);
     const cls = !cur || m.pop === null ? 'na' : level(m.pop);
-    return `<div class="county-pop-chip fav ${cls}"><span>★ ${escHtml(labelOf(id))}${parseIdentifier(id).type === 'town' ? ` <small class="fav-sub">${escHtml(parseIdentifier(id).county)}</small>` : ''}</span><strong>${m.r1h.toFixed(1)} mm · ${m.pop === null ? '—' : m.pop + '%'}</strong></div>`;
+    // 雨量：與「正在下雨」同一來源（測站）；降雨機率：仍為預報
+    const obs = hasStationData ? stationRainFor(id) : null;
+    const rainText = hasStationData ? (obs === null ? '—' : obs.toFixed(1) + ' mm') : m.r1h.toFixed(1) + ' mm';
+    return `<div class="county-pop-chip fav ${cls}"><span>★ ${escHtml(labelOf(id))}${parseIdentifier(id).type === 'town' ? ` <small class="fav-sub">${escHtml(parseIdentifier(id).county)}</small>` : ''}</span><strong>${rainText} · ${m.pop === null ? '—' : m.pop + '%'}</strong></div>`;
   }).join('');
 
   // 2. 正在下雨：依觀測雨量排序（不重複列自選地區）。優先用雨量測站（可到鄉鎮），沒有測站資料時退回縣市
