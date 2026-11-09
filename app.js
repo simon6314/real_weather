@@ -2038,6 +2038,28 @@ function findObservation(countyName, townName = '') {
 }
 
 // Helper to find a matching automatic rain gauge station observation
+// 某鄉鎮所有雨量測站中最大的 1 小時雨量（與雷達頁「正在下雨」同一算法）；沒有測站回傳 null
+function maxRain1HrForArea(countyName, townName = '') {
+  const stations = AppState.rainfallObservations || [];
+  if (!stations.length || !townName) return null;
+  const c = countyName.replace('台', '臺');
+  const t = townName.replace('台', '臺');
+  let best = null;
+  stations.forEach(st => {
+    const geo = st.GeoInfo || st.geoInfo || {};
+    const sc = String(geo.CountyName || geo.countyName || '').replace('台', '臺');
+    const stn = String(geo.TownName || geo.townName || '').replace('台', '臺');
+    if (sc !== c || stn !== t) return;
+    const rf = st.RainfallElement || st.rainfallElement || {};
+    const item = rf.Past1hr;
+    const raw = item ? (item.Precipitation !== undefined ? item.Precipitation : (item.precipitation !== undefined ? item.precipitation : item.value)) : null;
+    const n = parseFloat(raw);
+    const v = Number.isFinite(n) && n >= 0 ? n : 0;
+    best = best === null ? v : Math.max(best, v);
+  });
+  return best;
+}
+
 function findRainObservation(countyName, townName = '', weatherStationId = null) {
   if (!AppState.rainfallObservations || AppState.rainfallObservations.length === 0) return null;
   
@@ -2264,6 +2286,10 @@ function applyObservationToCurrent(current, countyName, townName = '') {
     current.rain1Hr = 0.0;
     current.rainDaily = 0.0;
   }
+
+  // 1 小時雨量：與雷達頁同一來源，鄉鎮取該鄉鎮所有測站的最大值（有測站時覆寫上面的單一測站值）
+  const areaRain1Hr = maxRain1HrForArea(countyName, townName);
+  if (areaRain1Hr !== null) current.rain1Hr = areaRain1Hr;
 }
 
 // Merge CWA datasets into a clean county-specific map
